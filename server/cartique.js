@@ -45,10 +45,11 @@ export default class Cartique {
   }
 
   init() {
-    this.applyTheme();
-    this.renderSidebar(); // Render sidebar first
-    this.renderProductDisplays(); // Render product displays section
-  }
+  this.applyTheme();
+  this.renderSidebar(); // Render sidebar first
+  this.productDisplays = this.renderProductDisplays(); // Store the returned productDisplays element
+  this.renderLayout(); 
+}
 
   applyTheme() {
     const containerElement = document.getElementById(this.features.containerId);
@@ -107,47 +108,46 @@ export default class Cartique {
   }
 
   renderProductDisplays() {
-    // Create the product displays section
-    const productDisplays = document.createElement('div');
-    productDisplays.className = 'product-displays';
+  // Create the product displays section
+  const productDisplays = document.createElement('div');
+  productDisplays.className = 'product-displays';
 
-    // Render the top row (search, sorting, grid/list icons)
-    const topRow = document.createElement('div');
-    topRow.className = 'top-row';
+  // Render the top row (search, sorting, grid/list icons)
+  const topRow = document.createElement('div');
+  topRow.className = 'top-row';
 
-    // Search input
-    if (this.features.search) {
-      this.initSearch();
-      topRow.appendChild(this.searchContainer);
-    }
-
-    // Sorting dropdown
-    if (this.features.sorting) {
-      this.initSorting();
-      topRow.appendChild(this.sortContainer);
-    }
-
-    // Grid/List icons
-    const layoutIcons = document.createElement('div');
-    layoutIcons.className = 'layout-icons';
-    layoutIcons.innerHTML = `
-      <button class="grid-icon">Grid</button>
-      <button class="list-icon">List</button>
-    `;
-    layoutIcons.querySelector('.grid-icon').addEventListener('click', () => this.setLayout('grid'));
-    layoutIcons.querySelector('.list-icon').addEventListener('click', () => this.setLayout('list'));
-    topRow.appendChild(layoutIcons);
-
-    // Append top row to product displays section
-    productDisplays.appendChild(topRow);
-
-    // Render the product grid
-    this.renderLayout();
-    productDisplays.appendChild(this.container.querySelector('.product-grid'));
-
-    // Append product displays section to the main container
-    this.container.appendChild(productDisplays);
+  // Search input
+  if (this.features.search) {
+    this.initSearch();
+    topRow.appendChild(this.searchContainer);
   }
+
+  // Sorting dropdown
+  if (this.features.sorting) {
+    this.initSorting();
+    topRow.appendChild(this.sortContainer);
+  }
+
+  // Grid/List icons
+  const layoutIcons = document.createElement('div');
+  layoutIcons.className = 'layout-icons';
+  layoutIcons.innerHTML = `
+    <button class="grid-icon">Grid</button>
+    <button class="list-icon">List</button>
+  `;
+  layoutIcons.querySelector('.grid-icon').addEventListener('click', () => this.setLayout('grid'));
+  layoutIcons.querySelector('.list-icon').addEventListener('click', () => this.setLayout('list'));
+  topRow.appendChild(layoutIcons);
+
+  // Append top row to product displays section
+  productDisplays.appendChild(topRow);
+
+  // Append product displays section to the main container
+  this.container.appendChild(productDisplays);
+
+  return productDisplays; // Return the productDisplays element
+}
+
 
   setLayout(layout) {
     this.features.grid = layout === 'grid';
@@ -155,46 +155,61 @@ export default class Cartique {
   }
 
   renderLayout() {
-    // Clear only the product grid area
-    const productGrid = this.container.querySelector('.product-grid');
-    if (productGrid) {
-      productGrid.innerHTML = '';
-    } else {
-      const productGrid = document.createElement('div');
-      productGrid.className = 'product-grid';
-      this.container.appendChild(productGrid);
-    }
+  // Clear only the product grid area
+  const productGrid = this.container.querySelector('.product-grid');
+  if (productGrid) {
+    productGrid.innerHTML = '';
+  } else {
+    const productGrid = document.createElement('div');
+    productGrid.className = 'product-grid';
+    this.container.appendChild(productGrid);
+  }
 
-    // Render the product grid or list
+  // Render the product grid or list
+  if (this.features.grid) {
+    this.renderGrid();
+  } else {
+    this.renderList();
+  }
+
+  // Initial render
+  if (!this.filteredProductsRendered) {
+    this.filteredProductsRendered = true;
     if (this.features.grid) {
       this.renderGrid();
     } else {
       this.renderList();
     }
   }
+}
 
   renderGrid() {
-    const grid = document.createElement('div');
-    grid.className = 'product-grid';
-    grid.style.gridTemplateColumns = `repeat(${this.features.columns}, 1fr)`;
+  const grid = document.createElement('div');
+  grid.className = 'product-grid';
+  grid.style.gridTemplateColumns = `repeat(${this.features.columns}, 1fr)`; // Update grid columns
 
-    // Use filtered products for display
-    const visibleProducts = this.features.pagination
-      ? this.filteredProducts.slice(0, this.features.rows)
-      : this.filteredProducts;
+  // Use filtered products for display
+  const visibleProducts = this.features.pagination
+    ? this.filteredProducts.slice(0, this.features.rows)
+    : this.filteredProducts;
 
-    visibleProducts.forEach((product) => {
-      grid.appendChild(this.createProductCard(product));
-    });
+  visibleProducts.forEach((product) => {
+    grid.appendChild(this.createProductCard(product));
+  });
 
-    this.container.querySelector('.product-grid').appendChild(grid);
-
-    // Render pagination if enabled
-    if (this.features.pagination) {
-      this.renderPagination();
-    }
+  // Append the grid to the product displays section
+  const existingGrid = this.productDisplays.querySelector('.product-grid');
+  if (existingGrid) {
+    existingGrid.replaceWith(grid); // Replace existing grid
+  } else {
+    this.productDisplays.appendChild(grid); // Append new grid
   }
 
+  // Render pagination if enabled
+  if (this.features.pagination) {
+    this.renderPagination();
+  }
+}
   renderList() {
     const list = document.createElement('div');
     list.className = 'product-list';
@@ -331,6 +346,7 @@ export default class Cartique {
 
     const sortSelect = document.createElement('select');
     sortSelect.innerHTML = `
+      <option value=""> Sort Products </option>
       <option value="price-asc">Price: Low to High</option>
       <option value="price-desc">Price: High to Low</option>
       <option value="title-asc">Title: A to Z</option>
