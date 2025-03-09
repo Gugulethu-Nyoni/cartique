@@ -1,4 +1,4 @@
-class Cartique {
+export default class Cartique {
   constructor(products, features = {}) {
     // Default features
     this.defaultFeatures = {
