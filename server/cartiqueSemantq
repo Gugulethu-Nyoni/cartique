@@ -1,0 +1,49 @@
+
+
+main frame
+
+side bar |  1. search, sort, grid list buttons 
+			2. product displays (product cards for grid (number of rows and columns defined in js - html and css class names must be robust and ready for that )) - list displays card must occupy full width of the whole product displays section
+			3. product display footer  
+
+
+In semantq 
+
+will have these components
+components
+/cartique
+SideBar
+has different search filters (e.g for clothing you have size, color, brand etc add )
+
+and ProductDisplays Section which has the sections in the given vertical (stacked order)
+ProductControls (ProductSearch, Sort, LayoutButtons (grid and list - grid is default))
+ProductDisplay (product cards - for grid layout number rows and columns defined from js - html and component class names must be ready for this)
+ProductDisplayFooter 
+
+
+ProductCard
+<div id="cartique_product_image_container" class="cartique_product_image_container"> 
+
+<a href="url_to_view_product_component"> 
+	<img class src="cartique_product_image" id="cartique_product_image" /> 
+</a>
+
+</div>
+
+
+<h3 id="title" class="cartique_product_title"> Product Title </h3>
+<p id="description" class="cartique_product_description"> Product Description </p>
+<p id="price" class="cartique_product_price"> Product Price </p>
+<p id="salePrice" class="cartique_saleprice_price"> Sale Price </p>
+
+<div> <a href="" id="cartique_cta" class="cartique_cta"> View Product </a> </div>
+
+
+const products = [
+{id: 1, title: 'Golf T-shirt', description: 'Cool Fashionable T-shirt', price: '200', salePrice: '120'}
+];
+
+capability to map fields 
+e.g. title: 'product-title'- if no map is given the framework assumes that keys in the products object are the same as slot attribute values in the templates 
+
+

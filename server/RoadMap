@@ -1,0 +1,64 @@
+
+
+remove from cart
+increment and decrement qty 
+fix subtotal 
+
+checkout goes to canonical 
+View Cart - SPA approach with go back option 
+View Product - SPA approach with go back option 
+
+search
+sort
+grid
+list
+
+clean up templates 
+
+
+
+
+1. define main frame :: done 
+2. define components css and structure 
+3. sort out the js rendering using Cartique Class
+
+
+Target IDs
+
+cartique-sidebar
+cartique-controls
+cartique-product-grid
+cartique-product-list
+cartique-product-footer
+
+Targets
+
+
+cartique-sidebar
+cartique-controls
+	cartique-search-container
+	cartique-sort-container
+	cartique-view-toggles-container
+cartique-product-grid
+cartique-product-list
+cartique-product-footer
+
+
+the main frame has divs with theese IDs: 
+
+cartique-sidebar
+cartique-controls
+	cartique-search-container
+	cartique-sort-container
+	cartique-view-toggles-container
+cartique-product-grid
+cartique-product-list
+cartique-product-footer
+
+so - from the componentsHTML (merged) - js must captute html based correponding id (so same ids are used in the main frame and component for matching purposes) e.g. for cartique-sidebar: you get the contents inside the <div id="cartique-sidebar"> get this content </div> from the component html and insert it to the div with corresponding id in the main frame dom you just created 
+
+
+ <!-- Call to Action -->
+  <!-- <div>
+    <a href="" id="cartique_cta" class="cartique_cta">View Product</a>
+  </div> -->

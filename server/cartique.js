@@ -1,3 +1,5 @@
+"use strict";
+
 export default class Cartique {
   constructor(products, features = {}) {
     // Default features
@@ -41,19 +43,44 @@ export default class Cartique {
     this.searchContainer = null;
     this.sortContainer = null;
 
+    // Path to the merged HTML file
+    this.filePath = 'build/routes/store/store.html';
+
+    // Template holder for merged components
+    this.templateHolder = null;
+
     this.init();
   }
 
-  init() {
-  this.applyTheme();
-  this.renderSidebar(); // Render sidebar first
-  this.productDisplays = this.renderProductDisplays(); // Store the returned productDisplays element
-  this.renderLayout(); 
+  async init() {
+    this.applyTheme();
+    await this.fetchAndExtractComponents(); // Ensure templates are fully fetched before proceeding
+
+    // Render UI components sequentially after fetching
+    await this.renderMainFrame();
+    await this.renderSidebar();
+    await this.renderControls();
+    await this.renderProductDisplays();
+    await this.renderFooter();
+    await this.renderCartSlider();
+    await this.renderCartItemTemplate();
+
+    // Set default layout to grid
+    this.setLayout('grid');
+
+    // Add event listeners for layout toggles
+    const gridButton = document.querySelector('.grid-icon');
+    const listButton = document.querySelector('.list-icon');
+
+    if (gridButton && listButton) {
+        gridButton.addEventListener('click', () => this.setLayout('grid'));
+        listButton.addEventListener('click', () => this.setLayout('list'));
+    }
 }
 
   applyTheme() {
     const containerElement = document.getElementById(this.features.containerId);
-    containerElement.classList.add(this.features.containerClass);
+    //containerElement.classList.add(this.features.containerClass);
 
     const root = document.documentElement;
     root.style.setProperty('--theme-primary', this.features.theme === 'dark' ? '#1e1e1e' : '#ffffff');
@@ -65,309 +92,535 @@ export default class Cartique {
     root.style.setProperty('--theme-shadow', '0 4px 8px rgba(0, 0, 0, 0.1)');
   }
 
-  renderSidebar() {
-    console.log('inside renderSidebar function');
+  async fetchAndExtractComponents() {
+    try {
+      // Fetch the merged HTML file
+      const response = await fetch(this.filePath);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch components: ${response.statusText}`);
+      }
 
-    const sidebarHTML = `
-      <aside class="sidebar">
-        <h2>Filters</h2>
-        <div class="filter-section">
-          <h4>Price Range</h4>
-          <input type="range" min="0" max="100" value="50" class="price-range">
-          <div class="price-range-labels">
-            <span>Low</span><span class="price-range-value">50</span><span>High</span>
-          </div>
-        </div>
-        <div class="checkbox-filters">
-          ${Object.keys(this.features.sidebarFeatures.filters)
-            .map(
-              (filterKey) => `
-                <h4>${filterKey}</h4>
-                <ul>
-                  ${this.features.sidebarFeatures.filters[filterKey]
-                    .map(
-                      (filterValue) => `
-                      <li>
-                        <label>
-                          <input type="checkbox">${filterValue}
-                        </label>
-                      </li>
-                    `
-                    )
-                    .join('')}
-                </ul>
-              `
-            )
-            .join('')}
-        </div>
-      </aside>
-    `;
+      // Get the HTML content
+      const htmlContent = await response.text();
 
-    // Append the sidebar HTML to the main container
-    this.container.insertAdjacentHTML('afterbegin', sidebarHTML);
-  }
+      // Create a template element to hold the fetched HTML
+      this.templateHolder = document.createElement('template');
+      this.templateHolder.innerHTML = htmlContent;
 
-  renderProductDisplays() {
-  // Create the product displays section
-  const productDisplays = document.createElement('div');
-  productDisplays.className = 'product-displays';
+      console.log("template",htmlContent);
 
-  // Render the top row (search, sorting, grid/list icons)
-  const topRow = document.createElement('div');
-  topRow.className = 'top-row';
-
-  // Search input
-  if (this.features.search) {
-    this.initSearch();
-    topRow.appendChild(this.searchContainer);
-  }
-
-  // Sorting dropdown
-  if (this.features.sorting) {
-    this.initSorting();
-    topRow.appendChild(this.sortContainer);
-  }
-
-  // Grid/List icons
-  const layoutIcons = document.createElement('div');
-  layoutIcons.className = 'layout-icons';
-  layoutIcons.innerHTML = `
-    <button class="grid-icon">Grid</button>
-    <button class="list-icon">List</button>
-  `;
-  layoutIcons.querySelector('.grid-icon').addEventListener('click', () => this.setLayout('grid'));
-  layoutIcons.querySelector('.list-icon').addEventListener('click', () => this.setLayout('list'));
-  topRow.appendChild(layoutIcons);
-
-  // Append top row to product displays section
-  productDisplays.appendChild(topRow);
-
-  // Append product displays section to the main container
-  this.container.appendChild(productDisplays);
-
-  return productDisplays; // Return the productDisplays element
-}
-
-
-  setLayout(layout) {
-    this.features.grid = layout === 'grid';
-    this.renderLayout();
-  }
-
-  renderLayout() {
-  // Clear only the product grid area
-  const productGrid = this.container.querySelector('.product-grid');
-  if (productGrid) {
-    productGrid.innerHTML = '';
-  } else {
-    const productGrid = document.createElement('div');
-    productGrid.className = 'product-grid';
-    this.container.appendChild(productGrid);
-  }
-
-  // Render the product grid or list
-  if (this.features.grid) {
-    this.renderGrid();
-  } else {
-    this.renderList();
-  }
-
-  // Initial render
-  if (!this.filteredProductsRendered) {
-    this.filteredProductsRendered = true;
-    if (this.features.grid) {
-      this.renderGrid();
-    } else {
-      this.renderList();
+      // Validate that the template holder was created successfully
+      if (!this.templateHolder.content) {
+        throw new Error('Failed to create template holder for components.');
+      }
+    } catch (error) {
+      console.error('Error fetching or extracting components:', error);
     }
   }
+
+  async renderMainFrame() {
+    const mainFrameTemplate = document.createElement('template');
+    mainFrameTemplate.innerHTML = `
+      <div class="cartique-container" id="cartique-container">
+        <aside class="cartique-sidebar" id="cartique-sidebar"></aside>
+        <main class="cartique-main-content" id="cartique-main-content">
+          <div class="cartique-controls" id="cartique-controls">
+            <div class="cartique-search-container" id="cartique-search-container"></div>
+            <div class="cartique-sort-container" id="cartique-sort-container"></div>
+            <div class="cartique-view-toggles-container" id="cartique-view-toggles-container"></div>
+            <div class="shopping-cart-icon-container" id="shopping-cart-icon-container"></div>
+          </div>
+          <div class="cartique-product-displays" id="cartique-product-displays">
+            <div class="cartique-product-grid" id="cartique-product-grid"></div>
+            <div class="cartique-product-list" id="cartique-product-list"></div>
+          </div>
+          <footer class="cartique-product-footer" id="cartique-product-footer"></footer>
+        </main>
+      </div>
+
+      <div id="cartique-hidden-blocks"> </div>
+
+      <div class="cart-overlay" id="cart-slide-overlay"></div>
+
+    `;
+
+    // Clone the template content and append it to the container
+    this.container.appendChild(mainFrameTemplate.content.cloneNode(true));
+
+   // now we can get overlay by document id to attach event listener for closing cart slider
+
+    const overlay = document.getElementById('cart-slide-overlay');
+    if (overlay) overlay.addEventListener('click', this.closeCart.bind(this));
+
+
+  }
+
+
+
+
+  async renderSidebar() {
+  const sidebarWrapper = this.templateHolder.content.getElementById('cartique-sidebar-component').cloneNode(true);
+  
+  // Extract the inner contents (excluding the wrapper div)
+  const sidebarContents = Array.from(sidebarWrapper.childNodes); 
+  
+  // Append only the contents, not the wrapper itself
+  const sidebarContainer = document.getElementById('cartique-sidebar');
+  sidebarContents.forEach(child => sidebarContainer.appendChild(child));
 }
 
-  renderGrid() {
-  const grid = document.createElement('div');
-  grid.className = 'product-grid';
-  grid.style.gridTemplateColumns = `repeat(${this.features.columns}, 1fr)`; // Update grid columns
 
-  // Use filtered products for display
+  async renderControls() {
+  const searchWrapper = this.templateHolder.content.getElementById('cartique-search-container-component').cloneNode(true);
+  const searchContainer = document.getElementById('cartique-search-container');
+  Array.from(searchWrapper.childNodes).forEach(child => searchContainer.appendChild(child));
+
+  const sortWrapper = this.templateHolder.content.getElementById('cartique-sort-container-component').cloneNode(true);
+  const sortContainer = document.getElementById('cartique-sort-container');
+  Array.from(sortWrapper.childNodes).forEach(child => sortContainer.appendChild(child));
+
+  const togglesWrapper = this.templateHolder.content.getElementById('cartique-view-toggles-container-component').cloneNode(true);
+  const togglesContainer = document.getElementById('cartique-view-toggles-container');
+  Array.from(togglesWrapper.childNodes).forEach(child => togglesContainer.appendChild(child));
+
+  const cartIconWrapper = this.templateHolder.content.getElementById('shopping-cart-icon-container-component').cloneNode(true);
+  const cartIconContainer = document.getElementById('shopping-cart-icon-container');
+  Array.from(cartIconWrapper.childNodes).forEach(child => cartIconContainer.appendChild(child));
+
+  //appended to document 
+  const cartIconClickEvent = document.getElementById('shopping-cart-icon');
+  if(cartIconClickEvent) cartIconClickEvent.addEventListener('click', this.showCart.bind(this)); 
+
+
+
+}
+
+
+  async renderProductDisplays() {
+  const gridWrapper = this.templateHolder.content.getElementById('cartique-product-grid-component').cloneNode(true);
+  const gridContainer = document.getElementById('cartique-product-grid');
+  Array.from(gridWrapper.childNodes).forEach(child => gridContainer.appendChild(child));
+
+  const listWrapper = this.templateHolder.content.getElementById('cartique-product-list-component').cloneNode(true);
+  const listContainer = document.getElementById('cartique-product-list');
+  Array.from(listWrapper.childNodes).forEach(child => listContainer.appendChild(child));
+
+  // Render products in the default layout (grid)
+  this.renderProducts('grid');
+}
+
+
+  async renderProducts(layout) {
+  // Determine the container based on the layout
+  const container = layout === 'grid'
+    ? document.getElementById('cartique-product-grid')
+    : document.getElementById('cartique-product-list');
+
+  // Clear the container before rendering new products
+  container.innerHTML = '';
+
+  // Remove inline styles & control layout via CSS classes
+  container.classList.toggle('grid-view', layout === 'grid');
+  container.classList.toggle('list-view', layout !== 'grid');
+
+  // Iterate over the products and create product cards
   const visibleProducts = this.features.pagination
-    ? this.filteredProducts.slice(0, this.features.rows)
+    ? this.filteredProducts.slice(0, this.features.rows * this.features.columns)
     : this.filteredProducts;
 
   visibleProducts.forEach((product) => {
-    grid.appendChild(this.createProductCard(product));
+    const productCard = this.createProductCard(product);
+    container.appendChild(productCard);
   });
-
-  // Append the grid to the product displays section
-  const existingGrid = this.productDisplays.querySelector('.product-grid');
-  if (existingGrid) {
-    existingGrid.replaceWith(grid); // Replace existing grid
-  } else {
-    this.productDisplays.appendChild(grid); // Append new grid
-  }
-
-  // Render pagination if enabled
-  if (this.features.pagination) {
-    this.renderPagination();
-  }
 }
-  renderList() {
-    const list = document.createElement('div');
-    list.className = 'product-list';
 
-    // Use filtered products for display
-    const visibleProducts = this.features.pagination
-      ? this.filteredProducts.slice(0, this.features.rows)
-      : this.filteredProducts;
 
-    visibleProducts.forEach((product) => {
-      list.appendChild(this.createProductCard(product));
-    });
 
-    this.container.querySelector('.product-grid').appendChild(list);
-
-    // Render pagination if enabled
-    if (this.features.pagination) {
-      this.renderPagination();
-    }
-  }
 
   createProductCard(product) {
-    const card = document.createElement('div');
-    card.className = 'product-card';
+  // Clone the product card template (removing the outermost wrapper)
+  const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component').cloneNode(true);
+  
+  // Extract the inner product card (first child of the wrapper)
+  const productCardTemplate = wrapper.firstElementChild.cloneNode(true);
 
-    // Product Image
-    const image = document.createElement('img');
-    image.src = product.image || 'placeholder.jpg';
-    image.alt = product.title;
-
-    // Product Title
-    const title = document.createElement('h3');
-    title.textContent = product.title;
-
-    // Product Description
-    const description = document.createElement('p');
-    description.textContent = product.description;
-
-    // Product Price
-    const price = document.createElement('div');
-    if (this.features.sale && product.sale_price) {
-      price.innerHTML = `
-        <span class="original-price">${product.currency} ${product.normal_price}</span>
-        <span class="sale-price">${product.currency} ${product.sale_price}</span>
-      `;
-    } else {
-      price.textContent = `${product.currency} ${product.price}`;
-    }
-
-    // Append elements to card
-    card.appendChild(image);
-    card.appendChild(title);
-    card.appendChild(description);
-    card.appendChild(price);
-
-    return card;
-  }
-
-  renderPagination() {
-    const totalPages = Math.ceil(this.filteredProducts.length / this.features.rows);
-    const paginationContainer = document.createElement('div');
-    paginationContainer.className = 'pagination';
-
-    for (let i = 1; i <= totalPages; i++) {
-      const button = document.createElement('button');
-      button.textContent = i;
-      button.addEventListener('click', () => this.goToPage(i));
-      paginationContainer.appendChild(button);
-    }
-
-    this.container.appendChild(paginationContainer);
-  }
-
-  goToPage(page) {
-    const start = (page - 1) * this.features.rows;
-    const end = start + this.features.rows;
-    this.filteredProducts = this.filteredProducts.slice(start, end);
-    this.renderLayout();
-  }
-
-  initSearch() {
-    this.searchContainer = document.createElement('div');
-    this.searchContainer.className = 'search-container';
-
-    this.searchInput = document.createElement('input');
-    this.searchInput.type = 'text';
-    this.searchInput.placeholder = 'Search products...';
-    this.searchInput.value = this.currentSearchQuery;
-
-    let searchTimeout = null;
-    this.searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        this.handleSearch(e.target.value);
-      }, 500);
-    });
-
-    this.searchContainer.appendChild(this.searchInput);
-  }
-
-  handleSearch(query) {
-    query = query.trim();
-
-    if (query === '') {
-      this.filteredProducts = [...this.products]; // Display all products when search query is empty
-    } else {
-      this.currentSearchQuery = query;
-
-      this.filteredProducts = this.products.filter(
-        (product) =>
-          product.title.toLowerCase().includes(this.currentSearchQuery.toLowerCase()) ||
-          product.description.toLowerCase().includes(this.currentSearchQuery.toLowerCase())
-      );
-    }
-
-    this.updateProductDisplay();
-  }
-
-  updateProductDisplay() {
-    // Clear only the product container, not the search and sort components
-    this.container.querySelectorAll('.product-grid, .product-list, .pagination').forEach((el) => el.remove());
-
-    // Render products without affecting search input
-    if (this.features.grid) {
-      this.renderGrid();
-    } else {
-      this.renderList();
-    }
-  }
-
-  initSorting() {
-    this.sortContainer = document.createElement('div');
-    this.sortContainer.className = 'sort-container';
-
-    const sortSelect = document.createElement('select');
-    sortSelect.innerHTML = `
-      <option value=""> Sort Products </option>
-      <option value="price-asc">Price: Low to High</option>
-      <option value="price-desc">Price: High to Low</option>
-      <option value="title-asc">Title: A to Z</option>
-      <option value="title-desc">Title: Z to A</option>
-    `;
-    sortSelect.value = this.currentSortType; // Preserve sorting state
-    sortSelect.addEventListener('change', (e) => this.handleSort(e.target.value));
-
-    this.sortContainer.appendChild(sortSelect);
-  }
-
-  handleSort(sortType) {
-    this.currentSortType = sortType;
-    const [field, order] = sortType.split('-');
-    this.filteredProducts.sort((a, b) => {
-      if (order === 'asc') {
-        return a[field] > b[field] ? 1 : -1;
+  // Iterate over the product object and update elements
+  for (const [key, value] of Object.entries(product)) {
+    const element = productCardTemplate.querySelector(`#${key}`);
+    if (element) {
+      if (element.tagName === 'IMG') {
+        element.src = value; 
+      } else if (element.tagName === 'A') {
+        element.href = value;
       } else {
-        return a[field] < b[field] ? 1 : -1;
+        element.textContent = value; 
+      }
+    }
+  }
+
+  // Handle sale price visibility
+  const salePriceElement = productCardTemplate.querySelector('#sale_price');
+  if (salePriceElement && !product.sale_price) {
+    salePriceElement.style.display = 'none'; // Hide if no sale price
+  } else {
+    const priceElement = productCardTemplate.querySelector('#price');
+    priceElement.style.textDecoration = "line-through";
+
+    const salePriceCurrencyElement = productCardTemplate.querySelector('#sale_price_currency');
+    salePriceCurrencyElement.textContent = product.currency;
+  }
+
+  return productCardTemplate;
+}
+
+
+
+createProductCard(product) {
+  //console.log("Product",product);
+  // Clone the product card template (removing the outermost wrapper)
+  const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component').cloneNode(true);
+  
+  // Extract the inner product card (first child of the wrapper)
+  const productCardTemplate = wrapper.firstElementChild.cloneNode(true);
+
+  // Iterate over the product object and update elements
+  for (const [key, value] of Object.entries(product)) {
+    const element = productCardTemplate.querySelector(`#${key}`);
+    if (element) {
+      if (element.tagName === 'IMG') {
+        element.src = value; 
+      } else if (element.tagName === 'A') {
+        element.href = value;
+      } else {
+        element.textContent = value; 
+      }
+    }
+  }
+
+  // Handle sale price visibility
+  const salePriceElement = productCardTemplate.querySelector('#sale_price');
+  if (salePriceElement && !product.sale_price) {
+    salePriceElement.style.display = 'none'; // Hide if no sale price
+  } else {
+    const priceElement = productCardTemplate.querySelector('#price');
+    priceElement.style.textDecoration = "line-through";
+
+    const salePriceCurrencyElement = productCardTemplate.querySelector('#sale_price_currency');
+    salePriceCurrencyElement.textContent = product.currency;
+  }
+
+
+  const addToCartElement = productCardTemplate.querySelector('.cartique_add_to_cart');
+  if (addToCartElement) {
+ //attach event listener
+    addToCartElement.id = product.id;
+    //addToCartElement.addEventListener('click', this.addToCart);
+  addToCartElement.addEventListener('click', (event) => this.addToCart(event));
+
+
+  }
+
+  return productCardTemplate;
+}
+
+
+
+  setLayout(layout) {
+    // Hide the inactive layout and show the active one
+    if (layout === 'grid') {
+      document.getElementById('cartique-product-grid').style.display = 'grid';
+      document.getElementById('cartique-product-list').style.display = 'none';
+    } else {
+      document.getElementById('cartique-product-grid').style.display = 'none';
+      document.getElementById('cartique-product-list').style.display = 'block';
+    }
+
+    // Re-render products in the selected layout
+    this.renderProducts(layout);
+  }
+
+  async renderFooter() {
+    const wrapper = this.templateHolder.content.getElementById('cartique-product-footer-component').cloneNode(true);
+   // attach event listener to cart close icon
+      const footer = wrapper.firstElementChild.cloneNode(true);
+    document.getElementById('cartique-product-footer').appendChild(footer);
+  }
+
+
+  async renderCartSlider() {
+    const wrapper = this.templateHolder.content.getElementById('cartique-cart-overlay-component').cloneNode(true);
+   // attach event listener to cart close icon
+   // if (wrapper) alert("Got it");
+
+    const cardSlider = wrapper.firstElementChild.cloneNode(true);
+    const cartCloseButton = cardSlider.querySelector('#cart-close-btn');
+
+    cartCloseButton.addEventListener('click', this.closeCart);
+    document.getElementById('cartique-hidden-blocks').appendChild(cardSlider);
+  }
+
+
+
+  async renderCartItemTemplate() {
+    const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component').cloneNode(true);
+   // attach event listener to cart close icon
+   // if (wrapper) alert("Got it");
+
+    const itemTemplate = wrapper.firstElementChild.cloneNode(true);
+    //const cartCloseButton = cardSlider.querySelector('#cart-close-btn');
+    //cartCloseButton.addEventListener('click', this.closeCart);
+    document.getElementById('cartique-hidden-blocks').appendChild(itemTemplate);
+  }
+
+
+
+
+
+
+addToCart(event) {
+  const productId = parseInt(event.target.id);
+  const product = this.products.find((product) => product.id === productId);
+
+  if (product) {
+    console.log("Adding this product to cart:", product);
+
+    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+
+    // Check if the product already exists in the cart
+    if (!cart.some((item) => item.id === product.id)) {
+      cart.push(product); // Add product if not in cart
+      localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+      console.log("Product added to cart.");
+    } else {
+      console.log("Product is already in the cart.");
+    }
+
+    this.showCart();
+  } else {
+    console.error("Product not found.");
+    // Optionally show a message to the user about the error
+  }
+}
+
+
+showCart() {
+  /* ADD PRODUCT TO THE CART ITEMS CONTAINER */
+  const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+
+  const displayEmptyCartMessage = () => {
+    const emptyCartMessage = document.getElementById('shopping-cart-empty');
+    emptyCartMessage.classList.add('show');
+  };
+
+  const hideEmptyCartMessage = () => {
+    const emptyCartMessage = document.getElementById('shopping-cart-empty');
+    emptyCartMessage.classList.remove('show');
+  };
+
+  // Display or hide the empty cart message
+  if (cart.length === 0) {
+    displayEmptyCartMessage();
+  } else {
+    hideEmptyCartMessage();
+  }
+
+  const cartContainer = document.getElementById('cart-items-container');
+  cartContainer.innerHTML = ''; // Clear previous items
+
+  const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component').cloneNode(true);
+  const cartItemTemplate = wrapper.firstElementChild.cloneNode(true);
+
+  if (!cartItemTemplate) {
+    console.error("No template found.");
+    return;
+  }
+
+  let subTotal = 0;
+  let subTotalElement = document.getElementById('subtotal');
+  subTotalElement.textContent = '0.00'; // Reset subtotal initially
+
+  // Loop through each product in the cart
+  cart.forEach((product) => {
+    const cartItem = cartItemTemplate.cloneNode(true); // Clone template for each product
+
+    const removeItemElement = cartItem.querySelector('#remove-item');
+    if (removeItemElement) {
+      removeItemElement.id = product.id;
+      removeItemElement.addEventListener('click', (event) => this.removeCartItem(event));
+    }
+
+
+    /// handle decrease-qty and increase-qty listeners 
+
+    const decreaseQtyElement = cartItem.querySelector('.decrease-qty');
+    if (decreaseQtyElement) {
+      decreaseQtyElement.id = `decrease_quantity_${product.id}`;
+      decreaseQtyElement.addEventListener('click', (event) => this.decreaseQtyItem(event));
+    }
+
+
+    const increaseQtyElement = cartItem.querySelector('.increase-qty');
+    if (increaseQtyElement) {
+      increaseQtyElement.id = `increase_quantity_${product.id}`;
+      increaseQtyElement.addEventListener('click', (event) => this.increaseQtyItem(event));
+    }
+
+    const quantityInputElement = cartItem.querySelector('.quantity');
+    if (quantityInputElement) {
+      quantityInputElement.id = `quantity_${product.id}`;
+    }
+
+
+
+    // Loop through product keys and update corresponding elements
+    Object.keys(product).forEach((key) => {
+      const targetElement = cartItem.querySelector(`#${key}`);
+      if (targetElement) {
+        if (key === "sale_price") {
+          const priceElement = cartItem.querySelector('.cartique_cart_product_price');
+          if (priceElement) {
+            priceElement.style.textDecoration = "line-through"; // Strike-through if sale_price exists
+          }
+          targetElement.textContent = product[key]; // Set the sale price text
+          subTotal += product[key]; // Add the sale price to subtotal
+        } else if (key === "price" && !product.sale_price) {
+  targetElement.textContent = product[key]; // Set the price text
+  subTotal += parseFloat(product[key]); // Add the price to subtotal
+}
+else if (key === "image") {
+          targetElement.src = product[key]; // Set image src
+        } else if (key === "currency") {
+          const currencyElement = cartItem.querySelector(`#${key}`);
+          if (currencyElement) {
+            currencyElement.textContent = product[key]; // Set text content for currency
+          }
+        } else {
+          targetElement.textContent = product[key]; // Set text content for other keys
+        }
       }
     });
-    this.renderLayout();
+
+    // Append the updated item to the cart container
+    cartContainer.appendChild(cartItem);
+  });
+
+  // Update the subtotal display after the loop
+  if (subTotalElement) {
+    subTotalElement.textContent = subTotal.toFixed(2); // Format the subtotal with two decimals
   }
+
+  // Update currency (as it is the same for all items in this cart)
+  const currencyElement = document.getElementById('subtotal-currency');
+  if (currencyElement && cart.length > 0) {
+    currencyElement.textContent = cart[0].currency; // Set the currency from the first product
+  }
+
+  // Open the cart slider and show the overlay
+  document.getElementById('cart-slide').classList.add('open');
+  document.getElementById('cart-slide-overlay').style.display = 'block';
+}
+
+
+
+
+
+
+
+closeCart() {
+  document.getElementById('cart-slide').classList.remove('open');
+  document.getElementById('cart-slide-overlay').style.display = 'none';
+}
+
+
+removeCartItem(event) {
+//alert("Remove");
+const productId = parseInt(event.target.id); 
+let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+cart = cart.filter(product => product.id !== productId);
+localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+this.showCart(); 
+
+}
+
+
+removeCartItemBasedOnQty(productId) {
+let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+cart = cart.filter(product => product.id !== productId);
+localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+this.showCart(); 
+
+}
+
+
+
+decreaseQtyItem(event) {
+  const decreaserId = event.target.id; // Example: "decrease_quantity_1"
+  const quantityInputId = decreaserId.replace('decrease_', ''); // "quantity_1"
+  const quantityInputElement = document.getElementById(quantityInputId);
+
+  const subtotalElement = document.getElementById('subtotal');
+  const productId = parseInt(decreaserId.replace('decrease_quantity_', ''));
+
+  // Find product once instead of twice
+  const product = this.products.find(product => product.id === productId);
+  if (!product) {
+    console.error(`Product with ID ${productId} not found`);
+    return;
+  }
+
+  const productPrice = product.sale_price || product.price;
+  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0; // Ensure it's a number
+
+  if (quantityInputElement) {
+    let newQty = Math.max(parseInt(quantityInputElement.value) - 1, 0);
+    quantityInputElement.value = newQty;
+
+    if (newQty === 0) this.removeCartItemBasedOnQty(productId);
+
+    // Update subtotal but ensure it doesn't go negative
+    const newSubtotal = Math.max(currentSubtotal - productPrice, 0);
+    subtotalElement.textContent = newSubtotal.toFixed(2); // Keep 2 decimal places
+  } else {
+    console.error(`Element with ID ${quantityInputId} not found`);
+  }
+}
+
+
+
+
+increaseQtyItem(event) {
+  const increaserId = event.target.id; // Example: "increase_quantity_1"
+  const quantityInputId = increaserId.replace('increase_', ''); // "quantity_1"
+  const quantityInputElement = document.getElementById(quantityInputId);
+
+  const subtotalElement = document.getElementById('subtotal');
+  const productId = parseInt(increaserId.replace('increase_quantity_', ''));
+
+  // Find product once instead of twice
+  const product = this.products.find(product => product.id === productId);
+  if (!product) {
+    console.error(`Product with ID ${productId} not found`);
+    return;
+  }
+
+  const productPrice = product.sale_price || product.price;
+  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0; // Ensure it's a number
+
+  if (quantityInputElement) {
+    let newQty = parseInt(quantityInputElement.value) + 1;
+    quantityInputElement.value = newQty;
+
+    // Update subtotal
+    const newSubtotal = currentSubtotal + productPrice;
+    subtotalElement.textContent = newSubtotal.toFixed(2); // Keep 2 decimal places
+  } else {
+    console.error(`Element with ID ${quantityInputId} not found`);
+  }
+}
+
+
+
+
+
+// Cartique class main wrapper
 }
