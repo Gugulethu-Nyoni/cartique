@@ -656,6 +656,11 @@
   outline: 2px solid var(--theme-border);
 }
 
+.cart-footer a {
+    text-transform: none; /* Ensure no text transformation */
+    text-decoration: none; /* Remove the underline */
+}
+
 /* Overlay (darkens the background when cart is open) */
 .cart-overlay {
   position: fixed;

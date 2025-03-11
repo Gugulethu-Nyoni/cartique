@@ -3,10 +3,18 @@
 </div>
 
 <div id="cartique-search-container-component">
-    <input type="text" class="cartique-search" placeholder="Search...">
+
+<div class="search-container">
+    <input type="text" id="cartique-search" class="cartique-search" placeholder="Search...">
 </div>
 
+
+</div>
+
+
+
 <div id="cartique-sort-container-component">
+  <div class="sort-container">
     <select class="cartique-sort">
       <option value=""> Sort Products </option>
       <option value="price-asc">Price: Low to High</option>
@@ -14,6 +22,7 @@
       <option value="title-asc">Title: A to Z</option>
       <option value="title-desc">Title: Z to A</option>
     </select>
+  </div>
 </div>
 
 <div id="cartique-view-toggles-container-component">
@@ -120,7 +129,9 @@
       </p>
     </div>
     <button class="cart-btn" id="view-cart-btn">View Cart</button>
-    <button class="cart-btn" id="checkout-btn">Checkout</button>
+    <a href="#" id="checkout-url"> 
+      <button class="cart-btn" id="checkout-btn">Checkout</button> 
+    </a>
   </div>
 
 

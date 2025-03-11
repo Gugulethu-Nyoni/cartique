@@ -14,6 +14,8 @@ export default class Cartique {
       containerId: 'cartique', // Default container ID
       containerClass: 'cartique-container',
       sale: false, // Enable sale badges and strike-through pricing
+      checkoutUrl: '#',
+      checkoutUrlMode: 'self', // options are self or blank default is self
       sidebarFeatures: {
         filters: {
           Color: ['Red', 'Blue', 'Green'],
@@ -50,7 +52,19 @@ export default class Cartique {
     this.templateHolder = null;
 
     this.init();
+
+  this.debouncedSearch = this.debounce(this.handleSearch.bind(this), 300);
   }
+
+
+  // Debounce function
+debounce(func, delay) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(this, args), delay);
+  };
+}
 
   async init() {
     this.applyTheme();
@@ -175,9 +189,21 @@ export default class Cartique {
   const searchContainer = document.getElementById('cartique-search-container');
   Array.from(searchWrapper.childNodes).forEach(child => searchContainer.appendChild(child));
 
+  // Attach debounced event listener to the search input
+  const searchInput = searchContainer.querySelector('.cartique-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', (event) => this.debouncedSearch(event));
+  }
+
   const sortWrapper = this.templateHolder.content.getElementById('cartique-sort-container-component').cloneNode(true);
   const sortContainer = document.getElementById('cartique-sort-container');
   Array.from(sortWrapper.childNodes).forEach(child => sortContainer.appendChild(child));
+
+  // Attach event listener to the sort dropdown
+  const sortDropdown = sortContainer.querySelector('.cartique-sort');
+  if (sortDropdown) {
+    sortDropdown.addEventListener('change', (event) => this.handleSort(event));
+  }
 
   const togglesWrapper = this.templateHolder.content.getElementById('cartique-view-toggles-container-component').cloneNode(true);
   const togglesContainer = document.getElementById('cartique-view-toggles-container');
@@ -211,7 +237,6 @@ export default class Cartique {
 
 
   async renderProducts(layout) {
-  // Determine the container based on the layout
   const container = layout === 'grid'
     ? document.getElementById('cartique-product-grid')
     : document.getElementById('cartique-product-list');
@@ -219,11 +244,11 @@ export default class Cartique {
   // Clear the container before rendering new products
   container.innerHTML = '';
 
-  // Remove inline styles & control layout via CSS classes
+  // Set the layout classes
   container.classList.toggle('grid-view', layout === 'grid');
   container.classList.toggle('list-view', layout !== 'grid');
 
-  // Iterate over the products and create product cards
+  // Render the filtered products
   const visibleProducts = this.features.pagination
     ? this.filteredProducts.slice(0, this.features.rows * this.features.columns)
     : this.filteredProducts;
@@ -233,7 +258,6 @@ export default class Cartique {
     container.appendChild(productCard);
   });
 }
-
 
 
 
@@ -347,6 +371,83 @@ createProductCard(product) {
   }
 
 
+
+/* START SEARCH SORT LAYOUT FUNCTION BLOCKS */
+
+handleSearch(event) {
+  const searchQuery = event.target.value.trim().toLowerCase(); // Get the search query
+
+  // Update the current search query
+  this.currentSearchQuery = searchQuery;
+
+  // Filter the products
+  this.filteredProducts = this.products.filter(product => {
+    // Check if the product title or description matches the search query
+    return (
+      product.title.toLowerCase().includes(searchQuery) ||
+      product.description.toLowerCase().includes(searchQuery)
+    );
+  });
+
+  // Re-render the products in the current layout
+  const currentLayout = document.getElementById('cartique-product-grid').style.display === 'grid' ? 'grid' : 'list';
+  this.renderProducts(currentLayout);
+}
+
+
+
+
+
+handleSort(event) {
+  const sortType = event.target.value; // Get the selected sort option
+
+  // Update the current sort type
+  this.currentSortType = sortType;
+
+  // Sort the products based on the selected option
+  switch (sortType) {
+    case 'price-asc':
+      this.filteredProducts.sort((a, b) => a.price - b.price); // Price: Low to High
+      break;
+    case 'price-desc':
+      this.filteredProducts.sort((a, b) => b.price - a.price); // Price: High to Low
+      break;
+    case 'title-asc':
+      this.filteredProducts.sort((a, b) => a.title.localeCompare(b.title)); // Title: A to Z
+      break;
+    case 'title-desc':
+      this.filteredProducts.sort((a, b) => b.title.localeCompare(a.title)); // Title: Z to A
+      break;
+    default:
+      // No sorting (default order)
+      this.filteredProducts = [...this.products];
+      break;
+  }
+
+  // Re-render the products in the current layout
+  const currentLayout = document.getElementById('cartique-product-grid').style.display === 'grid' ? 'grid' : 'list';
+  this.renderProducts(currentLayout);
+}
+
+
+
+  /* END SORT LAYOUT FUNCTION BLOCKS */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   async renderCartSlider() {
     const wrapper = this.templateHolder.content.getElementById('cartique-cart-overlay-component').cloneNode(true);
    // attach event listener to cart close icon
@@ -355,8 +456,40 @@ createProductCard(product) {
     const cardSlider = wrapper.firstElementChild.cloneNode(true);
     const cartCloseButton = cardSlider.querySelector('#cart-close-btn');
 
+
+    ///<a herf="#" id="checkout-url">
+
+    //const htmlExtract = wrapper.firstElementChild.cloneNode(true);
+   
+
+
     cartCloseButton.addEventListener('click', this.closeCart);
     document.getElementById('cartique-hidden-blocks').appendChild(cardSlider);
+
+
+ const checkoutUrl = document.getElementById('checkout-url');
+if (checkoutUrl) {
+    // Set the checkout URL
+    checkoutUrl.href = this.features.checkoutUrl;
+
+    // Ensure the correct format for checkoutUrlMode (with an underscore)
+    let checkoutUrlMode = this.features.checkoutUrlMode;
+
+    if (checkoutUrlMode) {
+        // Prepend '_' if not already present
+        if (!checkoutUrlMode.startsWith('_')) {
+            checkoutUrlMode = `_${checkoutUrlMode}`;
+        }
+
+        // Set the target with the properly formatted mode
+        checkoutUrl.target = checkoutUrlMode;
+    }
+}
+
+
+
+
+
   }
 
 
@@ -410,11 +543,20 @@ showCart() {
   const displayEmptyCartMessage = () => {
     const emptyCartMessage = document.getElementById('shopping-cart-empty');
     emptyCartMessage.classList.add('show');
+
+    // hide view cart and checkout buttons if hidden
+
+    document.getElementById("view-cart-btn").style.display = "none";
+    document.getElementById("checkout-btn").style.display = "none";
   };
 
   const hideEmptyCartMessage = () => {
     const emptyCartMessage = document.getElementById('shopping-cart-empty');
     emptyCartMessage.classList.remove('show');
+
+        // show view cart and checkout buttons if hidden
+    document.getElementById("view-cart-btn").style.display = "block";
+    document.getElementById("checkout-btn").style.display = "block";
   };
 
   // Display or hide the empty cart message
