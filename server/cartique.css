@@ -81,16 +81,16 @@
     display: flex;
     flex-direction: column; /* Stack controls vertically on mobile */
     gap: 1rem;
-    background-color: #ffffff; /* White background */
+    background-color: var(--theme-primary); /* Use theme's primary color */
     padding: 1.5rem;
     border-radius: 10px; /* Rounded corners */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle drop shadow */
+    box-shadow: var(--theme-shadow); /* Use theme's shadow */
 }
 
 .cartique-controls .cartique-search {
     width: 100%; /* Full width on mobile */
     padding: 0.75rem;
-    border: 1px solid #e2e8f0; /* Light border */
+    border: 1px solid var(--theme-border); /* Use theme's border color */
     border-radius: 10px; /* Rounded corners */
     font-size: 1rem;
     outline: none;
@@ -98,23 +98,23 @@
 }
 
 .cartique-controls .cartique-search:focus {
-    border-color: #4a90e2; /* Highlight on focus */
+    border-color: var(--theme-accent); /* Highlight on focus with accent color */
 }
 
 .cartique-controls .cartique-sort {
     width: 100%; /* Full width on mobile */
     padding: 0.75rem;
-    border: 1px solid #e2e8f0; /* Light border */
+    border: 1px solid var(--theme-border); /* Use theme's border color */
     border-radius: 10px; /* Rounded corners */
     font-size: 1rem;
-    background-color: #ffffff; /* White background */
+    background-color: var(--theme-primary); /* Use theme's primary background */
     cursor: pointer;
     outline: none;
     transition: border-color 0.3s ease;
 }
 
 .cartique-controls .cartique-sort:focus {
-    border-color: #4a90e2; /* Highlight on focus */
+    border-color: var(--theme-accent); /* Highlight on focus with accent color */
 }
 
 .cartique-view-toggles {
@@ -127,35 +127,31 @@
     padding: 0.75rem 1rem;
     border: none;
     border-radius: 10px; /* Rounded corners */
-    background-color: #4a90e2; /* Modern blue */
-    color: #ffffff; /* White text */
+    background-color: var(--theme-border);  /* Use accent color */
+    color: var(--theme-text); /* Use theme's text color */
     font-size: 1rem;
     cursor: pointer;
     transition: background-color 0.3s ease;
 }
 
 .cartique-controls .cartique-view-toggle:hover {
-    background-color: #357abd; /* Darker blue on hover */
+    background-color: var(--theme-accent); /* Hover with theme border color */
 }
-
-
-
-
 
 /* Shopping Cart Icon */
 .cartique-controls .shopping-cart-icon {
     position: fixed; /* Keeps it visible while scrolling */
     top: 20px; /* Distance from the top */
     right: 20px; /* Distance from the right */
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
+    background-color: var(--theme-primary); /* Use theme's primary background */
+    border: 1px solid var(--theme-border); /* Use theme's border color */
     border-radius: 50%;
     width: 50px;
     height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--theme-shadow); /* Use theme's shadow */
     z-index: 1000; /* Ensures it stays on top of other elements */
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.3s ease;
@@ -163,7 +159,7 @@
 
 /* Hover Effect */
 .cartique-controls .shopping-cart-icon:hover {
-    background-color: #f8f8f8;
+    background-color: var(--theme-secondary); /* Hover with secondary theme color */
     transform: scale(1.1);
 }
 
@@ -191,7 +187,7 @@
 }
 
 /* Grid Layout Container */
-#cartique-product-grid {
+.cartique-product-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-auto-rows: minmax(100px, auto);
@@ -199,7 +195,7 @@
 }
 
 /* Product Card */
-.cartique_product_card {
+.cartique-product-grid .cartique_product_card {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     overflow: hidden;
@@ -211,21 +207,20 @@
     padding-bottom: 60px; /* Add padding to accommodate the slide-up container */
 }
 
-
-.cartique_product_card:hover {
+.cartique-product-grid .cartique_product_card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* Product Image */
-.cartique_product_image_container {
+.cartique-product-grid .cartique_product_image_container {
     position: relative;
     width: 100%;
     padding-top: 100%;
     overflow: hidden;
 }
 
-.cartique_product_image {
+.cartique-product-grid .cartique_product_image {
     position: absolute;
     top: 0;
     left: 0;
@@ -235,14 +230,14 @@
 }
 
 /* Product Details */
-.cartique_product_title {
+.cartique-product-grid .cartique_product_title {
     font-size: 18px;
     margin: 15px 15px 10px;
     color: #333;
     text-align: center;
 }
 
-.cartique_product_description {
+.cartique-product-grid .cartique_product_description {
     font-size: 14px;
     color: #777;
     margin: 0 15px 10px;
@@ -250,7 +245,7 @@
 }
 
 /* Pricing */
-.currency-price-display {
+.cartique-product-grid .currency-price-display {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -258,19 +253,19 @@
     padding: 10px;
 }
 
-.currency-price-display span {
+.cartique-product-grid .currency-price-display span {
     display: inline-flex;
     align-items: center;
     gap: 2px;
 }
 
-.cartique_product_price {
+.cartique-product-grid .cartique_product_price {
     font-size: 16px;
     color: #333;
     text-align: center;
 }
 
-.cartique_saleprice_price {
+.cartique-product-grid .cartique_saleprice_price {
     font-size: 16px;
     color: #ff4757;
     font-weight: bold;
@@ -278,10 +273,10 @@
 }
 
 /* Call to Action */
-.cartique_cta {
+.cartique-product-grid .cartique_cta {
     display: block;
-    background-color: #d43f00;
-    color: #fff;
+    background-color: var(--theme-accent); /* Accent color */
+    color: var(--theme-primary); /* Text color */
     text-align: center;
     padding: 10px 20px;
     border-radius: 4px;
@@ -290,13 +285,13 @@
     transition: background-color 0.3s ease;
 }
 
-.cartique_cta:hover {
-    background-color: #b33600;
+.cartique-product-grid .cartique_cta:hover {
+    background-color: var(--theme-accent); /* Accent color on hover */
+    background-color: darken(var(--theme-accent), 10%); /* Darker shade on hover (using a CSS preprocessor) */
 }
 
 /* Slide Up Container */
-/* Slide Up Container */
-.slide.up {
+.cartique-product-grid .slide.up {
     position: absolute;
     bottom: -60px; /* Initially hidden */
     left: 50%; /* Center horizontally */
@@ -313,16 +308,14 @@
     margin-bottom: 10px;
 }
 
-
-.cartique_product_card:hover .slide.up {
+.cartique-product-grid .cartique_product_card:hover .slide.up {
     bottom: 0; /* Slide up to reveal */
     border: 1px solid var(--theme-border);
-    border-radius: 8px0;
+    border-radius: 8px;
 }
 
-
 /* Add to Cart Button */
-.cartique_add_to_cart {
+.cartique-product-grid .cartique_add_to_cart {
     width: 100%; /* Full width of the container */
     padding: 10px; /* Adjusted height */
     background-color: var(--btn-bg); /* White background */
@@ -342,7 +335,7 @@
     box-shadow: var(--theme-shadow); /* Drop shadow based on the theme */
 }
 
-.cartique_product_card:hover .cartique_add_to_cart {
+.cartique-product-grid .cartique_product_card:hover .cartique_add_to_cart {
     opacity: 1;
     background-color: var(--btn-hover-bg); /* Black background on hover */
     color: var(--btn-hover-text); /* White text on hover */
@@ -351,13 +344,12 @@
 }
 
 /* Optional: Add focus style for accessibility */
-.cartique_add_to_cart:focus {
+.cartique-product-grid .cartique_add_to_cart:focus {
     outline: 0.5px solid var(--theme-border);
 }
 
-
 /* Cart Item Styling */
-.cart-item {
+.cartique-product-grid .cart-item {
     padding: 10px;
     border-bottom: 1px solid var(--theme-border); /* Light border */
     border-radius: 10px;
@@ -366,19 +358,19 @@
 
 /* Responsive Adjustments */
 @media (max-width: 1024px) {
-    #cartique-product-grid {
+    .cartique-product-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
 @media (max-width: 768px) {
-    #cartique-product-grid {
+    .cartique-product-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
 @media (max-width: 480px) {
-    #cartique-product-grid {
+    .cartique-product-grid {
         grid-template-columns: repeat(1, 1fr);
     }
 }
@@ -386,16 +378,146 @@
 
 
 
-
 /* PRODUCT LIST CSS */
 
-/* List view */
-.cartique-product-list {
+/* Base styles for the product listing */
+.cartique_product_listings .cartique_product_listing {
     display: none; /* Hidden by default */
-    flex-direction: column;
-    gap: 1.5rem;
+  display: flex;
+  flex-direction: row; /* Horizontal layout for desktop */
+  align-items: flex-start; /* Align items to the top */
+  gap: 20px; /* Space between image and details */
+  padding: 20px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  background-color: var(--theme-primary);
+  box-shadow: var(--theme-shadow);
+  margin-bottom: 20px; /* Space between listings */
 }
 
+/* Product image container */
+.cartique_product_listings .cartique_product_image_container {
+  flex: 0 0 40%; /* Fixed width for image container */
+  max-width: 40%; /* Ensure image doesn't overflow */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.cartique_product_listings .cartique_product_image {
+  width: 100%;
+  height: auto;
+  object-fit: cover; /* Ensure image covers the container */
+  border-radius: 8px;
+}
+
+/* Product details container */
+.cartique_product_listings .product-details-animate {
+  flex: 1; /* Take remaining space */
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Reduced gap between elements */
+}
+
+/* Product title */
+.cartique_product_listings .cartique_product_title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--theme-text);
+  margin: 0;
+}
+
+/* Product description */
+.cartique_product_listings .cartique_product_description {
+  font-size: 1rem;
+  color: var(--theme-text-secondary);
+  margin: 0;
+}
+
+/* Currency and price display */
+.cartique_product_listings .currency-price-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* Reduced gap between price and sale price */
+}
+
+.cartique_product_listings .cartique_product_price {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--theme-text);
+}
+
+.cartique_product_listings .cartique_saleprice_price {
+  font-size: 1rem;
+  color: var(--theme-text-secondary);
+  text-decoration: line-through;
+}
+
+/* Add to cart button */
+.cartique_product_listings .slide.up {
+  margin-top: 10px; /* Space between price and button */
+}
+
+.cartique_product_listings .cartique_add_to_cart {
+  background-color: var(--btn-bg);
+  border: 2px solid var(--btn-border);
+  color: var(--btn-text);
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cartique_product_listings .cartique_add_to_cart:hover {
+  background-color: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .cartique_product_listings .cartique_product_listing {
+    flex-direction: column; /* Stack vertically on mobile */
+    gap: 15px; /* Space between stacked elements */
+  }
+
+  .cartique_product_listings .cartique_product_image_container {
+    flex: 0 0 auto; /* Reset fixed width */
+    max-width: 100%; /* Full width on mobile */
+  }
+
+  .cartique_product_listings .cartique_product_image {
+    height: auto; /* Ensure image scales properly */
+  }
+
+  .cartique_product_listings .product-details-animate {
+    gap: 6px; /* Further reduced gap between elements */
+  }
+
+  .cartique_product_listings .cartique_product_title {
+    font-size: 1.25rem; /* Slightly smaller title on mobile */
+  }
+
+  .cartique_product_listings .cartique_product_description {
+    font-size: 0.9rem; /* Slightly smaller description on mobile */
+  }
+
+  .cartique_product_listings .cartique_product_price {
+    font-size: 1.1rem; /* Slightly smaller price on mobile */
+  }
+
+  .cartique_product_listings .cartique_saleprice_price {
+    font-size: 0.9rem; /* Slightly smaller sale price on mobile */
+  }
+
+  .cartique_product_listings .cartique_add_to_cart {
+    width: 100%; /* Full-width button on mobile */
+    padding: 12px 20px; /* Slightly larger padding for better touch targets */
+  }
+}
 
 
 

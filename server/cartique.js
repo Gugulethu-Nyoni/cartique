@@ -97,14 +97,40 @@ debounce(func, delay) {
     //containerElement.classList.add(this.features.containerClass);
 
     const root = document.documentElement;
-    root.style.setProperty('--theme-primary', this.features.theme === 'dark' ? '#1e1e1e' : '#ffffff');
-    root.style.setProperty('--theme-secondary', this.features.theme === 'dark' ? '#2e2e2e' : '#f9f9f9');
-    root.style.setProperty('--theme-text', this.features.theme === 'dark' ? '#ffffff' : '#333333');
-    root.style.setProperty('--theme-text-secondary', this.features.theme === 'dark' ? '#cccccc' : '#777777');
-    root.style.setProperty('--theme-border', this.features.theme === 'dark' ? '#444444' : '#dddddd');
-    root.style.setProperty('--theme-accent', '#d43f00');
-    root.style.setProperty('--theme-shadow', '0 4px 8px rgba(0, 0, 0, 0.1)');
-  }
+
+    // Set default colors for light theme
+    const lightThemeColors = {
+        '--theme-primary': '#ffffff',  // White background
+        '--theme-secondary': '#f8f8f8',  // Soft off-white for subtle contrast
+        '--theme-text': '#222222',  // Darker text for readability
+        '--theme-text-secondary': '#666666',  // Softer secondary text color
+        '--theme-border': '#e0e0e0',  // Light border
+        '--theme-accent': '#2a2a2a',  // Subtle accent color
+        '--theme-shadow': '0 6px 12px rgba(0, 0, 0, 0.08)'  // Soft shadow
+    };
+
+    // Set colors for dark theme
+    const darkThemeColors = {
+        '--theme-primary': '#1a1a1a',  // Deep modern black
+        '--theme-secondary': '#252525',  // Soft dark gray
+        '--theme-text': '#ffffff',  // Clean white text
+        '--theme-text-secondary': '#bbbbbb',  // Softer secondary text
+        '--theme-border': '#444444',  // Dark border
+        '--theme-shadow': '0 6px 12px rgba(0, 0, 0, 0.3)'  // Deeper shadow
+    };
+
+    // Choose the appropriate theme based on the current theme
+    const themeColors = this.features.theme === 'dark' ? darkThemeColors : lightThemeColors;
+
+    // Apply the theme colors
+    Object.keys(themeColors).forEach(key => {
+        root.style.setProperty(key, themeColors[key]);
+    });
+
+    // Override the accent color which is fixed in your logic
+root.style.setProperty('--theme-accent', '#333333');  // Set to a deep charcoal gray for a sleek modern feel
+
+}
 
   async fetchAndExtractComponents() {
     try {
@@ -209,6 +235,21 @@ debounce(func, delay) {
   const togglesContainer = document.getElementById('cartique-view-toggles-container');
   Array.from(togglesWrapper.childNodes).forEach(child => togglesContainer.appendChild(child));
 
+
+
+  // Add event listeners for layout toggles
+  const gridButton = document.querySelector('.cartique-grid-view');
+  if (gridButton) {
+    gridButton.addEventListener('click', () => this.setLayout('grid'));
+  }
+  const listButton = document.querySelector('.cartique-list-view');
+  if (listButton) {
+    listButton.addEventListener('click', () => this.setLayout('list'));
+  }
+
+
+
+
   const cartIconWrapper = this.templateHolder.content.getElementById('shopping-cart-icon-container-component').cloneNode(true);
   const cartIconContainer = document.getElementById('shopping-cart-icon-container');
   Array.from(cartIconWrapper.childNodes).forEach(child => cartIconContainer.appendChild(child));
@@ -254,12 +295,15 @@ debounce(func, delay) {
     : this.filteredProducts;
 
   visibleProducts.forEach((product) => {
-    const productCard = this.createProductCard(product);
-    container.appendChild(productCard);
+    const productElement = layout === 'grid'
+      ? this.createProductCard(product) // Use Grid layout
+      : this.createProductListing(product); // Use List layout
+    container.appendChild(productElement);
   });
 }
 
 
+/*
 
   createProductCard(product) {
   // Clone the product card template (removing the outermost wrapper)
@@ -297,6 +341,7 @@ debounce(func, delay) {
   return productCardTemplate;
 }
 
+*/
 
 
 createProductCard(product) {
@@ -349,19 +394,69 @@ createProductCard(product) {
 
 
 
-  setLayout(layout) {
-    // Hide the inactive layout and show the active one
-    if (layout === 'grid') {
-      document.getElementById('cartique-product-grid').style.display = 'grid';
-      document.getElementById('cartique-product-list').style.display = 'none';
-    } else {
-      document.getElementById('cartique-product-grid').style.display = 'none';
-      document.getElementById('cartique-product-list').style.display = 'block';
-    }
+createProductListing(product) {
+  // Clone the product list template (removing the outermost wrapper)
+  const wrapper = this.templateHolder.content.getElementById('cartique-product-list-component').cloneNode(true);
 
-    // Re-render products in the selected layout
-    this.renderProducts(layout);
+  // Extract the inner product listing (first child of the wrapper)
+  const productListingTemplate = wrapper.firstElementChild.cloneNode(true);
+
+  // Add a class to differentiate list layout
+  productListingTemplate.classList.add('cartique-product-listing');
+
+  // Iterate over the product object and update elements
+  for (const [key, value] of Object.entries(product)) {
+    const element = productListingTemplate.querySelector(`#${key}`);
+    if (element) {
+      if (element.tagName === 'IMG') {
+        element.src = value;
+      } else if (element.tagName === 'A') {
+        element.href = value;
+      } else {
+        element.textContent = value;
+      }
+    }
   }
+
+  // Handle sale price visibility
+  const salePriceElement = productListingTemplate.querySelector('#sale_price');
+  if (salePriceElement && !product.sale_price) {
+    salePriceElement.style.display = 'none'; // Hide if no sale price
+  } else {
+    const priceElement = productListingTemplate.querySelector('#price');
+    priceElement.style.textDecoration = 'line-through';
+
+    const salePriceCurrencyElement = productListingTemplate.querySelector('#sale_price_currency');
+    salePriceCurrencyElement.textContent = product.currency;
+  }
+
+  // Attach event listener to the "Add to Cart" button
+  const addToCartElement = productListingTemplate.querySelector('.cartique_add_to_cart');
+  if (addToCartElement) {
+    addToCartElement.id = product.id;
+    addToCartElement.addEventListener('click', (event) => this.addToCart(event));
+  }
+
+  return productListingTemplate;
+}
+
+
+
+
+
+  setLayout(layout) {
+  // Hide the inactive layout and show the active one
+  if (layout === 'grid') {
+    document.getElementById('cartique-product-grid').style.display = 'grid';
+    document.getElementById('cartique-product-list').style.display = 'none';
+  } else {
+    document.getElementById('cartique-product-grid').style.display = 'none';
+    document.getElementById('cartique-product-list').style.display = 'block';
+  }
+
+  // Re-render products in the selected layout
+  this.renderProducts(layout);
+}
 
   async renderFooter() {
     const wrapper = this.templateHolder.content.getElementById('cartique-product-footer-component').cloneNode(true);
@@ -432,15 +527,6 @@ handleSort(event) {
 
 
   /* END SORT LAYOUT FUNCTION BLOCKS */
-
-
-
-
-
-
-
-
-
 
 
 
