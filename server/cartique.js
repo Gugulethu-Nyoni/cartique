@@ -718,10 +718,14 @@ showCart() {
 else if (key === "image") {
           targetElement.src = product[key]; // Set image src
         } else if (key === "currency") {
-          const currencyElement = cartItem.querySelector(`#${key}`);
-          if (currencyElement) {
-            currencyElement.textContent = product[key]; // Set text content for currency
-          }
+
+    const currencyElements = cartItem.querySelectorAll(`#${key}`);  
+      // Select all elements with the matching id or class
+      currencyElements.forEach(currencyElement => {
+        currencyElement.textContent = product[key];  
+      });
+
+
         } else {
           targetElement.textContent = product[key]; // Set text content for other keys
         }
