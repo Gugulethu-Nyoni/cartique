@@ -8,7 +8,7 @@ const products = [
     description: "Men's running shoes with a full-length air unit.",
     price: 299.99,
     currency: '$',
-    image: 'https://static.nike.com/a/images/t_PDP_864_v1/f_auto,b_rgb:f5f5f5/ab2d4e7f-2f9d-49c9-8e4e-7a3d8c32e0d/air-max-270-running-shoe-BQ1028-002.jpg',
+    image: 'https://assets.superbalistcdn.co.za/500x720/filters:quality(75):format(jpg)/3974860/original.jpg', // Example image
     sale_price: 129.99,
   },
   {
@@ -17,7 +17,7 @@ const products = [
     description: 'Classic shell-toed sneakers for men and women.',
     price: 79.99,
     currency: '$',
-    image: 'https://assets.adidas.com/images/w_600,f_auto,q_auto:sensitive,fl_lossy/0d6e0f2a9b34a23a3b4ab30006d9d3_9366/Superstar_Shoes_White_GZ1182_01_standard.jpg',
+    image: 'https://www.side-step.co.za/media/catalog/product/cache/60023b40f56fdff39b9c495b8e044aef/a/d/add6022gt-adidas-retropy-f2-black-grey-white-ig9986-v1_jpg.jpg', // Example image
   },
   {
     id: 3,
@@ -25,7 +25,7 @@ const products = [
     description: 'Water-resistant and breathable insulated jacket for men and women.',
     price: 179.99,
     currency: '$',
-    image: 'https://images.thenorthface.com/is/image/TheNorthFace/tnf-thermoball-jacket-ayf4-her.jpg',
+    image: 'https://www.younglifestore.com/cdn/shop/products/CL09041TheNorthFaceMen_sThermoBallTrekkerJacket6.jpg?v=1631912778&width=450', // Example image
     sale_price: 80.99,
   },
   {
@@ -34,7 +34,7 @@ const products = [
     description: 'Classic straight-fit jeans for men.',
     price: 69.99,
     currency: '$',
-    image: 'https://www.levi.com/dw/image/v2/BCZS_PRD/on/demandware.static/-/Sites-levi-master-catalog/default/dw9d7e9f2a/501-Original-Fit-Jeans_2301_001_b01.jpg',
+    image: 'https://assets.woolworthsstatic.co.za/501-Original-Fit-Jeans-INDIGO-506356158.jpg?V=hpEA&o=eyJidWNrZXQiOiJ3dy1vbmxpbmUtaW1hZ2UtcmVzaXplIiwia2V5IjoiaW1hZ2VzL2VsYXN0aWNlcmEvcHJvZHVjdHMvaGVyby8yMDIyLTA4LTAyLzUwNjM1NjE1OF9JTkRJR09faGVyby5qcGcifQ&w=800&q=85', // Example image
   },
   {
     id: 5,
@@ -42,7 +42,7 @@ const products = [
     description: 'Classic skateboarding shoes for men and women.',
     price: 59.99,
     currency: '$',
-    image: 'https://images.vans.com/is/image/Vans/VN000D3HY28-HERO?$VF_PDP_MAIN$',
+    image: 'https://thefoschini.vtexassets.com/arquivos/ids/178901246-1200-1600?v=638759944272900000&width=1200&height=1600&aspect=true', // Example image
   },
   {
     id: 6,
@@ -50,7 +50,7 @@ const products = [
     description: 'Soft and comfortable hoodie for men and women.',
     price: 29.99,
     currency: '$',
-    image: 'https://championproducts.wdsglobal.com/images/products/medium/CHM2180.jpg',
+    image: 'https://cdn.shopify.com/s/files/1/0802/5836/7772/files/VN000D3HY28-HERO.jpg?v=1718880696', // Example image
   },
   {
     id: 7,
@@ -58,7 +58,7 @@ const products = [
     description: 'Iconic and versatile sneakers for men and women.',
     price: 69.99,
     currency: '$',
-    image: 'https://www.reebok.com/us/en/images/products/medium/BS7661.jpg',
+    image: 'https://thefoschini.vtexassets.com/arquivos/ids/179098005-1200-1600?v=638760030876370000&width=1200&height=1600&aspect=true', // Example image
   },
   {
     id: 8,
@@ -66,7 +66,7 @@ const products = [
     description: 'Versatile and sustainable parka for men and women.',
     price: 229.99,
     currency: '$',
-    image: 'https://www.patagonia.com/dw/image/v2/ABBM_PRD/on/demandware.static/-/Sites-patagonia-master/default/dw0f9d7f2a/images/hi-res/23410ALT.jpg',
+    image: 'https://contents.mediadecathlon.com/p2077593/1cr1/k$82c176d3de769da9c2a8fe8c5329de0b/m-3-in-1-waterproof-comfort-10c-travel-trekking-jacket-travel-500-black.jpg?format=auto&f=1200x0', // Example image
   },
   {
     id: 9,
@@ -74,7 +74,7 @@ const products = [
     description: 'Classic and iconic sneakers for men and women.',
     price: 49.99,
     currency: '$',
-    image: 'https://www.converse.com/dw/image/v2/ABBM_PRD/on/demandware.static/-/Sites-converse-master-catalog/default/dwae2b5e77/Chuck-Taylor-All-Star-Classic-Design-Black-162053C_01.jpg',
+    image: 'https://thefoschini.vtexassets.com/arquivos/ids/173440242-1200-1600?v=638725619779270000&width=1200&height=1600&aspect=true', // Example image
   },
   {
     id: 10,
@@ -82,7 +82,7 @@ const products = [
     description: 'Water-resistant and breathable jacket for men and women.',
     price: 99.99,
     currency: '$',
-    image: 'https://images.thenorthface.com/is/image/TheNorthFace/tnf-venture-2-jacket-ayf4-her.jpg',
+    image: 'https://thenorthface.co.za/cdn/shop/files/7QEYLFW2_960x_crop_center.png?v=1738400547', // Example image
   },
   {
     id: 11,
@@ -90,10 +90,9 @@ const products = [
     description: 'High-performance running shoes for men and women.',
     price: 179.99,
     currency: '$',
-    image: 'https://assets.adidas.com/images/w_600,f_auto,q_auto:sensitive,fl_lossy/5d0c0f',
+    image: 'https://thefoschini.vtexassets.com/arquivos/ids/173406258-1200-1600?v=638725600565000000&width=1200&height=1600&aspect=true', // Example image
   }
 ];
-
 
 
 const features = {

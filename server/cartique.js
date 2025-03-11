@@ -717,7 +717,7 @@ showCart() {
 }
 else if (key === "image") {
           targetElement.src = product[key]; // Set image src
-        } else if (key === "currency") {
+        } else if (key === "currency" && typeof product.sale_price === 'number' && product.sale_price > 0) {
 
     const currencyElements = cartItem.querySelectorAll(`#${key}`);  
       // Select all elements with the matching id or class
@@ -726,7 +726,20 @@ else if (key === "image") {
       });
 
 
-        } else {
+        } else if (key === "currency") {
+
+    const currencyElement = cartItem.querySelector(`#${key}`);  
+      // Select all elements with the matching id or class
+      
+        currencyElement.textContent = product[key];  
+      
+
+
+        } 
+
+
+
+        else {
           targetElement.textContent = product[key]; // Set text content for other keys
         }
       }
