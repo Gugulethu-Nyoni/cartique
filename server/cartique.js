@@ -178,9 +178,33 @@ root.style.setProperty('--theme-accent', '#333333');  // Set to a deep charcoal 
         </main>
       </div>
 
-      <div id="cartique-hidden-blocks"> </div>
+      <div id="cartique-hidden-blocks" style="display:none;"> </div>
 
       <div class="cart-overlay" id="cart-slide-overlay"></div>
+
+  <div id="toast-container">
+  <div class="toast">
+    <div class="toast-content">
+      <span class="svg">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+          <g data-name="60-Check">
+            <path d="M16 0a16 16 0 1 0 16 16A16 16 0 0 0 16 0zm0 30a14 14 0 1 1 14-14 14 14 0 0 1-14 14z"/>
+            <path d="m13 20.59-4.29-4.3-1.42 1.42 5 5a1 1 0 0 0 1.41 0l11-11-1.41-1.41z"/>
+          </g>
+        </svg>
+      </span>
+      <div class="message">
+        <span class="text text-1">Success</span>
+        <span class="text text-2">You will now be redirected to the login page to login and complete your checkout. 
+        </span>
+      </div>
+    </div>
+    <i class="fa-solid fa-xmark close"></i>
+    <div class="progress active"></div>
+  </div>
+</div>
+
+
 
     `;
 
@@ -535,7 +559,7 @@ handleSort(event) {
 
 
   async renderCartSlider() {
-    const wrapper = this.templateHolder.content.getElementById('cartique-cart-overlay-component').cloneNode(true);
+    const wrapper = this.templateHolder.content.getElementById('cartique-cart-slider-component').cloneNode(true);
    // attach event listener to cart close icon
    // if (wrapper) alert("Got it");
 
@@ -550,12 +574,18 @@ handleSort(event) {
 
 
     cartCloseButton.addEventListener('click', this.closeCart);
+    document.getElementById('cartique-hidden-blocks').style.display = 'block';
     document.getElementById('cartique-hidden-blocks').appendChild(cardSlider);
-
+    document.getElementById('cartique-hidden-blocks').style.display = 'none';
 
  const checkoutUrl = document.getElementById('checkout-url');
 if (checkoutUrl) {
     // Set the checkout URL
+
+// attach an event 
+  checkoutUrl.addEventListener('click', this.checkout.bind(this));
+
+  /*
     checkoutUrl.href = this.features.checkoutUrl;
 
     // Ensure the correct format for checkoutUrlMode (with an underscore)
@@ -570,6 +600,8 @@ if (checkoutUrl) {
         // Set the target with the properly formatted mode
         checkoutUrl.target = checkoutUrlMode;
     }
+*/
+
 }
 
 
@@ -588,7 +620,10 @@ if (checkoutUrl) {
     const itemTemplate = wrapper.firstElementChild.cloneNode(true);
     //const cartCloseButton = cardSlider.querySelector('#cart-close-btn');
     //cartCloseButton.addEventListener('click', this.closeCart);
+    document.getElementById('cartique-hidden-blocks').style.display = 'block';
     document.getElementById('cartique-hidden-blocks').appendChild(itemTemplate);
+    document.getElementById('cartique-hidden-blocks').style.display = 'none';
+
   }
 
 
@@ -625,6 +660,8 @@ addToCart(event) {
 showCart() {
   /* ADD PRODUCT TO THE CART ITEMS CONTAINER */
   const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+
+document.getElementById('cartique-hidden-blocks').style.display = 'block';
 
   const displayEmptyCartMessage = () => {
     const emptyCartMessage = document.getElementById('shopping-cart-empty');
@@ -763,6 +800,9 @@ else if (key === "image") {
   // Open the cart slider and show the overlay
   document.getElementById('cart-slide').classList.add('open');
   document.getElementById('cart-slide-overlay').style.display = 'block';
+
+
+  //document.getElementById('cartique-hidden-blocks').style.display = 'none';
 }
 
 
@@ -774,6 +814,9 @@ else if (key === "image") {
 closeCart() {
   document.getElementById('cart-slide').classList.remove('open');
   document.getElementById('cart-slide-overlay').style.display = 'none';
+
+  document.getElementById('cartique-hidden-blocks').style.display = 'none';
+
 }
 
 
@@ -864,6 +907,105 @@ increaseQtyItem(event) {
 }
 
 
+checkout() {
+  /*
+    const cart = JSON.parse(localStorage.getItem('cartiqueCart'));
+
+    if (!cart) {
+        console.error('Cart is empty or not found in localStorage.');
+        return;
+    }
+
+    const checkoutUrl = this.features.checkoutUrl;
+
+    if (!checkoutUrl) {
+        console.error('Checkout URL is not defined.');
+        return;
+    }
+
+    const requestData = {
+        cart: cart,
+    };
+
+    fetch(checkoutUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Checkout successful:', data);
+        this.showCheckoutAlert();
+    })
+    .catch(error => {
+        console.error('Error during checkout:', error);
+    });
+*/
+
+  this.closeCart();
+
+  this.showCheckoutAlert();
+
+}
+
+
+showCheckoutAlert() {
+  const button = document.querySelector("button"),
+        toast = document.querySelector(".toast"),
+        closeIcon = document.querySelector(".close"),
+        progress = document.querySelector(".progress");
+
+  let timer1, timer2;
+
+  // Show the toast and progress animation
+  toast.classList.add("active");
+  progress.classList.add("active");
+
+  // Hide toast after 5 seconds
+  timer1 = setTimeout(() => {
+    toast.classList.remove("active");
+  }, 5000);
+
+  // Remove progress animation after 5.3 seconds
+  timer2 = setTimeout(() => {
+    progress.classList.remove("active");
+  }, 5300);
+
+  // Close icon functionality
+  closeIcon.addEventListener("click", () => {
+    toast.classList.remove("active");
+
+    setTimeout(() => {
+      progress.classList.remove("active");
+    }, 300);
+
+    clearTimeout(timer1);
+    clearTimeout(timer2);
+  });
+
+  // Redirect after the toast disappears (after 5 seconds)
+  setTimeout(() => {
+
+    // Check if checkoutUrl is valid
+    if (this.features.checkoutUrl && isValidUrl(this.features.checkoutUrl)) {
+        window.location.href = this.features.checkoutUrl;
+    } else {
+        console.error("Invalid checkout URL");
+    }
+  }, 5000);  // Set to 5 seconds to match the toast duration
+
+  // Validate URL function
+  function isValidUrl(url) {
+      try {
+          new URL(url);
+          return true;
+      } catch (e) {
+          return false;
+      }
+  }
+}
 
 
 

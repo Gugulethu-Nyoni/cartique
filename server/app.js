@@ -104,7 +104,7 @@ const features = {
   sale: true, // Enable sale badges
   search: true, // Enable search
   sorting: true, // Enable sorting
-  checkoutUrl: 'https://developer.yoco.com/online/api-reference/checkout/payments/accept-payments/',
+  checkoutUrl: 'https://www.google.com/',
   checkoutUrlMode: '_blank', // options are self or blank
   //containerId: 'customId', // Use custom container ID
 };
