@@ -46,7 +46,7 @@ export default class Cartique {
     this.sortContainer = null;
 
     // Path to the merged HTML file
-    this.filePath = 'page.html';
+    this.filePath = 'build/routes/store/store.html';
 
     // Template holder for merged components
     this.templateHolder = null;
@@ -133,39 +133,32 @@ root.style.setProperty('--theme-accent', '#333333');  // Set to a deep charcoal 
 }
 
   async fetchAndExtractComponents() {
-  try {
-    // Find the div with id "cartique-components"
-    const cartiqueComponents = document.getElementById('cartique-components');
+    try {
+      // Fetch the merged HTML file
+      const response = await fetch(this.filePath);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch components: ${response.statusText}`);
+      }
 
-    if (!cartiqueComponents) {
-      throw new Error('Could not find #cartique-components in the DOM.');
+      // Get the HTML content
+      const htmlContent = await response.text();
+
+      // Create a template element to hold the fetched HTML
+      this.templateHolder = document.createElement('template');
+      this.templateHolder.innerHTML = htmlContent;
+
+      console.log("template",htmlContent);
+
+      // Validate that the template holder was created successfully
+      if (!this.templateHolder.content) {
+        throw new Error('Failed to create template holder for components.');
+      }
+    } catch (error) {
+      console.error('Error fetching or extracting components:', error);
     }
-
-    // Extract the inner HTML of the div
-    const innerHTML = cartiqueComponents.innerHTML;
-
-    // Create a template element to hold the extracted HTML
-    this.templateHolder = document.createElement('template');
-    this.templateHolder.innerHTML = innerHTML;
-    
-    //alert('Template extracted HEre');
-    console.log("Template extracted:", innerHTML);
-
-    // Validate that the template holder was created successfully
-    if (!this.templateHolder.content) {
-      throw new Error('Failed to create template holder for components.');
-    }
-  } catch (error) {
-    console.error('Error extracting components:', error);
   }
-}
-
-
-
 
   async renderMainFrame() {
-        //alert('Rendering MainFrame');
-
     const mainFrameTemplate = document.createElement('template');
     mainFrameTemplate.innerHTML = `
       <div class="cartique-container" id="cartique-container">
@@ -231,8 +224,7 @@ root.style.setProperty('--theme-accent', '#333333');  // Set to a deep charcoal 
 
   async renderSidebar() {
   const sidebarWrapper = this.templateHolder.content.getElementById('cartique-sidebar-component').cloneNode(true);
-  if (sidebarWrapper)         alert('Rendering Sidebar');
-
+  
   // Extract the inner contents (excluding the wrapper div)
   const sidebarContents = Array.from(sidebarWrapper.childNodes); 
   

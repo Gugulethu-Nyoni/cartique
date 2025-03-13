@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Allow specific files
+!.npmignore
+!package.json
+!README.md
+!cartique.js

@@ -1,0 +1,24 @@
+{
+  "name": "cartique",
+  "version": "1.0.3",
+  "description": "A browser-targeting library for awesome functionality.",
+  "main": "cartique.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "browser",
+    "library",
+    "cartique"
+  ],
+  "author": "Gugulethu Nyoni <gugu@semantq.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gugulethu-Nyoni/cartique"
+  },
+  "homepage": "https://github.com/Gugulethu-Nyoni/cartique#readme",
+  "bugs": {
+    "url": "https://github.com/Gugulethu-Nyoni/cartique/issues"
+  }
+}
