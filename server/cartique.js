@@ -231,7 +231,7 @@ root.style.setProperty('--theme-accent', '#333333');  // Set to a deep charcoal 
 
   async renderSidebar() {
   const sidebarWrapper = this.templateHolder.content.getElementById('cartique-sidebar-component').cloneNode(true);
-  if (sidebarWrapper)         alert('Rendering Sidebar');
+  //if (sidebarWrapper)         alert('Rendering Sidebar');
 
   // Extract the inner contents (excluding the wrapper div)
   const sidebarContents = Array.from(sidebarWrapper.childNodes); 
