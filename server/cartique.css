@@ -880,36 +880,37 @@
 
 
 
-/* CHECKOTU SUCCES TOAST */
+/* CHECKOUT SUCCESS TOAST */
 
-#toast-container * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
-}
-
-#toast-container body {
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f4f7ff;
-  overflow: hidden;
+/* CHECKOUT SUCCESS TOAST */
+#toast-container {
+  position: fixed;
+  top: 25px;
+  right: 30px;
+  z-index: 9999;
 }
 
 #toast-container .toast {
   position: absolute;
-  top: 25px;
-  right: 30px;
+  right: 0;
   border-radius: 12px;
-  background: #d4edda; /* Light green color for success */
+  background: #d4edda;
   padding: 20px 35px 20px 25px;
   box-shadow: 0 6px 20px -5px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   transform: translateX(calc(100% + 30px));
   transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.35);
+  opacity: 0;
+  pointer-events: none;
 }
+
+#toast-container .toast.active {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Rest of your existing toast CSS remains the same */
 
 #toast-container .toast.active {
   transform: translateX(0%);
@@ -1025,5 +1026,10 @@
 
 #toast-container .toast.active ~ button {
   pointer-events: none;
+}
+
+body.toast-active {
+  overflow: hidden;
+  padding-right: 17px; /* Adjust for scrollbar width */
 }
 

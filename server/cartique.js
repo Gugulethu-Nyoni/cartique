@@ -1004,66 +1004,59 @@ checkout() {
 
 
 showCheckoutAlert() {
-  const button = document.querySelector("button"),
-        toast = document.querySelector(".toast"),
-        closeIcon = document.querySelector(".close"),
-        progress = document.querySelector(".progress");
+  const toast = document.querySelector(".toast");
+  const closeIcon = document.querySelector(".close");
+  const progress = document.querySelector(".progress");
 
-  let timer1, timer2;
+  // Clear any existing timeouts to prevent multiple toasts
+  this.clearToastTimeouts();
 
   // Show the toast and progress animation
   toast.classList.add("active");
   progress.classList.add("active");
 
-  // Hide toast after 5 seconds
-  timer1 = setTimeout(() => {
+  // Set new timeouts
+  this.toastTimer1 = setTimeout(() => {
     toast.classList.remove("active");
   }, 5000);
 
-  // Remove progress animation after 5.3 seconds
-  timer2 = setTimeout(() => {
+  this.toastTimer2 = setTimeout(() => {
     progress.classList.remove("active");
   }, 5300);
 
   // Close icon functionality
-  closeIcon.addEventListener("click", () => {
+  closeIcon.onclick = () => {
     toast.classList.remove("active");
-
-    setTimeout(() => {
-      progress.classList.remove("active");
-    }, 300);
-
-    clearTimeout(timer1);
-    clearTimeout(timer2);
-  });
+    progress.classList.remove("active");
+    this.clearToastTimeouts();
+  };
 
   // Redirect after the toast disappears (after 5 seconds)
-  setTimeout(() => {
-
-    // Check if checkoutUrl is valid
-    if (this.features.checkoutUrl && isValidUrl(this.features.checkoutUrl)) {
-
-  // Get current cart from localStorage
-  let cart = JSON.parse(localStorage.getItem('cartiqueCart'));
-  console.log("checkout Cart",JSON.stringify(cart,null,2));
-
-        window.location.href = this.features.checkoutUrl;
+  this.redirectTimer = setTimeout(() => {
+    if (this.features.checkoutUrl && this.isValidUrl(this.features.checkoutUrl)) {
+      let cart = JSON.parse(localStorage.getItem('cartiqueCart'));
+      console.log("checkout Cart", JSON.stringify(cart, null, 2));
+      window.location.href = this.features.checkoutUrl;
     } else {
-        console.error("Invalid checkout URL");
+      console.error("Invalid checkout URL");
     }
-  }, 5000);  // Set to 5 seconds to match the toast duration
-
-  // Validate URL function
-  function isValidUrl(url) {
-      try {
-          new URL(url);
-          return true;
-      } catch (e) {
-          return false;
-      }
-  }
+  }, 5000);
 }
 
+clearToastTimeouts() {
+  if (this.toastTimer1) clearTimeout(this.toastTimer1);
+  if (this.toastTimer2) clearTimeout(this.toastTimer2);
+  if (this.redirectTimer) clearTimeout(this.redirectTimer);
+}
+
+isValidUrl(url) {
+  try {
+    new URL(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 
 // Cartique class main wrapper
