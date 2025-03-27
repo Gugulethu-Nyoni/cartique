@@ -106,6 +106,7 @@ const features = {
   sorting: true, // Enable sorting
   checkoutUrl: 'https://www.google.com/',
   checkoutUrlMode: '_blank', // options are self or blank
+  //sidebar: false,
   //containerId: 'customId', // Use custom container ID
 };
 

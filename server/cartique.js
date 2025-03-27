@@ -649,11 +649,21 @@ addToCart(event) {
     let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
 
     // Check if the product already exists in the cart
-    if (!cart.some((item) => item.id === product.id)) {
-      cart.push(product); // Add product if not in cart
+    const existingProductIndex = cart.findIndex((item) => item.id === product.id);
+    
+    if (existingProductIndex === -1) {
+      // Add product with cart_quantity set to 1 if not in cart
+      const productWithQuantity = {
+        ...product,
+        cart_quantity: 1
+      };
+      cart.push(productWithQuantity);
       localStorage.setItem('cartiqueCart', JSON.stringify(cart));
       console.log("Product added to cart.");
     } else {
+      // If product exists, you could increment quantity here if you want
+      // cart[existingProductIndex].cart_quantity += 1;
+      // localStorage.setItem('cartiqueCart', JSON.stringify(cart));
       console.log("Product is already in the cart.");
     }
 
@@ -668,6 +678,8 @@ addToCart(event) {
 showCart() {
   /* ADD PRODUCT TO THE CART ITEMS CONTAINER */
   const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+
+  console.log("Cart with cart_quantity", cart);
 
 document.getElementById('cartique-hidden-blocks').style.display = 'block';
 
@@ -747,7 +759,9 @@ document.getElementById('cartique-hidden-blocks').style.display = 'block';
 
     // Loop through product keys and update corresponding elements
     Object.keys(product).forEach((key) => {
+
       const targetElement = cartItem.querySelector(`#${key}`);
+
       if (targetElement) {
         if (key === "sale_price") {
           const priceElement = cartItem.querySelector('.cartique_cart_product_price');
@@ -788,6 +802,15 @@ else if (key === "image") {
           targetElement.textContent = product[key]; // Set text content for other keys
         }
       }
+
+/// now update quantity with quanity from product object 
+if (key === 'cart_quantity') {
+const productQuantityElement = cartItem.querySelector(`#quantity_${product.id}`); 
+productQuantityElement.value = product.cart_quantity;
+
+}
+
+
     });
 
     // Append the updated item to the cart container
@@ -857,30 +880,41 @@ decreaseQtyItem(event) {
   const subtotalElement = document.getElementById('subtotal');
   const productId = parseInt(decreaserId.replace('decrease_quantity_', ''));
 
-  // Find product once instead of twice
+  // Get current cart from localStorage
+  let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+  
+  // Find product in products list and in cart
   const product = this.products.find(product => product.id === productId);
-  if (!product) {
-    console.error(`Product with ID ${productId} not found`);
+  const cartItemIndex = cart.findIndex(item => item.id === productId);
+
+  if (!product || cartItemIndex === -1) {
+    console.error(`Product with ID ${productId} not found in products or cart`);
     return;
   }
 
   const productPrice = product.sale_price || product.price;
-  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0; // Ensure it's a number
+  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0;
 
   if (quantityInputElement) {
     let newQty = Math.max(parseInt(quantityInputElement.value) - 1, 0);
     quantityInputElement.value = newQty;
 
-    if (newQty === 0) this.removeCartItemBasedOnQty(productId);
+    // Update cart quantity in localStorage
+    if (newQty === 0) {
+      this.removeCartItemBasedOnQty(productId);
+    } else {
+      // Update the quantity in the cart
+      cart[cartItemIndex].cart_quantity = newQty;
+      localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+    }
 
     // Update subtotal but ensure it doesn't go negative
     const newSubtotal = Math.max(currentSubtotal - productPrice, 0);
-    subtotalElement.textContent = newSubtotal.toFixed(2); // Keep 2 decimal places
+    subtotalElement.textContent = newSubtotal.toFixed(2);
   } else {
     console.error(`Element with ID ${quantityInputId} not found`);
   }
 }
-
 
 
 
@@ -892,27 +926,37 @@ increaseQtyItem(event) {
   const subtotalElement = document.getElementById('subtotal');
   const productId = parseInt(increaserId.replace('increase_quantity_', ''));
 
-  // Find product once instead of twice
+  // Get current cart from localStorage
+  let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+  
+  // Find product in products list and in cart
   const product = this.products.find(product => product.id === productId);
-  if (!product) {
-    console.error(`Product with ID ${productId} not found`);
+  const cartItemIndex = cart.findIndex(item => item.id === productId);
+
+  if (!product || cartItemIndex === -1) {
+    console.error(`Product with ID ${productId} not found in products or cart`);
     return;
   }
 
   const productPrice = product.sale_price || product.price;
-  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0; // Ensure it's a number
+  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0;
 
   if (quantityInputElement) {
     let newQty = parseInt(quantityInputElement.value) + 1;
     quantityInputElement.value = newQty;
 
+    // Update cart quantity in localStorage
+    cart[cartItemIndex].cart_quantity = newQty;
+    localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+
     // Update subtotal
     const newSubtotal = currentSubtotal + productPrice;
-    subtotalElement.textContent = newSubtotal.toFixed(2); // Keep 2 decimal places
+    subtotalElement.textContent = newSubtotal.toFixed(2);
   } else {
     console.error(`Element with ID ${quantityInputId} not found`);
   }
 }
+
 
 
 checkout() {
@@ -998,6 +1042,11 @@ showCheckoutAlert() {
 
     // Check if checkoutUrl is valid
     if (this.features.checkoutUrl && isValidUrl(this.features.checkoutUrl)) {
+
+  // Get current cart from localStorage
+  let cart = JSON.parse(localStorage.getItem('cartiqueCart'));
+  console.log("checkout Cart",JSON.stringify(cart,null,2));
+
         window.location.href = this.features.checkoutUrl;
     } else {
         console.error("Invalid checkout URL");
