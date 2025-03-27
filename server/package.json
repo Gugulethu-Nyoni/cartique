@@ -1,6 +1,6 @@
 {
   "name": "cartique",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A browser-targeting library for awesome functionality.",
   "main": "cartique.js",
   "scripts": {

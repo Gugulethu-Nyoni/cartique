@@ -195,6 +195,7 @@
 }
 
 /* Product Card */
+/* Updated Product Card */
 .cartique-product-grid .cartique_product_card {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
@@ -203,24 +204,28 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     position: relative;
-    padding: 4px;
-    padding-bottom: 60px; /* Add padding to accommodate the slide-up container */
+    padding: 0 0 60px 0; /* Keep padding only at bottom for slide-up container */
 }
+
 
 .cartique-product-grid .cartique_product_card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* Product Image */
+/* Product Image Container */
+/* Updated Product Image Container */
 .cartique-product-grid .cartique_product_image_container {
     position: relative;
-    width: 100%;
-    padding-top: 100%;
-    overflow: hidden; 
-
+    margin: -4px -6px 0 -4px; /* Negative margin to pull image to edges */
+    padding-top: 100%; /* Maintain aspect ratio */
+    overflow: hidden;
+    border-top-left-radius: 8px; /* Match parent card radius */
+    border-top-right-radius: 8px;
+    width: calc(100% + 5px); /* Extend beyond container */
 }
 
+/* Updated Product Image */
 .cartique-product-grid .cartique_product_image {
     position: absolute;
     top: 0;
@@ -228,8 +233,8 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block; /* Remove any default spacing */
 }
-
 
 /* IMAGE ANIMATION */
 

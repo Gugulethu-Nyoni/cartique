@@ -54,6 +54,8 @@ export default class Cartique {
     this.init();
 
   this.debouncedSearch = this.debounce(this.handleSearch.bind(this), 300);
+
+  this.completeInitialization();
   }
 
 
@@ -67,6 +69,10 @@ debounce(func, delay) {
 }
 
   async init() {
+
+    // Add critical CSS before anything else renders
+  this.injectCriticalCSS();
+
     this.applyTheme();
     await this.fetchAndExtractComponents(); // Ensure templates are fully fetched before proceeding
 
@@ -130,6 +136,32 @@ debounce(func, delay) {
     // Override the accent color which is fixed in your logic
 root.style.setProperty('--theme-accent', '#333333');  // Set to a deep charcoal gray for a sleek modern feel
 
+}
+
+
+injectCriticalCSS() {
+  const criticalCSS = `
+    #${this.features.containerId} {
+      visibility: hidden;
+      opacity: 0;
+    }
+    .cartique-container {
+      position: relative;
+      min-height: 100vh;
+    }
+    /* Add other critical styles here */
+  `;
+
+  const style = document.createElement('style');
+  style.textContent = criticalCSS;
+  document.head.appendChild(style);
+}
+
+
+// Then after everything is loaded
+completeInitialization() {
+  document.getElementById(this.features.containerId).style.visibility = 'visible';
+  document.getElementById(this.features.containerId).style.opacity = '1';
 }
 
   async fetchAndExtractComponents() {
@@ -202,7 +234,8 @@ root.style.setProperty('--theme-accent', '#333333');  // Set to a deep charcoal 
       </span>
       <div class="message">
         <span class="text text-1">Success</span>
-        <span class="text text-2">You will now be redirected to the login page to login and complete your checkout. 
+        <span class="text text-2">
+         You will now be redirected to the login page to login and complete your checkout. 
         </span>
       </div>
     </div>
