@@ -16,6 +16,8 @@ export default class Cartique {
       sale: false, // Enable sale badges and strike-through pricing
       checkoutUrl: '#',
       checkoutUrlMode: 'self', // options are self or blank default is self
+      sidebar: true,
+      sidebarDisplay: 'block',
       sidebarFeatures: {
         filters: {
           Color: ['Red', 'Blue', 'Green'],
@@ -69,6 +71,8 @@ debounce(func, delay) {
 }
 
   async init() {
+
+    if (!this.features.sidebar) this.features.sidebarDisplay ='none';
 
     // Add critical CSS before anything else renders
   this.injectCriticalCSS();
@@ -201,7 +205,7 @@ completeInitialization() {
     const mainFrameTemplate = document.createElement('template');
     mainFrameTemplate.innerHTML = `
       <div class="cartique-container" id="cartique-container">
-        <aside class="cartique-sidebar" id="cartique-sidebar"></aside>
+        <aside class="cartique-sidebar" id="cartique-sidebar" style="display: ${this.features.sidebarDisplay}"></aside>
         <main class="cartique-main-content" id="cartique-main-content">
           <div class="cartique-controls" id="cartique-controls">
             <div class="cartique-search-container" id="cartique-search-container"></div>
