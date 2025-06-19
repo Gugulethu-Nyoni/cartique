@@ -1038,3 +1038,52 @@ body.toast-active {
   padding-right: 17px; /* Adjust for scrollbar width */
 }
 
+
+/* Single Product View CSS */
+
+.single-product-view {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.single-product-view .product-image-container img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.single-product-view .product-details {
+  margin-top: 20px;
+}
+
+.single-product-view .back-to-products {
+  background: none;
+  border: none;
+  color: var(--theme-text);
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.single-product-view .price-container {
+  margin: 15px 0;
+  font-size: 24px;
+}
+
+.single-product-view .sale-price {
+  color: #e63946;
+  font-weight: bold;
+}
+
+.single-product-view .original-price {
+  text-decoration: line-through;
+  color: #666;
+  margin-right: 10px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -1185,7 +1185,7 @@ renderSingleProduct(product) {
     this.returnToListView();
   });
 
-  productView.querySelector('.add-to-cart').addEventListener('click', (e) => {
+  productView.querySelector('.cartique_add_to_cart').addEventListener('click', (e) => {
     this.addToCart(e);
   });
 
