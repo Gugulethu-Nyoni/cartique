@@ -58,6 +58,14 @@ export default class Cartique {
   this.debouncedSearch = this.debounce(this.handleSearch.bind(this), 300);
 
   this.completeInitialization();
+
+  // default display state
+
+  // Add these properties:
+  this.previousViewState = null; // Will store grid/list view state
+  this.currentLayout = 'grid';   // Tracks current layout mode
+  this.singleProductViewActive = false; // Flag for single product view
+  
   }
 
 
@@ -443,7 +451,7 @@ createProductCard(product) {
     e.preventDefault();
     this.showSingleProductView(product.id);
   });
-  
+
 
   // Handle sale price visibility
   const salePriceElement = productCardTemplate.querySelector('#sale_price');
