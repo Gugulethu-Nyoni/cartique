@@ -65,7 +65,7 @@ export default class Cartique {
   this.previousViewState = null; // Will store grid/list view state
   this.currentLayout = 'grid';   // Tracks current layout mode
   this.singleProductViewActive = false; // Flag for single product view
-  
+
   }
 
 
@@ -1112,6 +1112,44 @@ isValidUrl(url) {
     return false;
   }
 }
+
+
+/* HANDLING SINGLE PRODUCT VIEW */
+
+showSingleProductView(productId) {
+  // Convert to number if needed (IDs are often numbers)
+  productId = Number(productId);
+  
+  // Find the product
+  const product = this.products.find(p => p.id === productId);
+  if (!product) {
+    console.error('Product not found:', productId);
+    return;
+  }
+
+  // Store current view state
+  this.previousViewState = {
+    layout: this.currentLayout,
+    searchQuery: this.currentSearchQuery,
+    sortType: this.currentSortType,
+    scrollPosition: window.scrollY // Save scroll position
+  };
+
+  // Hide product listings and sidebar
+  document.getElementById('cartique-product-displays').style.display = 'none';
+  document.getElementById('cartique-sidebar').style.display = 'none';
+  
+  // Set flag
+  this.singleProductViewActive = true;
+  
+  // Show single product view
+  this.renderSingleProduct(product);
+}
+
+
+
+
+
 
 
 // Cartique class main wrapper
