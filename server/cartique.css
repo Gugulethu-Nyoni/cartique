@@ -1163,6 +1163,7 @@ body.toast-active {
 }
 
 /* Add to Cart Button */
+/* Remove margin-top: auto from the button */
 .spv-cartique_add_to_cart {
   width: 100%;
   max-width: 300px;
@@ -1175,9 +1176,10 @@ body.toast-active {
   border: 0.5px solid var(--theme-border);
   border-radius: 10px;
   cursor: pointer;
-  margin-top: auto;
+  /* Remove margin-top: auto */
   box-shadow: var(--theme-shadow);
   transition: all 0.2s ease;
+  align-self: flex-start; /* Align left within the column */
 }
 
 .spv-cartique_add_to_cart:hover {
