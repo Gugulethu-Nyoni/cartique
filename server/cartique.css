@@ -16,6 +16,12 @@
   --btn-text: #000000; /* Black text */
   --btn-hover-bg: #000000; /* Black background on hover */
   --btn-hover-text: #ffffff; /* White text on hover */
+
+  --spv-btn-bg: #000000; /* Black button background */
+  --spv-btn-border: #ffffff; /* White border */
+  --spv-btn-text: #ffffff; /* White text */
+  --spv-btn-hover-bg: #ffffff; /* White background on hover */
+  --spv-btn-hover-text: #000000; /* Black text on hover */
 }
 
 [data-theme="dark"] {
@@ -32,6 +38,8 @@
   --btn-text: #ffffff; /* White text */
   --btn-hover-bg: #ffffff; /* White background on hover */
   --btn-hover-text: #000000; /* Black text on hover */
+
+  
 }
 
 
@@ -1081,6 +1089,23 @@ body.toast-active {
   text-decoration: line-through;
   color: #666;
   margin-right: 10px;
+}
+
+
+/* Add to Cart Button */
+.spv-cartique_add_to_cart {
+    width: 100%; /* Full width of the container */
+    padding: 10px; /* Adjusted height */
+    background-color: var(--spv-btn-bg); /* White background */
+    color: var(--spv-btn-text); /* Black text */
+    font-size: 14px;
+    font-weight: bold;
+    text-transform: uppercase;
+    border: 0.5px solid var(--theme-border); /* Lighter gray border with theme variable */
+    border-radius: 10px;
+    cursor: pointer;
+    display: block; /* Makes the button a block-level element */
+    box-shadow: var(--theme-shadow); /* Drop shadow based on the theme */
 }
 
 @keyframes fadeIn {

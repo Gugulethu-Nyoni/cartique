@@ -1176,7 +1176,7 @@ renderSingleProduct(product) {
         `}
       </div>
       <p class="description">${product.description}</p>
-      <button class="cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+      <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
     </div>
   `;
 
@@ -1185,7 +1185,7 @@ renderSingleProduct(product) {
     this.returnToListView();
   });
 
-  productView.querySelector('.cartique_add_to_cart').addEventListener('click', (e) => {
+  productView.querySelector('.spv-cartique_add_to_cart ').addEventListener('click', (e) => {
     this.addToCart(e);
   });
 
