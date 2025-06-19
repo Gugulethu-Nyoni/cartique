@@ -1197,6 +1197,31 @@ renderSingleProduct(product) {
 
 
 
+returnToListView() {
+  // Hide single product view
+  const singleProductView = document.getElementById('single-product-view-container');
+  if (singleProductView) {
+    singleProductView.style.display = 'none';
+  }
+
+  // Restore previous view
+  document.getElementById('cartique-product-displays').style.display = 'block';
+  document.getElementById('cartique-sidebar').style.display = this.features.sidebarDisplay;
+
+  // Reset flag
+  this.singleProductViewActive = false;
+
+  // Restore scroll position
+  if (this.previousViewState?.scrollPosition) {
+    window.scrollTo(0, this.previousViewState.scrollPosition);
+  }
+
+  // Note: Search/sort state is already preserved in the class properties
+  // so the products will automatically show in their previous state
+}
+
+
+
 
 
 // Cartique class main wrapper
