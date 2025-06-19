@@ -1075,9 +1075,11 @@ body.toast-active {
   object-fit: cover;
 }
 
+/* Update the product info column layout */
 .product-info-column {
   display: flex;
   flex-direction: column;
+  gap: 20px; /* Consistent spacing between elements */
 }
 
 .product-info-column h2 {
