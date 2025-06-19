@@ -1162,21 +1162,40 @@ renderSingleProduct(product) {
   productView.className = 'single-product-view';
   productView.innerHTML = `
     <button class="back-to-products">← Back to Products</button>
-    <div class="product-image-container">
-      <img src="${product.image}" alt="${product.title}">
-    </div>
-    <div class="product-details">
-      <h2>${product.title}</h2>
-      <div class="price-container">
-        ${product.sale_price ? `
-          <span class="original-price">${product.currency}${product.price}</span>
-          <span class="sale-price">${product.currency}${product.sale_price}</span>
-        ` : `
-          <span class="price">${product.currency}${product.price}</span>
-        `}
+    
+    <div class="product-content-wrapper">
+      <div class="product-image-column">
+        <div class="product-image-container">
+          <img src="${product.image}" alt="${product.title}">
+        </div>
       </div>
-      <p class="description">${product.description}</p>
-      <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+      
+      <div class="product-info-column">
+        <h2>${product.title}</h2>
+        <div class="price-container">
+          ${product.sale_price ? `
+            <span class="original-price">${product.currency}${product.price}</span>
+            <span class="sale-price">${product.currency}${product.sale_price}</span>
+          ` : `
+            <span class="price">${product.currency}${product.price}</span>
+          `}
+        </div>
+        <p class="description">${product.description}</p>
+        <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+      </div>
+    </div>
+    
+    <div class="product-tabs-container">
+      <div class="product-tabs-header">
+        <button class="tab-button active" data-tab="details">Product Details</button>
+        <button class="tab-button" data-tab="reviews">Reviews</button>
+      </div>
+      <div class="tab-content active" data-tab-content="details">
+        ${product.details || 'No additional details available.'}
+      </div>
+      <div class="tab-content" data-tab-content="reviews">
+        ${product.reviews || 'No reviews yet.'}
+      </div>
     </div>
   `;
 
@@ -1185,16 +1204,29 @@ renderSingleProduct(product) {
     this.returnToListView();
   });
 
-  productView.querySelector('.spv-cartique_add_to_cart ').addEventListener('click', (e) => {
+  productView.querySelector('.spv-cartique_add_to_cart').addEventListener('click', (e) => {
     this.addToCart(e);
+  });
+
+  // Add tab switching functionality
+  const tabButtons = productView.querySelectorAll('.tab-button');
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      // Remove active class from all buttons and contents
+      productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
+        el.classList.remove('active');
+      });
+      
+      // Add active class to clicked button and corresponding content
+      button.classList.add('active');
+      const tabName = button.dataset.tab;
+      productView.querySelector(`.tab-content[data-tab-content="${tabName}"]`).classList.add('active');
+    });
   });
 
   container.appendChild(productView);
   container.style.display = 'block';
 }
-
-
-
 
 
 returnToListView() {
