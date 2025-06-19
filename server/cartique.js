@@ -1181,7 +1181,7 @@ renderSingleProduct(product) {
           <span class="price">${product.currency}${product.price}</span>
         `}
       </div>
-      <p class="description">${product.description}</p>
+      <p class="product-description">${product.description}</p>
     </div>
     
     <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>

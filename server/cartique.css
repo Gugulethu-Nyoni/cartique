@@ -1110,6 +1110,21 @@ body.toast-active {
   color: var(--theme-text-secondary);
 }
 
+
+
+/* Add this to improve vertical rhythm */
+.product-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.description {
+  margin-bottom: 30px; /* Space before Add to Cart button */
+}
+
+
+
 /* Tabs Section */
 .product-tabs-container {
   grid-column: 1 / -1;
