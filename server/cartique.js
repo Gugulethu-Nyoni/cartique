@@ -1195,6 +1195,8 @@ renderSingleProduct(product) {
 
 
 
+
+
 returnToListView() {
   // Hide single product view
   const singleProductView = document.getElementById('single-product-view-container');
