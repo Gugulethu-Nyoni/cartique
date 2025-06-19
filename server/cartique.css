@@ -1047,6 +1047,8 @@ body.toast-active {
 }
 
 
+
+
 /* Single Product View CSS */
 .single-product-view {
   max-width: 1200px;
@@ -1114,8 +1116,10 @@ body.toast-active {
   padding-top: 30px;
 }
 
+/* Update the tabs header styling */
 .product-tabs-header {
   display: flex;
+  justify-content: center; /* Center the tabs */
   border-bottom: 1px solid var(--theme-border);
   margin-bottom: 20px;
 }
@@ -1128,6 +1132,7 @@ body.toast-active {
   cursor: pointer;
   color: var(--theme-text-secondary);
   position: relative;
+  margin: 0 10px; /* Add some spacing between tabs */
 }
 
 .tab-button.active {
