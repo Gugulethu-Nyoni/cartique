@@ -414,7 +414,7 @@ completeInitialization() {
 
 
 createProductCard(product) {
-  //console.log("Product",product);
+  //console.log("Product",product.id);
   // Clone the product card template (removing the outermost wrapper)
   const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component').cloneNode(true);
   
@@ -434,6 +434,16 @@ createProductCard(product) {
       }
     }
   }
+
+
+  // Add product ID to image container
+  const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
+  imgContainer.dataset.productId = product.id;
+  imgContainer.addEventListener('click', (e) => {
+    e.preventDefault();
+    this.showSingleProductView(product.id);
+  });
+  
 
   // Handle sale price visibility
   const salePriceElement = productCardTemplate.querySelector('#sale_price');
