@@ -1104,10 +1104,13 @@ body.toast-active {
   margin-right: 10px;
 }
 
-.description {
-  margin: 20px 0;
+.product-description {
+margin-bottom: 30px; /* Space before Add to Cart button */
+
+/*  margin: 20px 0;
   line-height: 1.6;
   color: var(--theme-text-secondary);
+  */
 }
 
 
@@ -1119,9 +1122,6 @@ body.toast-active {
   gap: 15px;
 }
 
-.description {
-  margin-bottom: 30px; /* Space before Add to Cart button */
-}
 
 
 
