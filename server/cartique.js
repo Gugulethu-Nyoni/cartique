@@ -1170,19 +1170,24 @@ renderSingleProduct(product) {
         </div>
       </div>
       
-      <div class="product-info-column">
-        <h2>${product.title}</h2>
-        <div class="price-container">
-          ${product.sale_price ? `
-            <span class="original-price">${product.currency}${product.price}</span>
-            <span class="sale-price">${product.currency}${product.sale_price}</span>
-          ` : `
-            <span class="price">${product.currency}${product.price}</span>
-          `}
-        </div>
-        <p class="description">${product.description}</p>
-        <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+    <div class="product-info-column">
+    <div class="product-meta">
+      <h2>${product.title}</h2>
+      <div class="price-container">
+        ${product.sale_price ? `
+          <span class="original-price">${product.currency}${product.price}</span>
+          <span class="sale-price">${product.currency}${product.sale_price}</span>
+        ` : `
+          <span class="price">${product.currency}${product.price}</span>
+        `}
       </div>
+      <p class="description">${product.description}</p>
+    </div>
+    
+    <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+  </div>
+
+
     </div>
     
     <div class="product-tabs-container">
