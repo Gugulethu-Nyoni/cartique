@@ -1048,7 +1048,6 @@ body.toast-active {
 
 
 /* Single Product View CSS */
-
 .single-product-view {
   max-width: 1200px;
   margin: 0 auto;
@@ -1056,59 +1055,154 @@ body.toast-active {
   animation: fadeIn 0.3s ease;
 }
 
-.single-product-view .product-image-container img {
-  max-width: 100%;
+.product-content-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.product-image-column {
+  position: relative;
+}
+
+.product-image-column img {
+  width: 100%;
   height: auto;
   border-radius: 8px;
+  object-fit: cover;
 }
 
-.single-product-view .product-details {
-  margin-top: 20px;
+.product-info-column {
+  display: flex;
+  flex-direction: column;
 }
 
-.single-product-view .back-to-products {
-  background: none;
-  border: none;
+.product-info-column h2 {
+  font-size: 28px;
+  margin-bottom: 15px;
   color: var(--theme-text);
-  cursor: pointer;
-  margin-bottom: 20px;
-  font-size: 16px;
 }
 
-.single-product-view .price-container {
+.price-container {
   margin: 15px 0;
   font-size: 24px;
 }
 
-.single-product-view .sale-price {
+.sale-price {
   color: #e63946;
   font-weight: bold;
 }
 
-.single-product-view .original-price {
+.original-price {
   text-decoration: line-through;
   color: #666;
   margin-right: 10px;
 }
 
+.description {
+  margin: 20px 0;
+  line-height: 1.6;
+  color: var(--theme-text-secondary);
+}
+
+/* Tabs Section */
+.product-tabs-container {
+  grid-column: 1 / -1;
+  margin-top: 40px;
+  border-top: 1px solid var(--theme-border);
+  padding-top: 30px;
+}
+
+.product-tabs-header {
+  display: flex;
+  border-bottom: 1px solid var(--theme-border);
+  margin-bottom: 20px;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--theme-text-secondary);
+  position: relative;
+}
+
+.tab-button.active {
+  color: var(--theme-text);
+  font-weight: bold;
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--theme-accent);
+}
+
+.tab-content {
+  display: none;
+  padding: 20px 0;
+  line-height: 1.6;
+}
+
+.tab-content.active {
+  display: block;
+}
 
 /* Add to Cart Button */
 .spv-cartique_add_to_cart {
-    width: 100%; /* Full width of the container */
-    padding: 10px; /* Adjusted height */
-    background-color: var(--spv-btn-bg); /* White background */
-    color: var(--spv-btn-text); /* Black text */
-    font-size: 14px;
-    font-weight: bold;
-    text-transform: uppercase;
-    border: 0.5px solid var(--theme-border); /* Lighter gray border with theme variable */
-    border-radius: 10px;
-    cursor: pointer;
-    display: block; /* Makes the button a block-level element */
-    box-shadow: var(--theme-shadow); /* Drop shadow based on the theme */
+  width: 100%;
+  max-width: 300px;
+  padding: 12px;
+  background-color: var(--spv-btn-bg);
+  color: var(--spv-btn-text);
+  font-size: 14px;
+  font-weight: bold;
+  text-transform: uppercase;
+  border: 0.5px solid var(--theme-border);
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: auto;
+  box-shadow: var(--theme-shadow);
+  transition: all 0.2s ease;
+}
+
+.spv-cartique_add_to_cart:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.back-to-products {
+  background: none;
+  border: none;
+  color: var(--theme-text);
+  cursor: pointer;
+  margin-bottom: 30px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .product-content-wrapper {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .spv-cartique_add_to_cart {
+    max-width: 100%;
+  }
 }
