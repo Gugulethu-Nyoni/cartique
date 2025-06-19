@@ -1148,6 +1148,53 @@ showSingleProductView(productId) {
 
 
 
+renderSingleProduct(product) {
+  // Create container if it doesn't exist
+  let container = document.getElementById('single-product-view-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'single-product-view-container';
+    document.getElementById('cartique-main-content').appendChild(container);
+  }
+
+  container.innerHTML = '';
+  
+  // Create the single product view structure
+  const productView = document.createElement('div');
+  productView.className = 'single-product-view';
+  productView.innerHTML = `
+    <button class="back-to-products">← Back to Products</button>
+    <div class="product-image-container">
+      <img src="${product.image}" alt="${product.title}">
+    </div>
+    <div class="product-details">
+      <h2>${product.title}</h2>
+      <div class="price-container">
+        ${product.sale_price ? `
+          <span class="original-price">${product.currency}${product.price}</span>
+          <span class="sale-price">${product.currency}${product.sale_price}</span>
+        ` : `
+          <span class="price">${product.currency}${product.price}</span>
+        `}
+      </div>
+      <p class="description">${product.description}</p>
+      <button class="add-to-cart" data-product-id="${product.id}">Add to Cart</button>
+    </div>
+  `;
+
+  // Add event listeners
+  productView.querySelector('.back-to-products').addEventListener('click', () => {
+    this.returnToListView();
+  });
+
+  productView.querySelector('.add-to-cart').addEventListener('click', (e) => {
+    this.addToCart(e);
+  });
+
+  container.appendChild(productView);
+  container.style.display = 'block';
+}
+
 
 
 
