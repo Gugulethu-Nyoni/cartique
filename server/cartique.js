@@ -472,8 +472,6 @@ createProductCard(product) {
     addToCartElement.id = product.id;
     //addToCartElement.addEventListener('click', this.addToCart);
   addToCartElement.addEventListener('click', (event) => this.addToCart(event));
-
-
   }
 
   return productCardTemplate;
@@ -1178,7 +1176,7 @@ renderSingleProduct(product) {
         `}
       </div>
       <p class="description">${product.description}</p>
-      <button class="add-to-cart" data-product-id="${product.id}">Add to Cart</button>
+      <button class="cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
     </div>
   `;
 
