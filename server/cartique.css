@@ -558,11 +558,12 @@
 /* Product display footer */
 .cartique-product-footer {
     padding: 1.5rem;
-    background-color: #ffffff; /* White background */
+    background-color: #ffffff;
     text-align: center;
-    margin-top: 1.5rem;
-    border-radius: 10px; /* Rounded corners */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle drop shadow */
+    margin-top: auto; /* Push to bottom */
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    order: 999; /* Ensure it stays last in flex order */
 }
 
 /* Desktop layout */
@@ -580,6 +581,9 @@
 
     .cartique-main-content {
         width: 70%; /* 70% width on desktop */
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh; /* Take full viewport height */
     }
 
     /* When sidebar is hidden on desktop, make main content take full width */
@@ -1050,6 +1054,14 @@ body.toast-active {
 
 
 /* Single Product View CSS */
+
+
+/* Single product view container */
+#single-product-view-container {
+    flex: 1; /* Take remaining space */
+    margin-bottom: 20px; /* Space before footer */
+}
+
 .single-product-view {
   max-width: 1200px;
   margin: 0 auto;
