@@ -47,7 +47,7 @@ const products = [
   {
     id: 6,
     title: 'Champion Life Hoodie',
-    description: 'Soft and comfortable hoodie for men and women.',
+    description: 'Soft and comfortable hoodie for men and women.Gulai tunjang is a traditional Indonesian dish from Padang, West Sumatra, featuring beef tendon (kikil) cooked in a rich, spicy coconut milk-based curry. Slow-cooked with aromatic spices like turmeric, ginger, galangal, and chili, it has a tender, chewy texture and a savory, slightly spicy flavor. Often served with steamed rice, boiled cassava leaves, and sambal lado mudo, it’s a beloved staple in Padang restaurants.',
     price: 29.99,
     currency: '$',
     image: 'https://cdn.shopify.com/s/files/1/0802/5836/7772/files/VN000D3HY28-HERO.jpg?v=1718880696', // Example image

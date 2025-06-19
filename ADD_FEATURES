@@ -1,0 +1,141 @@
+1. SINGE PRODUCT VIEW - DONE
+2. PAGINATION  - be able to define 
+3. CATEGORIES (product object will have category_name, category_id )
+4. GLOBAL CURRENCY 
+5. DATABASE ADAPTORS e.g. mysql db, supabase, mongodb, firebase
+
+
+
+
+
+
+// In constructor:
+this.currentPage = 1;
+this.productsPerPage = features.rows || 10;
+
+// New method:
+getPaginatedProducts() {
+  const start = (this.currentPage - 1) * this.productsPerPage;
+  const end = start + this.productsPerPage;
+  return this.filteredProducts.slice(start, end);
+}
+
+// Update renderProducts():
+renderProducts(layout) {
+  const visibleProducts = this.features.pagination 
+    ? this.getPaginatedProducts()
+    : this.filteredProducts;
+  // ... rest of rendering logic
+}
+
+// Add pagination controls:
+renderPagination() {
+  const totalPages = Math.ceil(this.filteredProducts.length / this.productsPerPage);
+  // Render page numbers/controls
+}
+
+
+
+
+
+
+
+// Product object would need:
+{
+  category_id: 1,
+  category_name: "Shoes",
+  // ... other fields
+}
+
+// In Cartique class:
+constructor() {
+  this.currentCategory = null;
+  this.categories = this.extractCategories(products);
+}
+
+extractCategories(products) {
+  return [...new Set(products.map(p => p.category_name))];
+}
+
+filterByCategory(category) {
+  this.currentCategory = category;
+  this.filteredProducts = category 
+    ? this.products.filter(p => p.category_name === category)
+    : [...this.products];
+  this.renderProducts();
+}
+
+
+
+
+
+
+// In features:
+const features = {
+  currency: 'USD', // Default
+  currencySymbol: '$', // Default
+  exchangeRates: { USD: 1, EUR: 0.85, GBP: 0.75 }, // Example
+  // ... other features
+}
+
+// Method to change currency:
+setCurrency(newCurrency) {
+  this.features.currency = newCurrency;
+  this.features.currencySymbol = this.getCurrencySymbol(newCurrency);
+  this.convertPrices();
+  this.renderProducts();
+}
+
+convertPrices() {
+  const rate = this.features.exchangeRates[this.features.currency];
+  this.products.forEach(product => {
+    product.displayPrice = product.price * rate;
+    if (product.sale_price) {
+      product.displaySalePrice = product.sale_price * rate;
+    }
+  });
+}
+
+
+
+
+
+
+// Base adapter interface
+class DatabaseAdapter {
+  constructor(config) { /* ... */ }
+  async getProducts() { /* abstract */ }
+  async getCategories() { /* abstract */ }
+  // ... other common methods
+}
+
+// MySQL implementation
+class MySQLAdapter extends DatabaseAdapter {
+  async getProducts() {
+    // Implementation specific to MySQL
+  }
+}
+
+// In Cartique:
+constructor(products, features, databaseConfig) {
+  if (databaseConfig) {
+    this.db = this.createAdapter(databaseConfig);
+    this.loadFromDatabase();
+  } else {
+    this.products = products;
+  }
+}
+
+createAdapter(config) {
+  switch(config.type) {
+    case 'mysql': return new MySQLAdapter(config);
+    case 'supabase': return new SupabaseAdapter(config);
+    // ... other adapters
+  }
+}
+
+async loadFromDatabase() {
+  this.products = await this.db.getProducts();
+  this.categories = await this.db.getCategories();
+  // Initialize UI
+}

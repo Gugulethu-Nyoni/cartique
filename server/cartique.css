@@ -1118,6 +1118,7 @@ body.toast-active {
 
 .product-description {
 margin-bottom: 30px; /* Space before Add to Cart button */
+text-align: justify;
 
 /*  margin: 20px 0;
   line-height: 1.6;
