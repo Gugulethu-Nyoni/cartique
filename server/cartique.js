@@ -17,6 +17,8 @@ export default class Cartique {
       checkoutUrl: '#',
       checkoutUrlMode: 'self', // options are self or blank default is self
       sidebar: true,
+      footer: true;
+      footerDisplay: 'block';
       sidebarDisplay: 'block',
       sidebarFeatures: {
         filters: {
@@ -81,6 +83,7 @@ debounce(func, delay) {
   async init() {
 
     if (!this.features.sidebar) this.features.sidebarDisplay ='none';
+    if (!this.features.footer) this.features.footerDisplay ='none';
 
     // Add critical CSS before anything else renders
   this.injectCriticalCSS();
@@ -225,7 +228,7 @@ completeInitialization() {
             <div class="cartique-product-grid" id="cartique-product-grid"></div>
             <div class="cartique-product-list" id="cartique-product-list"></div>
           </div>
-          <footer class="cartique-product-footer" id="cartique-product-footer"></footer>
+          <footer class="cartique-product-footer" id="cartique-product-footer" style="display:${this.features.footerDisplay}"></footer>
         </main>
       </div>
 
