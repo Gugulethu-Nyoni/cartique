@@ -17,8 +17,8 @@ export default class Cartique {
       checkoutUrl: '#',
       checkoutUrlMode: 'self', // options are self or blank default is self
       sidebar: true,
-      footer: true;
-      footerDisplay: 'block';
+      footer: true,
+      footerDisplay: 'block',
       sidebarDisplay: 'block',
       sidebarFeatures: {
         filters: {
