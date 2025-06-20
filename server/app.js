@@ -107,6 +107,7 @@ const features = {
   checkoutUrl: 'https://www.google.com/',
   checkoutUrlMode: '_blank', // options are self or blank
   sidebar: false,
+  productsFooter: false;
   //containerId: 'customId', // Use custom container ID
 };
 
