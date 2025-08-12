@@ -732,167 +732,145 @@ addToCart(event) {
 
 
 showCart() {
-  /* ADD PRODUCT TO THE CART ITEMS CONTAINER */
-  const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    /* ADD PRODUCT TO THE CART ITEMS CONTAINER */
+    const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
 
-  console.log("Cart with cart_quantity", cart);
+    console.log("Cart with cart_quantity", cart);
 
-document.getElementById('cartique-hidden-blocks').style.display = 'block';
+    document.getElementById('cartique-hidden-blocks').style.display = 'block';
 
-  const displayEmptyCartMessage = () => {
-    const emptyCartMessage = document.getElementById('shopping-cart-empty');
-    emptyCartMessage.classList.add('show');
+    const displayEmptyCartMessage = () => {
+        const emptyCartMessage = document.getElementById('shopping-cart-empty');
+        emptyCartMessage.classList.add('show');
+        document.getElementById("view-cart-btn").style.display = "none";
+        document.getElementById("checkout-btn").style.display = "none";
+    };
 
-    // hide view cart and checkout buttons if hidden
+    const hideEmptyCartMessage = () => {
+        const emptyCartMessage = document.getElementById('shopping-cart-empty');
+        emptyCartMessage.classList.remove('show');
+        document.getElementById("view-cart-btn").style.display = "block";
+        document.getElementById("checkout-btn").style.display = "block";
+    };
 
-    document.getElementById("view-cart-btn").style.display = "none";
-    document.getElementById("checkout-btn").style.display = "none";
-  };
-
-  const hideEmptyCartMessage = () => {
-    const emptyCartMessage = document.getElementById('shopping-cart-empty');
-    emptyCartMessage.classList.remove('show');
-
-        // show view cart and checkout buttons if hidden
-    document.getElementById("view-cart-btn").style.display = "block";
-    document.getElementById("checkout-btn").style.display = "block";
-  };
-
-  // Display or hide the empty cart message
-  if (cart.length === 0) {
-    displayEmptyCartMessage();
-  } else {
-    hideEmptyCartMessage();
-  }
-
-  const cartContainer = document.getElementById('cart-items-container');
-  cartContainer.innerHTML = ''; // Clear previous items
-
-  const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component').cloneNode(true);
-  const cartItemTemplate = wrapper.firstElementChild.cloneNode(true);
-
-  if (!cartItemTemplate) {
-    console.error("No template found.");
-    return;
-  }
-
-  let subTotal = 0;
-  let subTotalElement = document.getElementById('subtotal');
-  subTotalElement.textContent = '0.00'; // Reset subtotal initially
-
-  // Loop through each product in the cart
-  cart.forEach((product) => {
-    const cartItem = cartItemTemplate.cloneNode(true); // Clone template for each product
-
-    const removeItemElement = cartItem.querySelector('#remove-item');
-    if (removeItemElement) {
-      removeItemElement.id = product.id;
-      removeItemElement.addEventListener('click', (event) => this.removeCartItem(event));
+    // Display or hide the empty cart message
+    if (cart.length === 0) {
+        displayEmptyCartMessage();
+    } else {
+        hideEmptyCartMessage();
     }
 
+    const cartContainer = document.getElementById('cart-items-container');
+    cartContainer.innerHTML = ''; // Clear previous items
 
-    /// handle decrease-qty and increase-qty listeners 
+    const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component').cloneNode(true);
+    const cartItemTemplate = wrapper.firstElementChild.cloneNode(true);
 
-    const decreaseQtyElement = cartItem.querySelector('.decrease-qty');
-    if (decreaseQtyElement) {
-      decreaseQtyElement.id = `decrease_quantity_${product.id}`;
-      decreaseQtyElement.addEventListener('click', (event) => this.decreaseQtyItem(event));
+    if (!cartItemTemplate) {
+        console.error("No template found.");
+        return;
     }
 
+    let subTotal = 0;
 
-    const increaseQtyElement = cartItem.querySelector('.increase-qty');
-    if (increaseQtyElement) {
-      increaseQtyElement.id = `increase_quantity_${product.id}`;
-      increaseQtyElement.addEventListener('click', (event) => this.increaseQtyItem(event));
-    }
+    // Loop through each product in the cart
+    cart.forEach((product) => {
+        const cartItem = cartItemTemplate.cloneNode(true); // Clone template for each product
 
-    const quantityInputElement = cartItem.querySelector('.quantity');
-    if (quantityInputElement) {
-      quantityInputElement.id = `quantity_${product.id}`;
-    }
-
-
-
-    // Loop through product keys and update corresponding elements
-    Object.keys(product).forEach((key) => {
-
-      const targetElement = cartItem.querySelector(`#${key}`);
-
-      if (targetElement) {
-        if (key === "sale_price") {
-          const priceElement = cartItem.querySelector('.cartique_cart_product_price');
-          if (priceElement) {
-            priceElement.style.textDecoration = "line-through"; // Strike-through if sale_price exists
-          }
-          targetElement.textContent = product[key]; // Set the sale price text
-          subTotal += product[key]; // Add the sale price to subtotal
-        } else if (key === "price" && !product.sale_price) {
-  targetElement.textContent = product[key]; // Set the price text
-  subTotal += parseFloat(product[key]); // Add the price to subtotal
-}
-else if (key === "image") {
-          targetElement.src = product[key]; // Set image src
-        } else if (key === "currency" && typeof product.sale_price === 'number' && product.sale_price > 0) {
-
-    const currencyElements = cartItem.querySelectorAll(`#${key}`);  
-      // Select all elements with the matching id or class
-      currencyElements.forEach(currencyElement => {
-        currencyElement.textContent = product[key];  
-      });
-
-
-        } else if (key === "currency") {
-
-    const currencyElement = cartItem.querySelector(`#${key}`);  
-      // Select all elements with the matching id or class
-      
-        currencyElement.textContent = product[key];  
-      
-
-
-        } 
-
-
-
-        else {
-          targetElement.textContent = product[key]; // Set text content for other keys
+        const removeItemElement = cartItem.querySelector('#remove-item');
+        if (removeItemElement) {
+            removeItemElement.id = product.id;
+            removeItemElement.addEventListener('click', (event) => this.removeCartItem(event));
         }
-      }
 
-/// now update quantity with quanity from product object 
-if (key === 'cart_quantity') {
-const productQuantityElement = cartItem.querySelector(`#quantity_${product.id}`); 
-productQuantityElement.value = product.cart_quantity;
+        const decreaseQtyElement = cartItem.querySelector('.decrease-qty');
+        if (decreaseQtyElement) {
+            decreaseQtyElement.id = `decrease_quantity_${product.id}`;
+            decreaseQtyElement.addEventListener('click', (event) => this.decreaseQtyItem(event));
+        }
 
-}
+        const increaseQtyElement = cartItem.querySelector('.increase-qty');
+        if (increaseQtyElement) {
+            increaseQtyElement.id = `increase_quantity_${product.id}`;
+            increaseQtyElement.addEventListener('click', (event) => this.increaseQtyItem(event));
+        }
 
+        const quantityInputElement = cartItem.querySelector('.quantity');
+        if (quantityInputElement) {
+            quantityInputElement.id = `quantity_${product.id}`;
+            quantityInputElement.value = product.cart_quantity;
+        }
 
+        // --- FIXED LOGIC: Ensure all prices are numbers before adding to total ---
+        let itemPrice = product.price;
+        if (product.sale_price) {
+            itemPrice = product.sale_price;
+        }
+
+        const numericPrice = parseFloat(itemPrice);
+        if (!isNaN(numericPrice)) {
+            subTotal += numericPrice * product.cart_quantity;
+        }
+        // --- END FIXED LOGIC ---
+
+        // Loop through product keys and update corresponding elements
+        Object.keys(product).forEach((key) => {
+            const targetElement = cartItem.querySelector(`#${key}`);
+            if (targetElement) {
+                if (key === "sale_price") {
+                    const priceElement = cartItem.querySelector('.cartique_cart_product_price');
+                    if (priceElement) {
+                        priceElement.style.textDecoration = "line-through";
+                    }
+                    targetElement.textContent = product[key];
+                } else if (key === "price" && !product.sale_price) {
+                    targetElement.textContent = product[key];
+                } else if (key === "image") {
+                    targetElement.src = product[key];
+                } else if (key === "currency") {
+                    // Update all currency elements with the correct currency
+                    const currencyElements = cartItem.querySelectorAll(`#${key}`);
+                    currencyElements.forEach(currencyElement => {
+                        currencyElement.textContent = product[key];
+                    });
+                } else {
+                    targetElement.textContent = product[key];
+                }
+            }
+        });
+
+        // Append the updated item to the cart container
+        cartContainer.appendChild(cartItem);
     });
 
-    // Append the updated item to the cart container
-    cartContainer.appendChild(cartItem);
-  });
+    // Update the subtotal display after the loop
+    const subTotalElement = document.getElementById('subtotal');
+    if (subTotalElement) {
+        // --- FIXED LOGIC: Use the calculated subTotal directly ---
+        subTotalElement.textContent = subTotal.toFixed(2);
+        // --- END FIXED LOGIC ---
+    }
 
-  // Update the subtotal display after the loop
-  if (subTotalElement) {
-    subTotalElement.textContent = subTotal.toFixed(2); // Format the subtotal with two decimals
-  }
+    // Update currency display
+    const currencyElement = document.getElementById('subtotal-currency');
+    if (currencyElement && cart.length > 0) {
+        currencyElement.textContent = cart[0].currency;
+    }
 
-  // Update currency (as it is the same for all items in this cart)
-  const currencyElement = document.getElementById('subtotal-currency');
-  if (currencyElement && cart.length > 0) {
-    currencyElement.textContent = cart[0].currency; // Set the currency from the first product
-  }
-
-  // Open the cart slider and show the overlay
-  document.getElementById('cart-slide').classList.add('open');
-  document.getElementById('cart-slide-overlay').style.display = 'block';
-
-
-  //document.getElementById('cartique-hidden-blocks').style.display = 'none';
+    // Open the cart slider and show the overlay
+    document.getElementById('cart-slide').classList.add('open');
+    document.getElementById('cart-slide-overlay').style.display = 'block';
 }
 
 
+
+calculateCartTotal(cart) {
+    return cart.reduce((total, product) => {
+        const price = parseFloat(product.sale_price || product.price);
+        const quantity = parseFloat(product.cart_quantity);
+        return total + (isNaN(price) || isNaN(quantity) ? 0 : price * quantity);
+    }, 0);
+}
 
 
 
@@ -929,90 +907,64 @@ this.showCart();
 
 
 decreaseQtyItem(event) {
-  const decreaserId = event.target.id; // Example: "decrease_quantity_1"
-  const quantityInputId = decreaserId.replace('decrease_', ''); // "quantity_1"
-  const quantityInputElement = document.getElementById(quantityInputId);
+    const decreaserId = event.target.id;
+    const productId = parseInt(decreaserId.replace('decrease_quantity_', ''));
+    
+    // Retrieve the cart from localStorage
+    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    
+    // Find the item in the cart
+    const cartItemIndex = cart.findIndex(item => item.id === productId);
 
-  const subtotalElement = document.getElementById('subtotal');
-  const productId = parseInt(decreaserId.replace('decrease_quantity_', ''));
+    // If the item exists in the cart...
+    if (cartItemIndex !== -1) {
+        // Decrement the quantity. The minimum quantity is 0.
+        let newQty = Math.max(cart[cartItemIndex].cart_quantity - 1, 0);
 
-  // Get current cart from localStorage
-  let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-  
-  // Find product in products list and in cart
-  const product = this.products.find(product => product.id === productId);
-  const cartItemIndex = cart.findIndex(item => item.id === productId);
-
-  if (!product || cartItemIndex === -1) {
-    console.error(`Product with ID ${productId} not found in products or cart`);
-    return;
-  }
-
-  const productPrice = product.sale_price || product.price;
-  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0;
-
-  if (quantityInputElement) {
-    let newQty = Math.max(parseInt(quantityInputElement.value) - 1, 0);
-    quantityInputElement.value = newQty;
-
-    // Update cart quantity in localStorage
-    if (newQty === 0) {
-      this.removeCartItemBasedOnQty(productId);
+        if (newQty === 0) {
+            // If the quantity drops to zero, remove the item entirely
+            this.removeCartItemBasedOnQty(productId);
+        } else {
+            // Update the quantity in the cart data
+            cart[cartItemIndex].cart_quantity = newQty;
+            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+            
+            // Re-render the entire cart to reflect the new state and correct total
+            this.showCart();
+        }
     } else {
-      // Update the quantity in the cart
-      cart[cartItemIndex].cart_quantity = newQty;
-      localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        console.error(`Product with ID ${productId} not found in cart.`);
     }
-
-    // Update subtotal but ensure it doesn't go negative
-    const newSubtotal = Math.max(currentSubtotal - productPrice, 0);
-    subtotalElement.textContent = newSubtotal.toFixed(2);
-  } else {
-    console.error(`Element with ID ${quantityInputId} not found`);
-  }
 }
+
 
 
 
 increaseQtyItem(event) {
-  const increaserId = event.target.id; // Example: "increase_quantity_1"
-  const quantityInputId = increaserId.replace('increase_', ''); // "quantity_1"
-  const quantityInputElement = document.getElementById(quantityInputId);
+    const increaserId = event.target.id;
+    const productId = parseInt(increaserId.replace('increase_quantity_', ''));
+    
+    // Retrieve the cart from localStorage
+    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    
+    // Find the item in the cart
+    const cartItemIndex = cart.findIndex(item => item.id === productId);
 
-  const subtotalElement = document.getElementById('subtotal');
-  const productId = parseInt(increaserId.replace('increase_quantity_', ''));
+    // If the item exists in the cart...
+    if (cartItemIndex !== -1) {
+        // Increment the quantity
+        let newQty = cart[cartItemIndex].cart_quantity + 1;
+        
+        // Update the quantity in the cart data
+        cart[cartItemIndex].cart_quantity = newQty;
+        localStorage.setItem('cartiqueCart', JSON.stringify(cart));
 
-  // Get current cart from localStorage
-  let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-  
-  // Find product in products list and in cart
-  const product = this.products.find(product => product.id === productId);
-  const cartItemIndex = cart.findIndex(item => item.id === productId);
-
-  if (!product || cartItemIndex === -1) {
-    console.error(`Product with ID ${productId} not found in products or cart`);
-    return;
-  }
-
-  const productPrice = product.sale_price || product.price;
-  let currentSubtotal = parseFloat(subtotalElement.textContent) || 0;
-
-  if (quantityInputElement) {
-    let newQty = parseInt(quantityInputElement.value) + 1;
-    quantityInputElement.value = newQty;
-
-    // Update cart quantity in localStorage
-    cart[cartItemIndex].cart_quantity = newQty;
-    localStorage.setItem('cartiqueCart', JSON.stringify(cart));
-
-    // Update subtotal
-    const newSubtotal = currentSubtotal + productPrice;
-    subtotalElement.textContent = newSubtotal.toFixed(2);
-  } else {
-    console.error(`Element with ID ${quantityInputId} not found`);
-  }
+        // Re-render the entire cart to reflect the new state and correct total
+        this.showCart();
+    } else {
+        console.error(`Product with ID ${productId} not found in cart.`);
+    }
 }
-
 
 
 checkout() {
@@ -1074,11 +1026,11 @@ showCheckoutAlert() {
   // Set new timeouts
   this.toastTimer1 = setTimeout(() => {
     toast.classList.remove("active");
-  }, 5000);
+  }, 2000);
 
   this.toastTimer2 = setTimeout(() => {
     progress.classList.remove("active");
-  }, 5300);
+  }, 2300);
 
   // Close icon functionality
   closeIcon.onclick = () => {
@@ -1089,7 +1041,7 @@ showCheckoutAlert() {
 
   // Redirect after the toast disappears (after 5 seconds)
   this.redirectTimer = setTimeout(() => {
-    if (this.features.checkoutUrl && this.isValidUrl(this.features.checkoutUrl)) {
+    if (this.features.checkoutUrl) {
       let cart = JSON.parse(localStorage.getItem('cartiqueCart'));
       console.log("checkout Cart", JSON.stringify(cart, null, 2));
       window.location.href = this.features.checkoutUrl;

@@ -1,0 +1,28 @@
+cartique 
+
+fix front end 
+
+back 
+
+semantq add: cartique 
+
+routes 
+
+users table exists - can be extended - role (1, customer, 2 admin,)
+-mobile,email, gender, etc 
+
+customer_addresses| user_id | must align with typical shipment quotes structures 
+products - all possible fields and columns 
+categories - 
+
+ratings
+reviews 
+product variants
+payment_gateways
+shipping_services
+settings | currency etc 
+orders
+purchases
+inventory? 
+
+must have jsonb capabilities for extensibility 
