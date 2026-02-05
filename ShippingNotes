@@ -1,0 +1,26 @@
+
+I want us to add a Settings Table for this ecommerce system where shop owners can add soem critical details
+
+Currency 
+PaymentGateway - Options would be Yoco, Paystack, PayFast, Stripe, PayPal, or anyother 
+if Yoco - get YOCO_SECRET_KEY the testing one (Test secret key)
+so data model must have nullable fields for live and demo secret and api keys (include as many as typical for these payment gateway services)
+
+Shipping Service
+The Courrier Guy (Ship Logic) -- 
+live and demo api keys -- 
+
+checkout_mode(demo(test) or live)
+
+mehcanism for a robust keys storage for whatever payment and shipment service is added: e.g. if Yoco then: Yoco_demo_secret_key and Yoco_live_secret_key 
+
+there should be a field for isActive - only payment gateway and shipping service can be active at a time 
+
+
+
+
+
+1. get quote
+2. create quote
+3. add deliveery cost to checkout 
+4. track in ecommerce

@@ -1,2 +1,7 @@
 # cartique
 Semantq Native Ecommerce Front End UI 
+
+## TODO
+- SEARCHABLE CATEGORIES (SUB CATEGORIES)
+- VRIANT FILTERS
+- MAKE ADD TO CART VISIBLE ALWAYS

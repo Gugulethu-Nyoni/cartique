@@ -1,0 +1,35 @@
+{
+    "collection_address": {
+        "type": "business",
+        "company": "Shiplogic",
+        "street_address": "194 Bancor Avenue",
+        "local_area": "Menlyn",
+        "city": "Pretoria",
+        "zone": "Gauteng",
+        "country": "ZA",
+        "code": "0181"
+    },
+    "delivery_address": {
+        "type": "residential",
+        "company": "",
+        "street_address": "10 Midas Avenue",
+        "local_area": "Olympus AH",
+        "city": "Pretoria",
+        "zone": "Gauteng",
+        "country": "ZA",
+        "code": "0081",
+        "lat": -25.80665579999999,
+        "lng": 28.334732
+    },
+    "parcels": [
+        {
+            "submitted_length_cm": 42.5,
+            "submitted_width_cm": 38.5,
+            "submitted_height_cm": 5.5,
+            "submitted_weight_kg": 3
+        }
+    ],
+    "declared_value": 1500,
+    "collection_min_date": "2021-05-21",
+    "delivery_min_date": "2021-05-21"
+}

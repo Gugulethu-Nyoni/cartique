@@ -1,0 +1,103 @@
+
+// ======================
+// Settings & Configuration
+// ======================
+
+model StoreSettings {
+  id               Int          @id @default(autoincrement())
+  
+  // Store Information
+  storeName        String       @default("My Store") @map("store_name")
+  storeEmail       String?      @map("store_email")
+  storePhone       String?      @map("store_phone")
+  storeLogoUrl     String?      @map("store_logo_url")
+  
+  // General Settings
+  defaultCurrency  String       @default("ZAR") @map("default_currency")
+  availableCurrencies String[]  @default(["ZAR", "USD", "EUR"]) @map("available_currencies")
+  timezone         String       @default("Africa/Johannesburg") @map("timezone")
+  locale           String       @default("en-ZA") @map("locale")
+  checkoutMode     CheckoutMode @default(test) @map("checkout_mode")
+  
+  // Inventory & Orders
+  lowStockThreshold Int         @default(5) @map("low_stock_threshold")
+  autoArchiveOrdersDays Int     @default(30) @map("auto_archive_orders_days")
+  requireOrderApproval Boolean  @default(false) @map("require_order_approval")
+  
+  // Payment Gateway Settings
+  paymentGateway   String       @default("yoco") @map("payment_gateway") // "yoco", "paystack", "payfast", etc.
+  isPaymentActive  Boolean      @default(true) @map("is_payment_active")
+  
+  // Shipping Service Settings
+  shippingService  String       @default("courier_guy") @map("shipping_service") // "courier_guy", "ship_logic", "manual", etc.
+  isShippingActive Boolean      @default(true) @map("is_shipping_active")
+  
+  // API Keys & Credentials (Key-Value storage)
+  paymentConfig    Json         @map("payment_config") // Store all payment gateway keys
+  shippingConfig   Json         @map("shipping_config") // Store all shipping service keys
+  
+  // Other Settings
+  defaultShippingRate    Float?  @default(0.00) @map("default_shipping_rate")
+  freeShippingThreshold  Float?  @map("free_shipping_threshold")
+  metadata              Json?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("store_settings")
+}
+
+enum CheckoutMode {
+  test
+  live
+}
+
+
+
+
+{
+  "yoco": {
+    "live_secret_key": "sk_live_xxx",
+    "test_secret_key": "sk_test_xxx"
+  },
+  "paystack": {
+    "live_secret_key": "sk_live_xxx",
+    "live_public_key": "pk_live_xxx",
+    "test_secret_key": "sk_test_xxx",
+    "test_public_key": "pk_test_xxx"
+  },
+  "payfast": {
+    "live_merchant_id": "xxx",
+    "live_merchant_key": "xxx",
+    "live_passphrase": "xxx",
+    "test_merchant_id": "xxx",
+    "test_merchant_key": "xxx",
+    "test_passphrase": "xxx"
+  },
+  "stripe": {
+    "live_secret_key": "sk_live_xxx",
+    "live_publishable_key": "pk_live_xxx",
+    "test_secret_key": "sk_test_xxx",
+    "test_publishable_key": "pk_test_xxx"
+  }
+}
+
+
+
+
+
+{
+  "courier_guy": {
+    "live_api_key": "xxx",
+    "live_username": "xxx",
+    "live_password": "xxx",
+    "test_api_key": "xxx",
+    "test_username": "xxx",
+    "test_password": "xxx"
+  },
+  "ship_logic": {
+    "live_api_key": "xxx",
+    "live_client_id": "xxx",
+    "test_api_key": "xxx",
+    "test_client_id": "xxx"
+  }
+}
