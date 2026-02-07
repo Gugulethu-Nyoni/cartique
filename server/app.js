@@ -1,4 +1,4 @@
-import Cartique from './cartique.js';
+import Cartique from './cartique_2.js';
 
 // Example Usage:
 const products = [
