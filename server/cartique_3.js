@@ -34,13 +34,19 @@ export default class Cartique {
       footerDisplay: 'block',
       
       // Filters
-      sidebarFeatures: {
-        filters: {
-          Color: ['Red', 'Blue', 'Green'],
-          Size: ['S', 'M', 'L'],
-          Brand: ['Adidas', 'Nike', 'Puma'],
+      menu: {
+            enabled: false,
+            type: 'inline', // 'mega', 'inline', 'stacked'
+            position: 'top', // 'top', 'sidebar', 'custom'
+            containerId: 'cartique-catalogue-menu',
+            label: 'Categories',
+            showCounts: true,
+            megaMenuColumns: 3
         },
-      },
+
+        sidebarFeatures: {
+            filters: {}, // Now dynamically populated via extractVariantFilters
+        },
     };
 
     // Merge features with proper deep merge for nested objects
@@ -54,6 +60,9 @@ export default class Cartique {
     this.currentLayout = 'grid';
     this.singleProductViewActive = false;
     this.previousViewState = null;
+
+    this.categories = this._extractCategories(); 
+    this.activeCategoryId = null;
     
     // DOM References
     this.container = null;
@@ -67,398 +76,191 @@ export default class Cartique {
     this.toastTimer2 = null;
     this.redirectTimer = null;
 
-
-    this.menuConfig = {
-      enabled: features.menu?.enabled ?? false,
-      type: features.menu?.type ?? 'mega', // 'mega', 'inline', 'stacked'
-      position: features.menu?.position ?? 'top', // 'top', 'sidebar', 'custom'
-      containerId: features.menu?.containerId ?? 'cartique-catalogue-menu',
-      label: features.menu?.label ?? 'Catalogue',
-      maxVisibleItems: features.menu?.maxVisibleItems ?? 5,
-      showCounts: features.menu?.showCounts ?? true,
-      collapseOnMobile: features.menu?.collapseOnMobile ?? true,
-      animationSpeed: features.menu?.animationSpeed ?? 300,
-      megaMenuColumns: features.menu?.megaMenuColumns ?? 3
-    };
-
     // Initialize the component
     this.init();
   }
 
-/* CATEGORY DRIVEN MENU */
+/* CARTIQUE MENU IMPLEMENTATION */
 
-
-
-  generateCatalogMenu() {
-    if (!this.menuConfig.enabled) return null;
-
-    // Extract categories from products
-    const categories = this.extractCategories();
-    const menu = document.createElement('div');
-    menu.id = this.menuConfig.containerId;
-    menu.className = `cartique-catalogue-menu menu-type-${this.menuConfig.type}`;
-
-    switch (this.menuConfig.type) {
-      case 'inline':
-        menu.appendChild(this.createInlineMenu(categories));
-        break;
-      case 'stacked':
-        menu.appendChild(this.createStackedMenu(categories));
-        break;
-      case 'mega':
-      default:
-        menu.appendChild(this.createMegaMenu(categories));
-        break;
-    }
-
-    return menu;
-  }
-
-  extractCategories() {
-    const categoryMap = new Map();
-    
+_extractCategories() {
+    const catMap = new Map();
     this.products.forEach(product => {
-      if (product.categories && Array.isArray(product.categories)) {
-        product.categories.forEach(cat => {
-          const existing = categoryMap.get(cat.id) || {
-            id: cat.id,
-            name: cat.name,
-            count: 0,
-            subcategories: new Map(),
-            products: []
-          };
-          existing.count++;
-          existing.products.push(product.id);
-          categoryMap.set(cat.id, existing);
+        product.categories?.forEach(cat => {
+            if (!catMap.has(cat.id)) {
+                catMap.set(cat.id, { id: cat.id, name: cat.name, count: 0 });
+            }
+            catMap.get(cat.id).count++;
         });
-      }
     });
+    return Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
 
-    // Convert to array and sort by count (desc)
-    return Array.from(categoryMap.values())
-      .sort((a, b) => b.count - a.count);
-  }
 
-  createInlineMenu(categories) {
-    const container = document.createElement('div');
-    container.className = 'cartique-menu-inline';
-    
-    const ul = document.createElement('ul');
-    ul.className = 'cartique-menu-list';
-    
-    // Show limited items for inline menu
-    const visibleItems = this.menuConfig.maxVisibleItems 
-      ? categories.slice(0, this.menuConfig.maxVisibleItems)
-      : categories;
-    
-    visibleItems.forEach(category => {
-      const li = this.createMenuItem(category);
-      ul.appendChild(li);
-    });
+async renderCatalogueMenu() {
+    const cfg = this.features.menu;
+    if (!cfg || !cfg.enabled) return;
 
-    // Add "More" dropdown if there are more categories
-    if (this.menuConfig.maxVisibleItems && categories.length > this.menuConfig.maxVisibleItems) {
-      const moreLi = this.createMoreDropdown(categories.slice(this.menuConfig.maxVisibleItems));
-      ul.appendChild(moreLi);
+    // 1. Target Container Selection
+    let anchor;
+    if (cfg.position === 'custom' && cfg.containerId) {
+        anchor = document.getElementById(cfg.containerId);
+    } else {
+        const anchorId = cfg.position === 'sidebar' ? 'cartique-menu-anchor-sidebar' : 'cartique-menu-anchor-top';
+        anchor = document.getElementById(anchorId);
+    }
+    if (!anchor) return;
+
+    const categories = this.categories || this._extractCategories();
+    const activeId = String(this.activeCategoryId || 'all');
+    
+    let innerHtml = '';
+
+    if (cfg.type === 'mega') {
+        innerHtml = `
+            <div class="cartique-mega-wrapper">
+                <button class="mega-trigger" aria-expanded="false">
+                    ${cfg.label} <span class="chevron"></span>
+                </button>
+                <div class="mega-content" style="grid-template-columns: repeat(${cfg.megaMenuColumns || 3}, 1fr);">
+                    <div class="mega-item ${activeId === 'all' ? 'active' : ''}" data-cat-id="all">
+                        <strong>All Products</strong>
+                    </div>
+                    ${categories.map(cat => `
+                        <div class="mega-item ${activeId === String(cat.id) ? 'active' : ''}" data-cat-id="${cat.id}">
+                            <span class="cat-name">${cat.name}</span>
+                            ${cfg.showCounts ? `<span class="count">(${cat.count})</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+    } else {
+        const isInline = cfg.type === 'inline';
+        innerHtml = `
+            <div class="cartique-menu-container type-${cfg.type} ${cfg.collapseOnMobile ? 'mobile-collapse' : ''}">
+                <ul class="cartique-menu-list">
+                    ${!isInline ? `<li class="menu-label">${cfg.label}</li>` : ''}
+                    <li class="cartique-menu-item ${activeId === 'all' ? 'active' : ''}" data-cat-id="all">All</li>
+                    ${categories.map((cat, index) => `
+                        <li class="cartique-menu-item ${activeId === String(cat.id) ? 'active' : ''} 
+                            ${isInline && index >= cfg.maxVisibleItems ? 'item-hidden' : ''}" 
+                            data-cat-id="${cat.id}">
+                            <span class="cat-name">${cat.name}</span>
+                            ${cfg.showCounts ? `<span class="cat-count">(${cat.count})</span>` : ''}
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>`;
     }
 
-    container.appendChild(ul);
-    return container;
-  }
-
-  // NEW METHOD: Create stacked menu (label + dropdown)
-  createStackedMenu(categories) {
-    const container = document.createElement('div');
-    container.className = 'cartique-menu-stacked';
+    anchor.innerHTML = innerHtml;
+    this._attachMenuEvents(anchor);
     
-    // Label/button to toggle menu
-    const toggleBtn = document.createElement('button');
-    toggleBtn.className = 'cartique-menu-toggle';
-    toggleBtn.innerHTML = `
-      <span class="cartique-menu-label">${this.menuConfig.label}</span>
-      <span class="cartique-menu-icon">▼</span>
-    `;
-    
-    // Dropdown container
-    const dropdown = document.createElement('div');
-    dropdown.className = 'cartique-menu-dropdown';
-    dropdown.style.display = 'none';
-    
-    const ul = document.createElement('ul');
-    ul.className = 'cartique-menu-list';
-    
-    categories.forEach(category => {
-      const li = this.createMenuItem(category);
-      ul.appendChild(li);
-    });
-    
-    dropdown.appendChild(ul);
-    container.appendChild(toggleBtn);
-    container.appendChild(dropdown);
-
-    // Toggle functionality
-    this.addEventListener(toggleBtn, 'click', () => {
-      const isVisible = dropdown.style.display === 'block';
-      dropdown.style.display = isVisible ? 'none' : 'block';
-      toggleBtn.querySelector('.cartique-menu-icon').textContent = 
-        isVisible ? '▼' : '▲';
-    });
-
-    // Close on click outside
-    this.addEventListener(document, 'click', (e) => {
-      if (!container.contains(e.target)) {
-        dropdown.style.display = 'none';
-        toggleBtn.querySelector('.cartique-menu-icon').textContent = '▼';
-      }
-    });
-
-    return container;
-  }
-
-  // NEW METHOD: Create mega menu (multi-column)
-  createMegaMenu(categories) {
-    const container = document.createElement('div');
-    container.className = 'cartique-menu-mega';
-    
-    // Menu header
-    const header = document.createElement('div');
-    header.className = 'cartique-menu-header';
-    header.textContent = this.menuConfig.label;
-    container.appendChild(header);
-
-    // Mega menu content
-    const content = document.createElement('div');
-    content.className = 'cartique-menu-content';
-    
-    // Calculate column distribution
-    const itemsPerColumn = Math.ceil(categories.length / this.menuConfig.megaMenuColumns);
-    
-    for (let i = 0; i < this.menuConfig.megaMenuColumns; i++) {
-      const column = document.createElement('div');
-      column.className = 'cartique-menu-column';
-      
-      const start = i * itemsPerColumn;
-      const end = start + itemsPerColumn;
-      const columnItems = categories.slice(start, end);
-      
-      const ul = document.createElement('ul');
-      ul.className = 'cartique-menu-list';
-      
-      columnItems.forEach(category => {
-        const li = this.createMenuItem(category);
-        ul.appendChild(li);
-      });
-      
-      column.appendChild(ul);
-      content.appendChild(column);
+    if (cfg.type === 'mega') {
+        const wrapper = anchor.querySelector('.cartique-mega-wrapper');
+        const trigger = anchor.querySelector('.mega-trigger');
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            wrapper.classList.toggle('is-open');
+        });
+        document.addEventListener('click', () => wrapper.classList.remove('is-open'), { once: true });
     }
-    
-    container.appendChild(content);
-    return container;
-  }
+}
 
-  // NEW METHOD: Create individual menu item
-  createMenuItem(category) {
-    const li = document.createElement('li');
-    li.className = 'cartique-menu-item';
-    li.dataset.categoryId = category.id;
-    
-    const link = document.createElement('a');
-    link.href = '#';
-    link.className = 'cartique-menu-link';
-    
-    let content = `<span class="cartique-menu-name">${category.name}</span>`;
-    
-    if (this.menuConfig.showCounts) {
-      content += `<span class="cartique-menu-count">(${category.count})</span>`;
-    }
-    
-    link.innerHTML = content;
-    li.appendChild(link);
 
-    // Click handler for filtering by category
-    this.addEventListener(link, 'click', (e) => {
-      e.preventDefault();
-      this.filterByCategory(category.id);
-    });
 
-    return li;
-  }
-
-  // NEW METHOD: Create "More" dropdown
-  createMoreDropdown(hiddenCategories) {
-    const li = document.createElement('li');
-    li.className = 'cartique-menu-item cartique-menu-more';
-    
-    const moreLink = document.createElement('a');
-    moreLink.href = '#';
-    moreLink.className = 'cartique-menu-link';
-    moreLink.textContent = 'More ▼';
-    
-    const dropdown = document.createElement('div');
-    dropdown.className = 'cartique-menu-more-dropdown';
-    dropdown.style.display = 'none';
-    
-    const ul = document.createElement('ul');
-    ul.className = 'cartique-menu-list';
-    
-    hiddenCategories.forEach(category => {
-      const subLi = this.createMenuItem(category);
-      ul.appendChild(subLi);
-    });
-    
-    dropdown.appendChild(ul);
-    li.appendChild(moreLink);
-    li.appendChild(dropdown);
-
-    // Toggle functionality
-    this.addEventListener(moreLink, 'click', (e) => {
-      e.preventDefault();
-      const isVisible = dropdown.style.display === 'block';
-      dropdown.style.display = isVisible ? 'none' : 'block';
-      moreLink.textContent = isVisible ? 'More ▼' : 'More ▲';
-    });
-
-    return li;
-  }
-
-  // NEW METHOD: Filter products by category
-  filterByCategory(categoryId) {
-    this.filteredProducts = this.products.filter(product => 
-      product.categories?.some(cat => cat.id === categoryId)
-    );
-    
-    // Update UI
-    this.renderProducts(this.currentLayout);
-    
-    // Close any open menus
-    this.closeAllMenus();
-    
-    // Scroll to products if menu was in sidebar
-    if (this.menuConfig.position === 'sidebar') {
-      document.getElementById('cartique-product-displays')?.scrollIntoView({ 
-        behavior: 'smooth' 
-      });
-    }
-  }
-
-  // NEW METHOD: Close all open menus
-  closeAllMenus() {
-    document.querySelectorAll('.cartique-menu-dropdown, .cartique-menu-more-dropdown').forEach(dropdown => {
-      dropdown.style.display = 'none';
-    });
-    
-    // Reset toggle icons
-    document.querySelectorAll('.cartique-menu-more').forEach(item => {
-      const link = item.querySelector('.cartique-menu-link');
-      if (link) link.textContent = 'More ▼';
-    });
-  }
-
-  // NEW METHOD: Inject menu into DOM
-  injectMenu() {
-    if (!this.menuConfig.enabled) return;
-    
-    const menu = this.generateCatalogMenu();
-    if (!menu) return;
-    
-    let targetElement;
-    
-    switch (this.menuConfig.position) {
-      case 'top':
-        targetElement = document.querySelector('.cartique-controls');
-        if (targetElement) {
-          targetElement.parentNode.insertBefore(menu, targetElement);
+_resolveMenuContainer(menu) {
+    // Priority 1: Custom ID provided in HTML
+    if (menu.position === 'custom' && menu.containerId) {
+        let customEl = document.getElementById(menu.containerId);
+        if (!customEl) {
+            console.warn(`Cartique: #${menu.containerId} not found. Creating placeholder.`);
+            customEl = document.createElement('div');
+            customEl.id = menu.containerId;
+            this.container.prepend(customEl); // Fallback placement
         }
-        break;
-      case 'sidebar':
-        targetElement = document.getElementById('cartique-sidebar');
-        if (targetElement) {
-          targetElement.prepend(menu);
-        }
-        break;
-      case 'custom':
-        targetElement = document.getElementById(this.menuConfig.containerId);
-        if (targetElement) {
-          targetElement.appendChild(menu);
-        }
-        break;
+        return customEl;
     }
-    
-    // Add mobile behavior
-    this.addMobileBehavior();
-  }
 
-  // NEW METHOD: Add mobile-responsive behavior
-  addMobileBehavior() {
-    if (!this.menuConfig.collapseOnMobile) return;
-    
-    const mediaQuery = window.matchMedia('(max-width: 768px)');
-    
-    const handleMobileChange = (e) => {
-      const menu = document.getElementById(this.menuConfig.containerId);
-      if (!menu) return;
-      
-      if (e.matches) {
-        // Mobile: Convert mega/inline to stacked
-        if (this.menuConfig.type === 'mega' || this.menuConfig.type === 'inline') {
-          menu.className = `cartique-catalogue-menu menu-type-stacked`;
-          const categories = this.extractCategories();
-          menu.innerHTML = '';
-          menu.appendChild(this.createStackedMenu(categories));
-        }
-      } else {
-        // Desktop: Restore original type
-        menu.className = `cartique-catalogue-menu menu-type-${this.menuConfig.type}`;
-        const categories = this.extractCategories();
-        menu.innerHTML = '';
-        
-        switch (this.menuConfig.type) {
-          case 'inline':
-            menu.appendChild(this.createInlineMenu(categories));
-            break;
-          case 'stacked':
-            menu.appendChild(this.createStackedMenu(categories));
-            break;
-          case 'mega':
-            menu.appendChild(this.createMegaMenu(categories));
-            break;
-        }
-      }
-    };
-    
-    // Initial check
-    handleMobileChange(mediaQuery);
-    
-    // Listen for changes
-    mediaQuery.addListener(handleMobileChange);
-  }
-
-  // Updated init method to include menu injection
-  async init() {
-    try {
-      // [All existing init code...]
-      
-      // NEW: Inject menu if enabled
-      if (this.menuConfig.enabled) {
-        this.injectMenu();
-      }
-      
-      // Complete initialization
-      this.completeInitialization();
-      
-    } catch (error) {
-      console.error('Failed to initialize Cartique:', error);
-      this.showErrorMessage('Failed to load product catalog');
+    // Priority 2: Injected into the Sidebar
+    if (menu.position === 'sidebar') {
+        return this.container.querySelector('.cartique-sidebar-inner');
     }
-  }
+
+    // Priority 3: Default Top Position
+    return this.container.querySelector('.cartique-header-nav');
+}
 
 
 
-/* END CATEGORY DRIVEN MENU */
+applyFilters() {
+    this.filteredProducts = this.products.filter(product => {
+        // 1. Category Filter
+        const matchesCategory = !this.activeCategoryId || 
+            product.categories.some(c => c.id === parseInt(this.activeCategoryId));
+
+        // 2. Variant Attribute Filter
+        const matchesAttributes = Object.entries(this.activeFilters).every(([key, selectedValues]) => {
+            if (!selectedValues.length) return true;
+            
+            // Check if any variant has an attribute matching the selected filters
+            return product.variants?.some(variant => 
+                variant.attributes.some(attr => 
+                    attr.key.toLowerCase() === key.toLowerCase() && 
+                    selectedValues.includes(attr.value)
+                )
+            );
+        });
+
+        return matchesCategory && matchesAttributes;
+    });
+
+    this.renderProducts();
+}
 
 
 
+_attachMenuEvents(container) {
+    // 1. Handle Category Selection (Pills, List Items, and Mega Items)
+    const selectors = '.cartique-menu-item, .mega-item';
+    
+    container.querySelectorAll(selectors).forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            const catId = item.getAttribute('data-cat-id');
+            
+            // Update the active state in the class
+            this.activeCategoryId = (catId === 'all') ? null : catId;
+
+            // UI: Close Mega Menu if it's open
+            const wrapper = container.querySelector('.cartique-mega-wrapper');
+            if (wrapper) {
+                wrapper.classList.remove('is-open');
+            }
+
+            // UI: Re-render the menu to show the new "active" state
+            this.renderCatalogueMenu();
+
+            // TRIGGER FILTER: Call your existing filter/search logic
+            // Note: Replace 'handleSearch' with your actual product filtering method name
+            if (typeof this.handleSearch === 'function') {
+                this.handleSearch();
+            } else if (typeof this.renderProductDisplays === 'function') {
+                this.renderProductDisplays();
+            }
+        });
+    });
+
+    // 2. Accessibility: Close Mega Menu on 'Escape' key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const wrapper = container.querySelector('.cartique-mega-wrapper');
+            if (wrapper) wrapper.classList.remove('is-open');
+        }
+    });
+}
+
+/* END CARTIQUE MENU IMPLEMENTATION */
 
 
 
@@ -594,69 +396,87 @@ export default class Cartique {
 
   async renderAllComponents() {
     const renderMethods = [
-      this.renderMainFrame.bind(this),
-      this.renderSidebar.bind(this),
-      this.renderControls.bind(this),
-      this.renderProductDisplays.bind(this),
-      this.renderFooter.bind(this),
-      this.renderCartSlider.bind(this),
-      this.renderCartItemTemplate.bind(this)
+        this.renderMainFrame.bind(this),          
+        this.renderSidebar.bind(this),
+        this.renderCatalogueMenu.bind(this),     
+        this.renderControls.bind(this),
+        this.renderProductDisplays.bind(this),
+        this.renderFooter.bind(this),
+        this.renderCartSlider.bind(this),
+        this.renderCartItemTemplate.bind(this)
     ];
 
     // Render components sequentially
     for (const method of renderMethods) {
-      await method();
+        try {
+            await method();
+        } catch (error) {
+            console.error(`Render failed for method: ${method.name}`, error);
+        }
     }
-  }
+}
+
+
 
   async renderMainFrame() {
-    const mainFrameTemplate = document.createElement('template');
-    mainFrameTemplate.innerHTML = `
-      <div class="cartique-container" id="cartique-container">
-        <aside class="cartique-sidebar" id="cartique-sidebar" style="display: ${this.features.sidebarDisplay}"></aside>
-        <main class="cartique-main-content" id="cartique-main-content">
-          <div class="cartique-controls" id="cartique-controls">
-            <div class="cartique-search-container" id="cartique-search-container"></div>
-            <div class="cartique-sort-container" id="cartique-sort-container"></div>
-            <div class="cartique-view-toggles-container" id="cartique-view-toggles-container"></div>
-            <div class="shopping-cart-icon-container" id="shopping-cart-icon-container"></div>
-          </div>
-          <div class="cartique-product-displays" id="cartique-product-displays">
-            <div class="cartique-product-grid" id="cartique-product-grid"></div>
-            <div class="cartique-product-list" id="cartique-product-list"></div>
-          </div>
-          <footer class="cartique-product-footer" id="cartique-product-footer" style="display:${this.features.footerDisplay}"></footer>
-        </main>
-      </div>
+  const mainFrameTemplate = document.createElement('template');
+  mainFrameTemplate.innerHTML = `
+    <div class="cartique-container" id="cartique-container">
+      
+      <aside class="cartique-sidebar" id="cartique-sidebar" style="display: ${this.features.sidebarDisplay}">
+        <div id="cartique-menu-anchor-sidebar" class="cartique-menu-anchor"></div>
+        <div id="cartique-sidebar-content"></div> 
+      </aside>
 
-      <div id="cartique-hidden-blocks" style="display:none;"></div>
-      <div class="cart-overlay" id="cart-slide-overlay"></div>
+      <main class="cartique-main-content" id="cartique-main-content">
+        
+        <div id="cartique-menu-anchor-top" class="cartique-menu-anchor"></div>
 
-      <div id="toast-container">
-        <div class="toast">
-          <div class="toast-content">
-            <span class="svg">✓</span>
-            <div class="message">
-              <span class="text text-1">Success</span>
-              <span class="text text-2">
-                You will now be redirected to the login page to complete your checkout.
-              </span>
-            </div>
-          </div>
-          <i class="fa-solid fa-xmark close"></i>
-          <div class="progress"></div>
+        <div class="cartique-controls" id="cartique-controls">
+          <div class="cartique-search-container" id="cartique-search-container"></div>
+          <div class="cartique-sort-container" id="cartique-sort-container"></div>
+          <div class="cartique-view-toggles-container" id="cartique-view-toggles-container"></div>
+          <div class="shopping-cart-icon-container" id="shopping-cart-icon-container"></div>
         </div>
-      </div>
-    `;
 
-    this.container.appendChild(mainFrameTemplate.content.cloneNode(true));
-    
-    // Set up overlay click handler
-    const overlay = document.getElementById('cart-slide-overlay');
-    if (overlay) {
-      this.addEventListener(overlay, 'click', this.closeCart.bind(this));
-    }
+        <div class="cartique-product-displays" id="cartique-product-displays">
+          <div class="cartique-product-grid" id="cartique-product-grid"></div>
+          <div class="cartique-product-list" id="cartique-product-list"></div>
+        </div>
+
+        <footer class="cartique-product-footer" id="cartique-product-footer" style="display:${this.features.footerDisplay}"></footer>
+      </main>
+    </div>
+
+    <div id="cartique-hidden-blocks" style="display:none;"></div>
+    <div class="cart-overlay" id="cart-slide-overlay"></div>
+
+    <div id="toast-container">
+      <div class="toast">
+        <div class="toast-content">
+          <span class="svg">✓</span>
+          <div class="message">
+            <span class="text text-1">Success</span>
+            <span class="text text-2">
+              You will now be redirected to the login page to complete your checkout.
+            </span>
+          </div>
+        </div>
+        <i class="fa-solid fa-xmark close"></i>
+        <div class="progress"></div>
+      </div>
+    </div>
+  `;
+
+  this.container.appendChild(mainFrameTemplate.content.cloneNode(true));
+  
+  // Set up overlay click handler
+  const overlay = document.getElementById('cart-slide-overlay');
+  if (overlay) {
+    this.addEventListener(overlay, 'click', this.closeCart.bind(this));
   }
+}
+
 
   async renderSidebar() {
     const sidebarWrapper = this.templateHolder.content.getElementById('cartique-sidebar-component');

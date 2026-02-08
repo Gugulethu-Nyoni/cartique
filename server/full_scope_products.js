@@ -1,5 +1,3 @@
-const currencySymbol = 'R';
-
 export const products = [
   {
     id: 1,
@@ -634,47 +632,3 @@ export const products = [
     ]
   }
 ];
-
-
-
-function extractVariantFilters(products, currencySymbol = '$') {
-  const filters = {};
-  const prices = [];
-  
-  // Single pass to collect everything
-  products.forEach(p => p.variants?.forEach(v => {
-    const priceNum = parseFloat(v.price);
-    if (!isNaN(priceNum)) prices.push(priceNum);
-    
-    v.attributes?.forEach(a => {
-      (filters[a.key] = filters[a.key] || new Set()).add(a.value);
-    });
-  }));
-  
-  // Add price ranges
-  if (prices.length) {
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const step = (max - min) / 6;
-    
-    filters.priceRange = new Set([
-      `Under ${currencySymbol}${Math.floor(min + step)}`,
-      `${currencySymbol}${Math.floor(min + step) + 1}-${currencySymbol}${Math.floor(min + step * 2)}`,
-      `${currencySymbol}${Math.floor(min + step * 2) + 1}-${currencySymbol}${Math.floor(min + step * 3)}`,
-      `${currencySymbol}${Math.floor(min + step * 3) + 1}-${currencySymbol}${Math.floor(min + step * 4)}`,
-      `${currencySymbol}${Math.floor(min + step * 4) + 1}-${currencySymbol}${Math.floor(min + step * 5)}`,
-      `Over ${currencySymbol}${Math.floor(min + step * 5)}`
-    ]);
-  }
-  
-  // Convert to arrays
-  return Object.fromEntries(
-    Object.entries(filters).map(([k, v]) => [k, Array.from(v).sort()])
-  );
-}
-
-
-
-
-const productFilters = extractVariantFilters(products, currencySymbol); 
-console.log(productFilters);
