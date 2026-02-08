@@ -1,40 +1,31 @@
 "use strict";
 
 export default class Cartique {
-  constructor(products, features = {}) {
-    // Validate required parameters
+ constructor(products, features = {}) {
+    // 1. Validation
     if (!products || !Array.isArray(products)) {
-      throw new Error('Cartique requires an array of products');
+        throw new Error('Cartique requires an array of products');
     }
 
-    // Default features with better organization
+    // 2. Default Configuration & Feature Merging
     this.defaultFeatures = {
-      // Layout
-      grid: true,
-      pagination: true,
-      columns: 3,
-      rows: 10,
-      
-      // UI Components
-      sidebar: true,
-      footer: true,
-      search: true,
-      sorting: true,
-      sale: false,
-      
-      // Configuration
-      theme: 'dark',
-      containerId: 'cartique',
-      containerClass: 'cartique-container',
-      checkoutUrl: '#',
-      checkoutUrlMode: 'self',
-      
-      // Display states
-      sidebarDisplay: 'block',
-      footerDisplay: 'block',
-      
-      // Filters
-      menu: {
+        grid: true,
+        pagination: true,
+        columns: 3,
+        rows: 10,
+        sidebar: true,
+        footer: true,
+        search: true,
+        sorting: true,
+        sale: false,
+        theme: 'dark',
+        containerId: 'cartique',
+        containerClass: 'cartique-container',
+        checkoutUrl: '#',
+        checkoutUrlMode: 'self',
+        sidebarDisplay: 'block',
+        footerDisplay: 'block',
+        menu: {
             enabled: false,
             type: 'inline', // 'mega', 'inline', 'stacked'
             position: 'top', // 'top', 'sidebar', 'custom'
@@ -43,42 +34,44 @@ export default class Cartique {
             showCounts: true,
             megaMenuColumns: 3
         },
-
         sidebarFeatures: {
-            filters: {}, // Now dynamically populated via extractVariantFilters
-        },
+            filters: {}, // Dynamically injected from extractVariantFilters
+        }
     };
 
-    // Merge features with proper deep merge for nested objects
+    // Deep merge to ensure nested objects like sidebarFeatures aren't overwritten
     this.features = this.deepMerge(this.defaultFeatures, features);
+    this.currencySymbol = this.features.currencySymbol || '$';
 
-    // Initialize
+
+    // 3. Data State Management
     this.products = products;
     this.filteredProducts = [...products];
+    this.categories = this._extractCategories(); 
+    
+    // UI State Tracking
     this.currentSearchQuery = '';
     this.currentSortType = '';
     this.currentLayout = 'grid';
+    this.activeCategoryId = null;
+    this.activeFilters = {}; // Key format: { color: Set(['Red']), size: Set(['XL']) }
     this.singleProductViewActive = false;
     this.previousViewState = null;
 
-    this.categories = this._extractCategories(); 
-    this.activeCategoryId = null;
-    
-    // DOM References
+    // 4. Component Lifecycle References
     this.container = null;
     this.templateHolder = null;
-    
-    // Event listener cleanup
     this.eventListeners = new Map();
     
-    // Timeouts for cleanup
+    // Cleanup Timers
     this.toastTimer1 = null;
     this.toastTimer2 = null;
     this.redirectTimer = null;
 
-    // Initialize the component
+    // 5. Fire off the Engine
     this.init();
-  }
+}
+
 
 /* CARTIQUE MENU IMPLEMENTATION */
 
@@ -97,17 +90,24 @@ _extractCategories() {
 
 
 async renderCatalogueMenu() {
+    // 1. Get config and set defaults if keys are missing
     const cfg = this.features.menu;
     if (!cfg || !cfg.enabled) return;
 
-    // 1. Target Container Selection
+    // Set Defaults: type -> mega, position -> top
+    const menuType = cfg.type || 'mega';
+    const menuPosition = cfg.position || 'top';
+    const menuColumns = cfg.megaMenuColumns || 3;
+
+    // 2. Determine Target Container using the defaulted position
     let anchor;
-    if (cfg.position === 'custom' && cfg.containerId) {
+    if (menuPosition === 'custom' && cfg.containerId) {
         anchor = document.getElementById(cfg.containerId);
     } else {
-        const anchorId = cfg.position === 'sidebar' ? 'cartique-menu-anchor-sidebar' : 'cartique-menu-anchor-top';
+        const anchorId = menuPosition === 'sidebar' ? 'cartique-menu-anchor-sidebar' : 'cartique-menu-anchor-top';
         anchor = document.getElementById(anchorId);
     }
+    
     if (!anchor) return;
 
     const categories = this.categories || this._extractCategories();
@@ -115,13 +115,14 @@ async renderCatalogueMenu() {
     
     let innerHtml = '';
 
-    if (cfg.type === 'mega') {
+    // Use menuType variable instead of cfg.type
+    if (menuType === 'mega') {
         innerHtml = `
             <div class="cartique-mega-wrapper">
                 <button class="mega-trigger" aria-expanded="false">
-                    ${cfg.label} <span class="chevron"></span>
+                    ${cfg.label || 'Categories'} <span class="chevron"></span>
                 </button>
-                <div class="mega-content" style="grid-template-columns: repeat(${cfg.megaMenuColumns || 3}, 1fr);">
+                <div class="mega-content" style="grid-template-columns: repeat(${menuColumns}, 1fr);">
                     <div class="mega-item ${activeId === 'all' ? 'active' : ''}" data-cat-id="all">
                         <strong>All Products</strong>
                     </div>
@@ -134,15 +135,15 @@ async renderCatalogueMenu() {
                 </div>
             </div>`;
     } else {
-        const isInline = cfg.type === 'inline';
+        const isInline = menuType === 'inline';
         innerHtml = `
-            <div class="cartique-menu-container type-${cfg.type} ${cfg.collapseOnMobile ? 'mobile-collapse' : ''}">
+            <div class="cartique-menu-container type-${menuType} ${cfg.collapseOnMobile ? 'mobile-collapse' : ''}">
                 <ul class="cartique-menu-list">
-                    ${!isInline ? `<li class="menu-label">${cfg.label}</li>` : ''}
+                    ${!isInline ? `<li class="menu-label">${cfg.label || 'Categories'}</li>` : ''}
                     <li class="cartique-menu-item ${activeId === 'all' ? 'active' : ''}" data-cat-id="all">All</li>
                     ${categories.map((cat, index) => `
                         <li class="cartique-menu-item ${activeId === String(cat.id) ? 'active' : ''} 
-                            ${isInline && index >= cfg.maxVisibleItems ? 'item-hidden' : ''}" 
+                            ${isInline && index >= (cfg.maxVisibleItems || 5) ? 'item-hidden' : ''}" 
                             data-cat-id="${cat.id}">
                             <span class="cat-name">${cat.name}</span>
                             ${cfg.showCounts ? `<span class="cat-count">(${cat.count})</span>` : ''}
@@ -155,7 +156,8 @@ async renderCatalogueMenu() {
     anchor.innerHTML = innerHtml;
     this._attachMenuEvents(anchor);
     
-    if (cfg.type === 'mega') {
+    // Toggle Logic for Mega
+    if (menuType === 'mega') {
         const wrapper = anchor.querySelector('.cartique-mega-wrapper');
         const trigger = anchor.querySelector('.mega-trigger');
         trigger.addEventListener('click', (e) => {
@@ -165,7 +167,6 @@ async renderCatalogueMenu() {
         document.addEventListener('click', () => wrapper.classList.remove('is-open'), { once: true });
     }
 }
-
 
 
 _resolveMenuContainer(menu) {
@@ -266,6 +267,177 @@ _attachMenuEvents(container) {
 
 
 
+
+
+
+
+/* ==========================================================
+   START SECTION: SIDEBAR SEARCH FILTERS
+   ========================================================== */
+
+
+renderFilterSidebar(filterGroups) {
+    const sidebar = document.getElementById('cartique-sidebar-component');
+    if (!sidebar) return;
+
+    // 1. Static Price Section
+    let html = `
+        <div class="filter-group price-group">
+            <div class="filter-header">
+                <span>Price</span>
+                <span class="chevron"></span>
+            </div>
+            <div class="price-slider-wrapper">
+                 <div class="range-input">
+                    <input type="range" class="range-min" min="0" max="1000" value="0">
+                    <input type="range" class="range-max" min="0" max="1000" value="1000">
+                 </div>
+                 <div class="slider-track"></div>
+            </div>
+        </div>
+        <hr class="sidebar-divider">
+    `;
+
+    // 2. Dynamic Content-Agnostic Sections
+    html += filterGroups.map(group => `
+        <div class="filter-group" data-filter-type="${group.id}">
+            <div class="filter-header collapsible" onclick="this.parentElement.classList.toggle('is-collapsed')">
+                <span>${group.label}</span>
+                <span class="chevron"></span>
+            </div>
+            <div class="filter-content">
+                <div class="filter-search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" class="filter-search-input" placeholder="Search" onkeyup="filterList(this)">
+                </div>
+                <div class="filter-meta">Showing ${group.options.length} of ${group.options.length} options</div>
+                <div class="filter-options-list">
+                    ${group.options.map(opt => `
+                        <label class="filter-option">
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" data-value="${opt.value}">
+                                <span class="checkmark"></span>
+                            </div>
+                            <span class="option-name">${opt.label}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+        <hr class="sidebar-divider">
+    `).join('');
+
+    sidebar.innerHTML = html;
+}
+
+
+
+
+/* ==========================================================
+   START SECTION: SIDEBAR SEARCH FILTERS
+   ========================================================== */
+
+
+renderSidebarFilters() {
+    const container = document.getElementById('cartique-filter-sidebar');
+    if (!container) return;
+
+    // Create a copy of the filters so we don't mutate the original data
+    const filters = { ...this.features.sidebarFeatures.filters };
+
+    let finalHTML = '';
+
+    // 1. Handle Price Range First (Checkboxes)
+    if (filters.priceRange) {
+        const priceOptions = filters.priceRange;
+        finalHTML += this.generateFilterHTML('priceRange', priceOptions);
+        delete filters.priceRange; // Remove it so it doesn't double-render in the loop
+    }
+
+    // 2. Handle everything else dynamically
+    finalHTML += Object.entries(filters).map(([group, options]) => {
+        return this.generateFilterHTML(group, options);
+    }).join('');
+
+    container.innerHTML = finalHTML;
+}
+
+// Helper method to keep the code DRY and avoid "wrecking" the working template
+generateFilterHTML(group, options) {
+    const title = group.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    return `
+        <div class="filter-section collapsed" data-filter-group="${group}">
+            <div class="filter-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                ${title}
+                <span class="chevron"></span>
+            </div>
+            <div class="filter-content">
+                <div class="options-list">
+                    ${options.map(val => `
+                        <label class="option-item">
+                            <input type="checkbox" data-type="${group}" value="${val}" 
+                                   onchange="cartique.handleFilterChange(this)">
+                            <span class="checkbox-custom"></span>
+                            ${val}
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+        <hr class="filter-divider">
+    `;
+}
+
+handleFilterChange(checkbox) {
+    const { type, value } = checkbox.dataset;
+    
+    if (!this.activeFilters[type]) {
+        this.activeFilters[type] = new Set();
+    }
+
+    if (checkbox.checked) {
+        this.activeFilters[type].add(value);
+    } else {
+        this.activeFilters[type].delete(value);
+        if (this.activeFilters[type].size === 0) delete this.activeFilters[type];
+    }
+
+    this.applyActiveFilters();
+}
+
+applyActiveFilters() {
+    this.filteredProducts = this.products.filter(product => {
+        // Check every active filter group
+        return Object.entries(this.activeFilters).every(([key, selectedValues]) => {
+            if (selectedValues.size === 0) return true;
+
+            // Price Range Logic
+            if (key === 'priceRange') {
+                return Array.from(selectedValues).some(range => this._checkPriceInRange(product.price, range));
+            }
+
+            // Variant Attribute Logic (Color, Size, etc.)
+            return product.variants?.some(variant => 
+                variant.attributes?.some(attr => 
+                    attr.key === key && selectedValues.has(attr.value)
+                )
+            );
+        });
+    });
+
+    this.renderProducts(); // Refresh the grid
+}
+
+
+
+/* ==========================================================
+   END SECTION: SIDEBAR SEARCH FILTERS
+   ========================================================== */
+
+
+
+
   // Deep merge helper method
   deepMerge(target, source) {
     const output = { ...target };
@@ -291,6 +463,8 @@ _attachMenuEvents(container) {
     return item && typeof item === 'object' && !Array.isArray(item);
   }
 
+
+
   // Debounce with immediate option
   debounce(func, wait, immediate = false) {
     let timeout;
@@ -307,41 +481,46 @@ _attachMenuEvents(container) {
     };
   }
 
+
   async init() {
-    try {
-      // Set display states
-      if (!this.features.sidebar) this.features.sidebarDisplay = 'none';
-      if (!this.features.footer) this.features.footerDisplay = 'none';
+  try {
+    // 1. Sync display states from features
+    this.features.sidebarDisplay = this.features.sidebar ? 'block' : 'none';
+    this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
-      // Validate container exists
-      this.container = document.querySelector(`#${this.features.containerId}`);
-      if (!this.container) {
-        throw new Error(`Container with ID "${this.features.containerId}" not found`);
-      }
-
-      // Apply theme - BUT ONLY MINIMAL THEME SETTINGS TO AVOID DARK OVERLAY
-      this.applyMinimalTheme();
-      
-      // Inject critical CSS
-      this.injectCriticalCSS();
-      
-      // Fetch templates
-      await this.fetchAndExtractComponents();
-      
-      // Render components
-      await this.renderAllComponents();
-      
-      // Set up event listeners
-      this.setupEventListeners();
-      
-      // Complete initialization
-      this.completeInitialization();
-      
-    } catch (error) {
-      console.error('Failed to initialize Cartique:', error);
-      this.showErrorMessage('Failed to load product catalog');
+    // 2. DOM setup & Theme
+    this.container = document.querySelector(`#${this.features.containerId}`);
+    if (!this.container) {
+      throw new Error(`Container with ID "${this.features.containerId}" not found`);
     }
+
+    this.applyMinimalTheme();
+    this.injectCriticalCSS();
+    
+    // 3. Component Loading
+    // This fetches the external HTML components (sidebar, search, etc.)
+    await this.fetchAndExtractComponents();
+    
+    // This injects them into the main DOM
+    await this.renderAllComponents();
+    
+    // 4. Dynamic Filter Injection
+    // Now that the sidebar placeholder exists in the DOM, we populate it
+    if (this.features.sidebar && this.features.sidebarFeatures?.filters) {
+      this.renderSidebarFilters(); 
+    }
+    
+    // 5. Interactivity & Completion
+    this.setupEventListeners();
+    this.completeInitialization();
+    
+  } catch (error) {
+    console.error('Failed to initialize Cartique:', error);
+    this.showErrorMessage('Failed to load product catalog');
   }
+}
+
+
 
   applyMinimalTheme() {
     // ONLY set the accent color to maintain original look
@@ -406,13 +585,26 @@ _attachMenuEvents(container) {
         this.renderCartItemTemplate.bind(this)
     ];
 
-    // Render components sequentially
+    // 1. Render components sequentially
     for (const method of renderMethods) {
         try {
             await method();
         } catch (error) {
             console.error(`Render failed for method: ${method.name}`, error);
         }
+    }
+
+    // 2. Post-Render UI Adjustments
+    // Now that renderSidebar() has finished, we can safely manipulate its style
+    const sidebar = document.getElementById('cartique-sidebar');
+    if (sidebar) {
+        sidebar.style.display = this.features.sidebarDisplay;
+    }
+
+    // 3. Dynamic Sidebar Population
+    // If sidebar is 'block', this is the moment to inject your dynamic productFilters
+    if (this.features.sidebar && this.features.sidebarFeatures?.filters) {
+        this.renderSidebarFilters(); 
     }
 }
 
@@ -670,37 +862,76 @@ _attachMenuEvents(container) {
 
   updateProductElement(element, product) {
     for (const [key, value] of Object.entries(product)) {
-      const target = element.querySelector(`#${key}`);
-      if (!target) continue;
+        const target = element.querySelector(`#${key}`);
+        if (!target) continue;
 
-      switch (target.tagName) {
+        switch (target.tagName) {
         case 'IMG':
-          target.src = value;
-          target.alt = product.title || '';
-          break;
+            target.src = value;
+            target.alt = product.title || '';
+            break;
         case 'A':
-          target.href = value;
-          break;
+            target.href = value;
+            break;
         default:
-          target.textContent = value;
-      }
+            target.textContent = value;
+        }
+    }
+
+    // Update REGULAR currency symbol
+    const regularCurrencyElement = element.querySelector('#currency');
+    if (regularCurrencyElement) {
+        regularCurrencyElement.textContent = this.features.currencySymbol || '$';
+        // Reset color for regular currency
+        regularCurrencyElement.style.color = '';
     }
 
     // Handle sale price
     const salePriceElement = element.querySelector('#sale_price');
     if (salePriceElement) {
-      if (product.sale_price) {
-        salePriceElement.style.display = 'block';
-        const priceElement = element.querySelector('#price');
-        if (priceElement) priceElement.style.textDecoration = 'line-through';
-        
-        const salePriceCurrency = element.querySelector('#sale_price_currency');
-        if (salePriceCurrency) salePriceCurrency.textContent = product.currency;
-      } else {
-        salePriceElement.style.display = 'none';
-      }
+        if (product.sale_price) {
+            salePriceElement.style.display = 'block';
+            salePriceElement.textContent = product.sale_price;
+            salePriceElement.style.color = 'red';
+            
+            // Update SALE PRICE currency symbol
+            const salePriceCurrency = element.querySelector('#sale_price_currency');
+            if (salePriceCurrency) {
+                salePriceCurrency.textContent = this.features.currencySymbol || '$';
+                salePriceCurrency.style.color = 'red';
+                salePriceCurrency.style.fontWeight = 'bold';
+
+            }
+            
+            // Strike through regular price
+            const priceElement = element.querySelector('#price');
+            if (priceElement) {
+                priceElement.style.textDecoration = 'line-through';
+                priceElement.style.color = '#666';
+                priceElement.style.opacity = '0.7';
+            }
+        } else {
+            salePriceElement.style.display = 'none';
+            salePriceElement.style.color = '';
+            
+            // Reset sale price currency
+            const salePriceCurrency = element.querySelector('#sale_price_currency');
+            if (salePriceCurrency) {
+                salePriceCurrency.textContent = '';
+                salePriceCurrency.style.color = '';
+            }
+            
+            // Reset regular price styling
+            const priceElement = element.querySelector('#price');
+            if (priceElement) {
+                priceElement.style.textDecoration = '';
+                priceElement.style.color = '';
+                priceElement.style.opacity = '';
+            }
+        }
     }
-  }
+}
+
 
   setLayout(layout) {
     const gridContainer = document.getElementById('cartique-product-grid');
@@ -902,6 +1133,7 @@ _attachMenuEvents(container) {
       } else if (key === 'currency') {
         const currencyElements = cartItem.querySelectorAll(`#${key}`);
         currencyElements.forEach(el => el.textContent = product[key]);
+
       } else {
         element.textContent = product[key];
       }
@@ -1086,10 +1318,10 @@ _attachMenuEvents(container) {
             <h2>${product.title}</h2>
             <div class="price-container">
               ${product.sale_price ? `
-                <span class="original-price">${product.currency}${product.price}</span>
-                <span class="sale-price">${product.currency}${product.sale_price}</span>
+                <span class="original-price">${this.features.currencySymbol}${product.price}</span>
+                <span class="sale-price">${this.features.currencySymbol}${product.sale_price}</span>
               ` : `
-                <span class="price">${product.currency}${product.price}</span>
+                <span class="price">${this.features.currencySymbol}${product.price}</span>
               `}
             </div>
             <p class="product-description">${product.description}</p>

@@ -53,6 +53,7 @@ const features = {
   sale: true,                // Enable sale badges
   search: true,              // Enable search
   sorting: true,             // Enable sorting
+  currencySymbol: currencySymbol,
   
   // Checkout & Navigation
   checkoutUrl: 'https://www.google.com/',
@@ -77,13 +78,14 @@ const features = {
   },
   
   // Product Filters Configuration
+  
   sidebarFeatures: {
-    priceFilter: true,
-    colorFilter: true,
-    sizeFilter: true,
-    brandFilter: true,
-    filters: productFilters       // Your dynamic filter structure
+    enabled: true,
+    priceRange: true,
+    search: true,
+    filters: productFilters
   }
+  
 };
 
 // Single consolidated instance with ALL features
