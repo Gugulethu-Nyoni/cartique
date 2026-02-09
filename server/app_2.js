@@ -1,5 +1,5 @@
 import Cartique from './cartique_3.js';
-import { products } from './full_scope_products.js';
+import { products } from './cars.js';
 
 const currencySymbol = 'R';
 
@@ -47,13 +47,14 @@ const features = {
   // Layout & Display
   grid: true,                // Use grid layout
   pagination: false,         // Disable pagination
-  columns: 3,                // 3 columns in grid layout
+  columns: 2,                // 3 columns in grid layout
   rows: 6,                   // Show 6 products per page
   theme: '#fff',             // Theme color
   sale: true,                // Enable sale badges
   search: true,              // Enable search
   sorting: true,             // Enable sorting
   currencySymbol: currencySymbol,
+  itemsPerPage: 4,
   
   // Checkout & Navigation
   checkoutUrl: 'https://www.google.com/',

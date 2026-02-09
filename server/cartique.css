@@ -567,7 +567,7 @@
     }
 
     .cartique-main-content {
-        width: 70%; /* 70% width on desktop */
+        width: 100%; /* 100% width on desktop */
         display: flex;
         flex-direction: column;
         min-height: 100vh; /* Take full viewport height */
@@ -1444,6 +1444,15 @@ text-align: justify;
    START SIDEBAR SEARCH FILTER CSS 
 /*============================= */
 
+/* --- MAIN LAYOUT WRAPPER --- */
+/* Ensure the parent container allows the sidebar to stick */
+.cartique-main-container {
+    display: flex;
+    align-items: flex-start; /* CRITICAL: Prevents sidebar from stretching full height */
+    gap: 24px;
+    width: 100%;
+}
+
 /* --- SIDEBAR CONTAINER --- */
 .cartique-sidebar {
     width: 100%;
@@ -1454,7 +1463,15 @@ text-align: justify;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     font-family: 'Inter', sans-serif;
     color: #1a1a1a;
-    margin-bottom: 1rem!important;
+    margin-bottom: 1rem !important;
+
+    /* STICKY LOGIC */
+    position: -webkit-sticky;
+    position: sticky;
+    top: 20px; /* Gap from top of browser when scrolling */
+    align-self: flex-start; 
+    max-height: calc(100vh - 40px); /* Keeps sidebar scrollable if content is long */
+    overflow-y: auto;
 }
 
 /* --- COLLAPSIBLE SECTIONS --- */
@@ -1474,18 +1491,16 @@ text-align: justify;
 
 /* --- CHEVRON LOGIC --- */
 .filter-header .chevron {
-    display: inline-block; /* REQUIRED for rotation to work */
+    display: inline-block;
     transition: transform 0.3s ease;
 }
 
-/* Default state: Pointing UP */
 .filter-header .chevron::after {
     content: '▲'; 
     font-size: 10px;
     display: block; 
 }
 
-/* Collapsed state: Flip 180 degrees to point DOWN */
 .filter-section.collapsed .chevron {
     transform: rotate(180deg);
 }
@@ -1504,14 +1519,20 @@ text-align: justify;
     padding: 5px 0;
 }
 
+/* Custom Scrollbar for the sidebar internal scroll */
+.cartique-sidebar::-webkit-scrollbar { width: 4px; }
+.cartique-sidebar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
 .option-item {
     display: flex;
     align-items: center;
     cursor: pointer;
     font-size: 14px;
+    transition: color 0.2s;
 }
 
-.option-item input { display: none; } /* Hide system checkbox */
+.option-item:hover { color: #000; }
+.option-item input { display: none; } 
 
 .checkbox-custom {
     width: 18px;
@@ -1521,7 +1542,7 @@ text-align: justify;
     margin-right: 12px;
     position: relative;
     background: #fff;
-    transition: background 0.2s, border-color 0.2s;
+    transition: all 0.2s;
 }
 
 .option-item input:checked + .checkbox-custom {
@@ -1529,7 +1550,6 @@ text-align: justify;
     border-color: #000;
 }
 
-/* Checkmark drawing */
 .option-item input:checked + .checkbox-custom::after {
     content: '';
     position: absolute;
@@ -1540,32 +1560,79 @@ text-align: justify;
     transform: rotate(45deg);
 }
 
-
-/* Mobile responsiveness for the Sidebar */
+/* --- MOBILE RESPONSIVENESS --- */
 @media (max-width: 767px) {
-    /* 1. Make the sidebar container full width and centered */
-    .cartique-sidebar {
-        max-width: 100%;    /* Overrides the 320px limit */
-        width: 100%;        /* Takes up full available space */
-        margin: 0 auto 1.5rem auto; /* Centers it and adds bottom spacing */
-        box-sizing: border-box; /* Ensures padding doesn't break width */
-    }
-
-    /* 2. Optional: Adjust internal padding for smaller screens */
-    .cartique-sidebar {
-        padding: 1rem; 
-    }
-
-    /* 3. Ensure the main content wrapper (parent) doesn't force a side-by-side layout */
-    .cartique-container { /* Replace with your actual parent wrapper class if different */
-        display: flex;
-        flex-direction: column; 
+    .cartique-main-container {
+        flex-direction: column;
         align-items: center;
+    }
+
+    .cartique-sidebar {
+        position: static; /* Disable sticky on mobile */
+        max-width: 100%;
         width: 100%;
-        padding: 0 15px; /* Adds a small gutter so it's not touching screen edges */
+        margin: 0 auto 1.5rem auto;
+        padding: 1rem;
+        box-sizing: border-box;
     }
 }
 /*==========================
    END SEARCH FILTER CSS 
 /*============================= */
+
+
+/*=============================
+  START INFINITE SCROLL
+/*=============================*/
+
+
+
+#cartique-scroll-sentinel {
+    grid-column: 1 / -1;
+    width: 100%;
+    text-align: center;
+    padding: 20px;
+}
+
+#cartique-scroll-sentinel::after {
+    content: "Loading more products...";
+    font-size: 14px;
+    color: #888;
+}
+
+
+/* Spinner Animation */
+.cartique-loader {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #000;
+    border-radius: 50%;
+    animation: cartique-spin 0.8s linear infinite;
+}
+
+@keyframes cartique-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Seamless Fade-in for new products */
+.cartique-fade-in {
+    opacity: 0;
+    transform: translateY(15px);
+    animation: cartique-entrance 0.5s ease forwards;
+}
+
+@keyframes cartique-entrance {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/*=============================
+  END INFINITE SCROLL
+/*=============================*/
+
+
 

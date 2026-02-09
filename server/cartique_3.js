@@ -68,6 +68,9 @@ export default class Cartique {
     this.toastTimer2 = null;
     this.redirectTimer = null;
 
+    this.itemsPerBatch = this.features.itemsPerPage || 12;
+    this.loadedCount = this.itemsPerBatch;
+
     // 5. Fire off the Engine
     this.init();
 }
@@ -342,16 +345,13 @@ renderSidebarFilters() {
     const container = document.getElementById('cartique-filter-sidebar');
     if (!container) return;
 
-    // Create a copy of the filters so we don't mutate the original data
     const filters = { ...this.features.sidebarFeatures.filters };
-
     let finalHTML = '';
 
-    // 1. Handle Price Range First (Checkboxes)
+    // 1. Handle Price Range First
     if (filters.priceRange) {
-        const priceOptions = filters.priceRange;
-        finalHTML += this.generateFilterHTML('priceRange', priceOptions);
-        delete filters.priceRange; // Remove it so it doesn't double-render in the loop
+        finalHTML += this.generateFilterHTML('priceRange', filters.priceRange);
+        delete filters.priceRange;
     }
 
     // 2. Handle everything else dynamically
@@ -360,7 +360,17 @@ renderSidebarFilters() {
     }).join('');
 
     container.innerHTML = finalHTML;
+
+    // 3. ATTACH EVENT LISTENER (Event Delegation)
+    // This catches changes from any checkbox inside the container automatically
+    container.addEventListener('change', (e) => {
+        if (e.target.matches('input[type="checkbox"]')) {
+            this.handleFilterChange(e.target);
+        }
+    });
 }
+
+
 
 // Helper method to keep the code DRY and avoid "wrecking" the working template
 generateFilterHTML(group, options) {
@@ -376,8 +386,7 @@ generateFilterHTML(group, options) {
                 <div class="options-list">
                     ${options.map(val => `
                         <label class="option-item">
-                            <input type="checkbox" data-type="${group}" value="${val}" 
-                                   onchange="cartique.handleFilterChange(this)">
+                            <input type="checkbox" data-type="${group}" value="${val}">
                             <span class="checkbox-custom"></span>
                             ${val}
                         </label>
@@ -389,52 +398,201 @@ generateFilterHTML(group, options) {
     `;
 }
 
-handleFilterChange(checkbox) {
-    const { type, value } = checkbox.dataset;
+
+handleFilterChange(element) {
+    console.group("🔍 Cartique Filter Debug");
     
-    if (!this.activeFilters[type]) {
-        this.activeFilters[type] = new Set();
-    }
+    const activeFilters = {};
+    const checkedBoxes = document.querySelectorAll('.option-item input:checked');
 
-    if (checkbox.checked) {
-        this.activeFilters[type].add(value);
-    } else {
-        this.activeFilters[type].delete(value);
-        if (this.activeFilters[type].size === 0) delete this.activeFilters[type];
-    }
-
-    this.applyActiveFilters();
-}
-
-applyActiveFilters() {
-    this.filteredProducts = this.products.filter(product => {
-        // Check every active filter group
-        return Object.entries(this.activeFilters).every(([key, selectedValues]) => {
-            if (selectedValues.size === 0) return true;
-
-            // Price Range Logic
-            if (key === 'priceRange') {
-                return Array.from(selectedValues).some(range => this._checkPriceInRange(product.price, range));
-            }
-
-            // Variant Attribute Logic (Color, Size, etc.)
-            return product.variants?.some(variant => 
-                variant.attributes?.some(attr => 
-                    attr.key === key && selectedValues.has(attr.value)
-                )
-            );
-        });
+    // 1. Map current state from UI
+    checkedBoxes.forEach(cb => {
+        const type = cb.dataset.type;
+        if (!activeFilters[type]) activeFilters[type] = [];
+        activeFilters[type].push(cb.value);
     });
 
-    this.renderProducts(); // Refresh the grid
+    console.log("Active Filters:", activeFilters);
+
+    // 2. Filter Logic
+    if (Object.keys(activeFilters).length === 0) {
+        this.filteredProducts = [...this.products];
+    } else {
+        this.filteredProducts = this.products.filter(product => {
+            // AND logic: Every active filter category must be satisfied
+            return Object.entries(activeFilters).every(([group, selectedValues]) => {
+                
+                // --- Case A: Price Range Logic (Sale Aware) ---
+                if (group === 'priceRange') {
+                    // Priority: Top-level sale -> Top-level price -> Lowest variant (sale or reg)
+                    const effectivePrice = product.sale_price || product.price || 
+                        Math.min(...product.variants.map(v => v.sale_price || v.price));
+                    
+                    return selectedValues.some(rangeLabel => this._checkPriceMatch(effectivePrice, rangeLabel));
+                }
+
+                // --- Case B: Variant Attributes (Color, Size, etc.) ---
+                return product.variants?.some(variant => {
+                    return variant.attributes?.some(attr => {
+                        return attr.key === group && selectedValues.includes(String(attr.value));
+                    });
+                });
+            });
+        });
+    }
+
+    console.log("Filtered Results Size:", this.filteredProducts.length);
+    console.groupEnd();
+
+    // 3. Trigger UI Update
+    this.renderProductDisplays();
 }
 
+
+_checkPriceMatch(price, label) {
+    // Extract all numbers from the string (e.g., "R100-R200" -> [100, 200])
+    const numbers = label.match(/\d+/g)?.map(Number);
+    if (!numbers) return false;
+    
+    if (label.includes('Under')) {
+        return price < numbers[0];
+    }
+    if (label.includes('Over')) {
+        return price > numbers[0];
+    }
+    if (numbers.length === 2) {
+        // Range case: e.g., "R100-R200"
+        return price >= numbers[0] && price <= numbers[1];
+    }
+    return false;
+}
+
+
+
+
+
+applyFilters(activeFilters) {
+    const hasActiveFilters = Object.keys(activeFilters).length > 0;
+
+    if (!hasActiveFilters) {
+        // If nothing is checked, show everything
+        this.filteredProducts = [...this.allProducts];
+    } else {
+        this.filteredProducts = this.allProducts.filter(product => {
+            // A product must match AT LEAST ONE value in EVERY active group (AND logic between groups)
+            return Object.entries(activeFilters).every(([group, selectedValues]) => {
+                const productValue = product[group]; 
+                return selectedValues.includes(productValue);
+            });
+        });
+    }
+
+    // 3. Re-render the Catalogue
+    this.renderProductDisplays(); 
+}
 
 
 /* ==========================================================
    END SECTION: SIDEBAR SEARCH FILTERS
    ========================================================== */
 
+
+
+/* ==========================================================
+   START SECTION: INFINITE SCROLL
+   ========================================================== */
+
+setupInfiniteScroll() {
+    // Clean up previous observer if it exists
+    if (this.observer) this.observer.disconnect();
+
+    // Create a sentinel element if it doesn't exist
+    let sentinel = document.getElementById('cartique-scroll-sentinel');
+    if (!sentinel) {
+        sentinel = document.createElement('div');
+        sentinel.id = 'cartique-scroll-sentinel';
+        sentinel.style.cssText = 'grid-column: 1/-1; height: 50px; display: flex; align-items: center; justify-content: center; width: 100%;';
+        this.container.appendChild(sentinel);
+    }
+
+    this.observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            this.loadMoreProducts();
+        }
+    }, { rootMargin: '200px' }); // Loads 200px before reaching the bottom for smoothness
+
+    this.observer.observe(sentinel);
+}
+
+
+loadMoreProducts() {
+    console.group("🚀 Infinite Scroll: Loading Batch");
+    
+    const productsSource = this.filteredProducts || this.products;
+    console.log(`State: ${this.loadedCount} / ${productsSource.length} displayed`);
+
+    const nextBatch = productsSource.slice(
+        this.loadedCount, 
+        this.loadedCount + this.itemsPerBatch
+    );
+
+    const sentinel = document.getElementById('cartique-scroll-sentinel');
+
+    if (nextBatch.length === 0) {
+        console.log("No more products to load. Disconnecting observer.");
+        if (this.observer) this.observer.disconnect();
+        if (sentinel) sentinel.innerHTML = '<span style="color: #999; font-size: 0.9rem;">You\'ve viewed all products</span>';
+        console.groupEnd();
+        return;
+    }
+
+    // 1. Show Loading State
+    if (sentinel) {
+      /*
+        sentinel.innerHTML = `
+            <div class="cartique-loader"></div>
+            <span style="margin-left: 10px; color: #666; font-size: 0.85rem;">Loading more...</span>
+        `;
+        */
+    }
+
+    // 2. Artificial Delay (Optional: 300ms) for visual smoothness
+    setTimeout(() => {
+        const layout = this.currentLayout || 'grid';
+        const container = document.getElementById(`cartique-product-${layout}`);
+        const fragment = document.createDocumentFragment();
+
+        nextBatch.forEach(product => {
+            const el = layout === 'grid' 
+                ? this.createProductCard(product) 
+                : this.createProductListing(product);
+            
+            if (el) {
+                // Add a small fade-in class for the seamless animation
+                el.classList.add('cartique-fade-in');
+                fragment.appendChild(el);
+            }
+        });
+
+        container.appendChild(fragment);
+        this.loadedCount += this.itemsPerBatch;
+        
+        console.log(`Success: Added ${nextBatch.length} items. New count: ${this.loadedCount}`);
+
+        // 3. Clear sentinel loader if more products remain
+        if (this.loadedCount < productsSource.length) {
+            if (sentinel) sentinel.innerHTML = ''; 
+        } else {
+            //if (sentinel) sentinel.innerHTML = '<span style="color: #999;">End of catalog</span>';
+            if (this.observer) this.observer.disconnect();
+        }
+        
+        console.groupEnd();
+    }, 400); // 400ms delay makes the "loading" state visible to the user
+}
+/* ==========================================================
+   END SECTION: INFINITE SCROLL
+   ========================================================== */
 
 
 
@@ -482,7 +640,7 @@ applyActiveFilters() {
   }
 
 
-  async init() {
+ async init() {
   try {
     // 1. Sync display states from features
     this.features.sidebarDisplay = this.features.sidebar ? 'block' : 'none';
@@ -498,19 +656,26 @@ applyActiveFilters() {
     this.injectCriticalCSS();
     
     // 3. Component Loading
-    // This fetches the external HTML components (sidebar, search, etc.)
+    // Fetches the external HTML components (sidebar, search, etc.)
     await this.fetchAndExtractComponents();
     
-    // This injects them into the main DOM
+    // Injects main structural components into the DOM
     await this.renderAllComponents();
+
+    // --- NEW STEP: Prepare Product Layout Shelves ---
+    // This sets up the grid and list containers ONCE to avoid duplication later
+    this.initializeContainers();
     
     // 4. Dynamic Filter Injection
-    // Now that the sidebar placeholder exists in the DOM, we populate it
     if (this.features.sidebar && this.features.sidebarFeatures?.filters) {
       this.renderSidebarFilters(); 
     }
     
-    // 5. Interactivity & Completion
+    // 5. Initial Product Render
+    // Ensure we show products immediately on load
+    this.renderProductDisplays();
+
+    // 6. Interactivity & Completion
     this.setupEventListeners();
     this.completeInitialization();
     
@@ -518,6 +683,25 @@ applyActiveFilters() {
     console.error('Failed to initialize Cartique:', error);
     this.showErrorMessage('Failed to load product catalog');
   }
+}
+
+
+initializeContainers() {
+    // Prepare Grid Container
+    const gridWrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
+    const gridContainer = document.getElementById('cartique-product-grid');
+    if (gridWrapper && gridContainer) {
+        gridContainer.innerHTML = ''; // Clean slate
+        gridContainer.appendChild(gridWrapper.cloneNode(true));
+    }
+
+    // Prepare List Container
+    const listWrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
+    const listContainer = document.getElementById('cartique-product-list');
+    if (listWrapper && listContainer) {
+        listContainer.innerHTML = ''; // Clean slate
+        listContainer.appendChild(listWrapper.cloneNode(true));
+    }
 }
 
 
@@ -767,50 +951,96 @@ applyActiveFilters() {
   }
 
   async renderProductDisplays() {
-    const gridWrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
-    if (gridWrapper) {
-      const gridContainer = document.getElementById('cartique-product-grid');
-      gridContainer.innerHTML = '';
-      gridContainer.appendChild(gridWrapper.cloneNode(true));
+    // 1. Determine Source Data
+    // Use filtered products if available, otherwise fall back to the master list
+    const displayData = this.filteredProducts || this.products;
+
+    // 2. Determine Active Layout
+    // Defaults to 'grid' if no layout state is stored
+    const layout = this.currentLayout || 'grid';
+
+    // 3. Locate UI Containers
+    const gridContainer = document.getElementById('cartique-product-grid');
+    const listContainer = document.getElementById('cartique-product-list');
+
+    // 4. Handle Visibility & Rendering Logic
+    // We toggle displays to 'none' for the inactive layout to prevent 
+    // products from stacking or appearing twice on the page.
+    if (layout === 'grid') {
+        if (listContainer) listContainer.style.display = 'none';
+        if (gridContainer) {
+            gridContainer.style.display = 'grid';
+            this.renderProducts('grid', displayData);
+        }
+    } else {
+        if (gridContainer) gridContainer.style.display = 'none';
+        if (listContainer) {
+            listContainer.style.display = 'block';
+            this.renderProducts('list', displayData);
+        }
     }
 
-    const listWrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
-    if (listWrapper) {
-      const listContainer = document.getElementById('cartique-product-list');
-      listContainer.innerHTML = '';
-      listContainer.appendChild(listWrapper.cloneNode(true));
-    }
+    console.log(`[UI] Rendered ${displayData.length} products in ${layout} view.`);
+}
 
-    this.renderProducts('grid');
-  }
 
-  renderProducts(layout) {
+
+ /**
+ * Renders products into the specified layout container.
+ * @param {string} layout - 'grid' or 'list'
+ * @param {Array} data - Optional specific data set to render
+ */
+renderProducts(layout, data) {
     const container = layout === 'grid' 
       ? document.getElementById('cartique-product-grid')
       : document.getElementById('cartique-product-list');
 
     if (!container) return;
 
+    // 1. RESET STATE: Reset the count for the infinite scroll batch
+    this.itemsPerBatch = this.features.itemsPerPage || 12;
+    this.loadedCount = this.itemsPerBatch;
     container.innerHTML = '';
-    container.classList.toggle('grid-view', layout === 'grid');
-    container.classList.toggle('list-view', layout === 'list');
+    
+    const productsToRender = data || this.filteredProducts || [];
 
-    // Determine visible products
-    const visibleProducts = this.features.pagination
-      ? this.filteredProducts.slice(0, this.features.rows * this.features.columns)
-      : this.filteredProducts;
+    // 2. EMPTY STATE GUARD
+    if (productsToRender.length === 0) {
+        container.innerHTML = `
+            <div class="no-results-msg" style="grid-column: 1 / -1; width: 100%; text-align: center; padding: 4rem 1rem;">
+                <p style="font-size: 1.2rem; color: #555; margin-bottom: 1rem;">No products found matching these criteria.</p>
+                <button onclick="location.reload()" style="cursor: pointer; border-bottom: 1px solid #000; background: none; border: none; font-weight: 600;">
+                    Reset all filters
+                </button>
+            </div>`;
+        return;
+    }
 
-    // Create product elements
-    visibleProducts.forEach(product => {
+    // 3. INITIAL SLICE: Only render the first batch
+    const initialSlice = productsToRender.slice(0, this.itemsPerBatch);
+
+    // 4. BATCH RENDER (Fragment)
+    const fragment = document.createDocumentFragment();
+    initialSlice.forEach(product => {
       const productElement = layout === 'grid'
         ? this.createProductCard(product)
         : this.createProductListing(product);
       
-      if (productElement) {
-        container.appendChild(productElement);
-      }
+      if (productElement) fragment.appendChild(productElement);
     });
-  }
+
+    container.appendChild(fragment);
+
+    // 5. INITIALIZE INFINITE SCROLL OBSERVER
+    // We only start observing if there are more products left to load
+    if (productsToRender.length > this.itemsPerBatch) {
+        this.setupInfiniteScroll();
+    }
+}
+
+
+
+
 
   createProductCard(product) {
     const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
