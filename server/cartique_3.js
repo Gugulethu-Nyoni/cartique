@@ -491,6 +491,147 @@ applyFilters(activeFilters) {
     this.renderProductDisplays(); 
 }
 
+/// MOBILE FILTERS 
+
+/* CONSOLIDATED SIDEBAR & FILTER LOGIC 
+   Place these methods within your main Product Gallery Class 
+*/
+
+/**
+ * 1. INITIALIZE MOBILE UI
+ * Call this once during your class constructor or init()
+ */
+initMobileFilters() {
+    const sidebar = document.getElementById('cartique-sidebar');
+    if (!sidebar) return;
+
+    // Add Mobile Trigger Bar to Body if it doesn't exist
+    if (!document.querySelector('.mobile-filter-trigger')) {
+        const trigger = document.createElement('div');
+        trigger.className = 'mobile-filter-trigger';
+        trigger.innerHTML = `Filter Products`;
+        trigger.onclick = () => this.toggleMobileSidebar(true);
+        document.body.appendChild(trigger);
+    }
+
+    // Add Close Button/Header to Sidebar if it doesn't exist
+    if (!sidebar.querySelector('.filter-close-btn')) {
+        const closeHeader = document.createElement('div');
+        closeHeader.className = 'filter-close-btn';
+        closeHeader.innerHTML = `
+            <span>Filters</span>
+            <span style="font-size: 24px;">&times;</span>
+        `;
+        closeHeader.onclick = () => this.toggleMobileSidebar(false);
+        sidebar.prepend(closeHeader);
+    }
+}
+
+/**
+ * 2. TOGGLE SIDEBAR VISIBILITY
+ * Handles the "is-active" class and body scrolling
+ */
+toggleMobileSidebar(open) {
+    const sidebar = document.getElementById('cartique-sidebar');
+    if (!sidebar) return;
+
+    if (open) {
+        sidebar.classList.add('is-active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    } else {
+        sidebar.classList.remove('is-active');
+        document.body.style.overflow = ''; // Restore background scrolling
+    }
+}
+
+/**
+ * 3. UPDATE EVENT LISTENERS
+ * Connects checkbox changes to the "slide away" behavior
+ */
+setupFilterEventListeners() {
+    const sidebar = document.getElementById('cartique-sidebar');
+    if (!sidebar) return;
+
+    sidebar.addEventListener('change', (e) => {
+        if (e.target.type === 'checkbox') {
+            // A. RUN YOUR FILTERING LOGIC
+            // Ensure this function processes your 'filteredProducts' array
+            this.handleFilterChange(e); 
+
+            // B. MOBILE-SPECIFIC: Slide away after checking
+            if (window.innerWidth <= 767) {
+                // 400ms delay allows user to see the "check" before it slides
+                setTimeout(() => {
+                    this.toggleMobileSidebar(false);
+                }, 400);
+            }
+        }
+    });
+}
+
+/**
+ * 4. CLEAR ALL FILTERS
+ * Ensures state is cleared and DOM is updated
+ */
+clearAllFilters() {
+    // Uncheck all checkboxes
+    const checkboxes = document.querySelectorAll('#cartique-filter-sidebar input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+        cb.checked = false;
+    });
+
+    // Reset internal state
+    this.activeFilters = {}; 
+    this.filteredProducts = null; // Revert to original product list
+    this.loadedCount = 0; // Reset infinite scroll
+
+    // Re-render
+    const layout = this.currentLayout || 'grid';
+    this.renderProducts(layout, this.products);
+
+    // If on mobile, stay open so user can see it cleared, or close manually
+    console.log("Filters cleared, state reset.");
+}
+
+
+renderMobileUI() {
+    const sidebar = document.getElementById('cartique-sidebar');
+    const sidebarComponent = document.getElementById('cartique-sidebar-component');
+    
+    // 1. Inject the Bottom Filter Bar (The Trigger)
+    if (!document.querySelector('.mobile-filter-trigger')) {
+        const filterBar = document.createElement('div');
+        filterBar.className = 'mobile-filter-trigger';
+        filterBar.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 6h16M7 12h10M10 18h4"/>
+                </svg>
+                FILTER
+            </div>
+        `;
+        filterBar.onclick = () => this.toggleMobileSidebar(true);
+        document.body.appendChild(filterBar);
+    }
+
+    // 2. Inject the Sidebar Mobile Header (Title + Close + Clear)
+    if (sidebar && !document.querySelector('.filter-mobile-header')) {
+        const header = document.createElement('div');
+        header.className = 'filter-mobile-header';
+        header.innerHTML = `
+            <span style="font-weight: 800; font-size: 1.2rem;">Filters</span>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <button onclick="window.galleryInstance.clearAllFilters()" 
+                        style="background:none; border:none; color:#888; text-decoration:underline; font-size:12px; cursor:pointer;">
+                    Clear All
+                </button>
+                <span onclick="window.galleryInstance.toggleMobileSidebar(false)" 
+                      style="font-size: 28px; cursor: pointer; line-height: 1;">&times;</span>
+            </div>
+        `;
+        sidebar.prepend(header);
+    }
+}
 
 /* ==========================================================
    END SECTION: SIDEBAR SEARCH FILTERS
@@ -529,66 +670,71 @@ loadMoreProducts() {
     console.group("🚀 Infinite Scroll: Loading Batch");
     
     const productsSource = this.filteredProducts || this.products;
-    console.log(`State: ${this.loadedCount} / ${productsSource.length} displayed`);
+    const sentinel = document.getElementById('cartique-scroll-sentinel');
 
+    // 1. SAFETY GUARD: If all products are already shown, kill the observer and hide sentinel
+    if (this.loadedCount >= productsSource.length) {
+        if (this.observer) this.observer.disconnect();
+        if (sentinel) {
+            sentinel.classList.remove('is-loading');
+            sentinel.style.display = 'none'; 
+        }
+        console.groupEnd();
+        return;
+    }
+
+    // 2. PREPARE DATA: Slice the next batch
     const nextBatch = productsSource.slice(
         this.loadedCount, 
         this.loadedCount + this.itemsPerBatch
     );
 
-    const sentinel = document.getElementById('cartique-scroll-sentinel');
-
-    if (nextBatch.length === 0) {
-        console.log("No more products to load. Disconnecting observer.");
-        if (this.observer) this.observer.disconnect();
-        if (sentinel) sentinel.innerHTML = '<span style="color: #999; font-size: 0.9rem;">You\'ve viewed all products</span>';
-        console.groupEnd();
-        return;
-    }
-
-    // 1. Show Loading State
+    // 3. UI FEEDBACK: Add the loading class (triggers the CSS loader and text)
     if (sentinel) {
-      /*
-        sentinel.innerHTML = `
-            <div class="cartique-loader"></div>
-            <span style="margin-left: 10px; color: #666; font-size: 0.85rem;">Loading more...</span>
-        `;
-        */
+        sentinel.classList.add('is-loading');
+        // Inject loader div if not using the CSS-only approach
+        sentinel.innerHTML = '<div class="cartique-loader"></div>';
     }
 
-    // 2. Artificial Delay (Optional: 300ms) for visual smoothness
+    // 4. EXECUTION: Smooth delay to prevent jarring UI jumps
     setTimeout(() => {
         const layout = this.currentLayout || 'grid';
         const container = document.getElementById(`cartique-product-${layout}`);
         const fragment = document.createDocumentFragment();
 
         nextBatch.forEach(product => {
-            const el = layout === 'grid' 
+            const el = (layout === 'grid') 
                 ? this.createProductCard(product) 
                 : this.createProductListing(product);
             
             if (el) {
-                // Add a small fade-in class for the seamless animation
-                el.classList.add('cartique-fade-in');
+                el.classList.add('cartique-fade-in'); // Trigger entrance animation
                 fragment.appendChild(el);
             }
         });
 
+        // Batch append to DOM
         container.appendChild(fragment);
-        this.loadedCount += this.itemsPerBatch;
         
-        console.log(`Success: Added ${nextBatch.length} items. New count: ${this.loadedCount}`);
+        // Update loaded state by actual items added
+        this.loadedCount += nextBatch.length;
+        
+        // 5. CLEANUP: Remove loading state and clear content
+        if (sentinel) {
+            sentinel.classList.remove('is-loading');
+            sentinel.innerHTML = ''; 
+        }
 
-        // 3. Clear sentinel loader if more products remain
-        if (this.loadedCount < productsSource.length) {
-            if (sentinel) sentinel.innerHTML = ''; 
-        } else {
-            //if (sentinel) sentinel.innerHTML = '<span style="color: #999;">End of catalog</span>';
+        // 6. TERMINATION: If we reached the end of the total product list
+        if (this.loadedCount >= productsSource.length) {
+            console.log("End of catalog reached. Disconnecting observer.");
             if (this.observer) this.observer.disconnect();
+            if (sentinel) sentinel.style.display = 'none';
         }
         
+        console.log(`Success: Added ${nextBatch.length} items. Total: ${this.loadedCount}`);
         console.groupEnd();
-    }, 400); // 400ms delay makes the "loading" state visible to the user
+    }, 400); 
 }
 /* ==========================================================
    END SECTION: INFINITE SCROLL
