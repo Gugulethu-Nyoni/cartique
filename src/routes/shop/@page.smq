@@ -1,0 +1,10 @@
+@script
+import CartiqueShop from '$global/shop/CartiqueShop';
+@end
+
+@style
+/* Add your page-specific styles here */
+@end
+
+@html
+<CartiqueShop />

@@ -1,5 +1,5 @@
 import Cartique from './cartique_3.js';
-import { products } from './cars.js';
+import { products } from './clothes.js';
 
 const currencySymbol = 'R';
 
@@ -57,7 +57,7 @@ const features = {
   itemsPerPage: 4,
   
   // Checkout & Navigation
-  checkoutUrl: 'https://www.google.com/',
+  checkoutUrl: '/auth/dashboard',
   checkoutUrlMode: '_blank', // options: 'self' or '_blank'
   
   // UI Components
@@ -85,7 +85,22 @@ const features = {
     priceRange: true,
     search: true,
     filters: productFilters
-  }
+  },
+
+    reviews: {
+    enabled: true,
+    allowGuestReviews: false,
+    requireApproval: false, // Simulated - would be server-side
+    apiEndpoint: 'productreview/productReviews', // Base endpoint
+    ratingsScale: 5, // 1-5 stars
+    showRatingDistribution: true,
+    sortOrder: 'newest' // 'newest', 'oldest', 'highest', 'lowest'
+  },
+
+  theme: 'light', 
+
+  themeColor: '#655793'
+
   
 };
 
