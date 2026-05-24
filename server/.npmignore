@@ -6,24 +6,9 @@ DUMP/
 public/
 prisma/
 
-# Documentation / notes
-Class_Outline/
-FILTER_TEST/
-
 # Demo / playground files
 index.html
-08_feb.js
-app.js
-app_2.js
-cars.js
-clothes.js
-full_scope_products.js
-cartique_2.js
-cartique_3.js
-cartique_3REST.js
-cartiqueOLD_STABLE.js
-old.js
-old.css
+
 
 # OS files
 .DS_Store
