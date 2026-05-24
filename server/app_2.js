@@ -7,22 +7,18 @@ function extractVariantFilters(products, currencySymbol = '$') {
   const filters = {};
   const prices = [];
   
-  // Single pass to collect everything
   products.forEach(p => p.variants?.forEach(v => {
     const priceNum = parseFloat(v.price);
     if (!isNaN(priceNum)) prices.push(priceNum);
-    
     v.attributes?.forEach(a => {
       (filters[a.key] = filters[a.key] || new Set()).add(a.value);
     });
   }));
   
-  // Add price ranges
   if (prices.length) {
     const min = Math.min(...prices);
     const max = Math.max(...prices);
     const step = (max - min) / 6;
-    
     filters.priceRange = new Set([
       `Under ${currencySymbol}${Math.floor(min + step)}`,
       `${currencySymbol}${Math.floor(min + step) + 1}-${currencySymbol}${Math.floor(min + step * 2)}`,
@@ -33,53 +29,49 @@ function extractVariantFilters(products, currencySymbol = '$') {
     ]);
   }
   
-  // Convert to arrays
   return Object.fromEntries(
     Object.entries(filters).map(([k, v]) => [k, Array.from(v).sort()])
   );
 }
 
-
-const productFilters = extractVariantFilters(products, currencySymbol); 
-console.log(productFilters);
+const productFilters = extractVariantFilters(products, currencySymbol);
 
 const features = {
   // Layout & Display
-  grid: true,                // Use grid layout
-  pagination: false,         // Disable pagination
-  columns: 2,                // 3 columns in grid layout
-  rows: 6,                   // Show 6 products per page
-  theme: '#fff',             // Theme color
-  sale: true,                // Enable sale badges
-  search: true,              // Enable search
-  sorting: true,             // Enable sorting
+  grid: true,
+  pagination: false,
+  columns: 2,
+  rows: 6,
+  theme: 'light',              // 'light' | 'dark'
+  themeColor: '#655793',       // Accent color
+  sale: true,
+  search: true,
+  sorting: true,
   currencySymbol: currencySymbol,
   itemsPerPage: 4,
   
   // Checkout & Navigation
   checkoutUrl: '/auth/dashboard',
-  checkoutUrlMode: '_blank', // options: 'self' or '_blank'
+  checkoutUrlMode: '_blank',
   
   // UI Components
   sidebar: true,
   footer: true,
-  // containerId: 'customId', // Optional: Use custom container ID
   
-  // NEW: Dynamic Catalog Menu Configuration
+  // Catalog Menu
   menu: {
-    enabled: true,                // Enable/disable catalog menu
-    type: 'mega',                 // 'mega', 'inline', or 'stacked'
-    position: 'top',              // 'top', 'sidebar', or 'custom'
-    containerId: 'cartique-catalogue-menu', // For custom position
-    label: 'Shop Categories',     // Label for stacked menu
-    maxVisibleItems: 5,           // For inline menu
-    showCounts: true,             // Show product counts
-    collapseOnMobile: true,       // Adapt to mobile screens
-    megaMenuColumns: 3            // Number of columns for mega menu
+    enabled: true,
+    type: 'mega',
+    position: 'top',
+    containerId: 'cartique-catalogue-menu',
+    label: 'Shop Categories',
+    maxVisibleItems: 5,
+    showCounts: true,
+    collapseOnMobile: true,
+    megaMenuColumns: 3
   },
   
-  // Product Filters Configuration
-  
+  // Sidebar Filters
   sidebarFeatures: {
     enabled: true,
     priceRange: true,
@@ -87,22 +79,16 @@ const features = {
     filters: productFilters
   },
 
-    reviews: {
+  // Reviews
+  reviews: {
     enabled: true,
     allowGuestReviews: false,
-    requireApproval: false, // Simulated - would be server-side
-    apiEndpoint: 'productreview/productReviews', // Base endpoint
-    ratingsScale: 5, // 1-5 stars
+    requireApproval: false,
+    apiEndpoint: 'productreview/productReviews',
+    ratingsScale: 5,
     showRatingDistribution: true,
-    sortOrder: 'newest' // 'newest', 'oldest', 'highest', 'lowest'
-  },
-
-  theme: 'light', 
-
-  themeColor: '#655793'
-
-  
+    sortOrder: 'newest'
+  }
 };
 
-// Single consolidated instance with ALL features
 const shopUI = new Cartique(products, features);
