@@ -453,22 +453,23 @@ const CARTIQUE_CSS = `
 }
 
 .product-image-column .product-image-container {
-  position: relative;
-  width: 100%;
-  padding-top: 56.25%;
-  overflow: hidden;
-  border-radius: 8px;
-  background: #f5f5f5;
+    position: relative;
+    width: 100%;
+    padding-top: 75%; /* 4:3 aspect ratio */
+    overflow: hidden;
+    border-radius: 8px;
+    background: #f5f5f5;
 }
 
 .product-image-column img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 8px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* CHANGED from cover to contain */
+    border-radius: 8px;
+    background: #f5f5f5;
 }
 
 .product-info-column {
@@ -2146,13 +2147,12 @@ const CARTIQUE_CSS = `
     z-index: 9999 !important;
   }
 }
-
 `;
 
 
 
 export default class Cartique {
- constructor(products, features = {}) {
+ constructor(products, features = {}, callbacks = {}) {
     // 1. Validation
     if (!products || !Array.isArray(products)) {
         throw new Error('Cartique requires an array of products');
@@ -2222,6 +2222,8 @@ export default class Cartique {
 
     this.itemsPerBatch = this.features.itemsPerPage || 12;
     this.loadedCount = this.itemsPerBatch;
+
+    this.callbacks = callbacks || {};
 
     // 5. Fire off the Engine
     this.init();
@@ -3563,45 +3565,82 @@ renderProducts(layout, data) {
 
 
   updateProductElement(element, product) {
-    // Update image
-    const imgEl = element.querySelector('#image');
-    if (imgEl) {
-        imgEl.src = product.image || '';
-        imgEl.alt = product.title || '';
+    // Update all product fields EXCEPT currency
+    for (const [key, value] of Object.entries(product)) {
+        if (key === 'currency') continue; // Skip - handled below
+        
+        const target = element.querySelector(`#${key}`);
+        if (!target) continue;
+
+        switch (target.tagName) {
+        case 'IMG':
+            target.src = value;
+            target.alt = product.title || '';
+            break;
+        case 'A':
+            target.href = value;
+            break;
+        default:
+            target.textContent = value;
+        }
     }
 
-    // Update title
-    const titleEl = element.querySelector('#title');
-    if (titleEl) titleEl.textContent = product.title || '';
-
-    // Update description
-    const descEl = element.querySelector('#description');
-    if (descEl) descEl.textContent = product.description || '';
-
-    // Update currency symbols
+    // Update ALL currency symbols (both regular and sale)
     const currencyEls = element.querySelectorAll('#currency');
     currencyEls.forEach(el => {
         el.textContent = this.currencySymbol || '$';
         el.style.color = '';
+        el.style.fontWeight = '';
     });
 
     // Handle pricing
     const priceEl = element.querySelector('#price');
     const salePriceEl = element.querySelector('#sale_price');
-    
-    if (product.sale_price) {
+    const salePriceCurrencyEl = element.querySelector('#sale_price_currency');
+
+    if (product.sale_price && product.original_price) {
         if (priceEl) {
-            priceEl.textContent = product.price;
+            priceEl.textContent = product.original_price;
             priceEl.style.textDecoration = 'line-through';
             priceEl.style.color = '#666';
             priceEl.style.opacity = '0.7';
+            priceEl.style.fontWeight = '';
         }
         if (salePriceEl) {
             salePriceEl.textContent = product.sale_price;
             salePriceEl.style.display = 'block';
             salePriceEl.style.color = 'red';
+            salePriceEl.style.fontWeight = 'bold';
             const saleContainer = salePriceEl.closest('span');
             if (saleContainer) saleContainer.style.display = '';
+        }
+        if (salePriceCurrencyEl) {
+            salePriceCurrencyEl.textContent = this.currencySymbol || '$';
+            salePriceCurrencyEl.style.display = '';
+            salePriceCurrencyEl.style.color = 'red';
+            salePriceCurrencyEl.style.fontWeight = 'bold';
+        }
+    } else if (product.sale_price) {
+        if (priceEl) {
+            priceEl.textContent = product.price;
+            priceEl.style.textDecoration = 'line-through';
+            priceEl.style.color = '#666';
+            priceEl.style.opacity = '0.7';
+            priceEl.style.fontWeight = '';
+        }
+        if (salePriceEl) {
+            salePriceEl.textContent = product.sale_price;
+            salePriceEl.style.display = 'block';
+            salePriceEl.style.color = 'red';
+            salePriceEl.style.fontWeight = 'bold';
+            const saleContainer = salePriceEl.closest('span');
+            if (saleContainer) saleContainer.style.display = '';
+        }
+        if (salePriceCurrencyEl) {
+            salePriceCurrencyEl.textContent = this.currencySymbol || '$';
+            salePriceCurrencyEl.style.display = '';
+            salePriceCurrencyEl.style.color = 'red';
+            salePriceCurrencyEl.style.fontWeight = 'bold';
         }
     } else {
         if (priceEl) {
@@ -3609,12 +3648,19 @@ renderProducts(layout, data) {
             priceEl.style.textDecoration = '';
             priceEl.style.color = '';
             priceEl.style.opacity = '';
+            priceEl.style.fontWeight = '';
         }
         if (salePriceEl) {
             salePriceEl.textContent = '';
             salePriceEl.style.display = 'none';
             const saleContainer = salePriceEl.closest('span');
             if (saleContainer) saleContainer.style.display = 'none';
+        }
+        if (salePriceCurrencyEl) {
+            salePriceCurrencyEl.textContent = '';
+            salePriceCurrencyEl.style.display = 'none';
+            salePriceCurrencyEl.style.color = '';
+            salePriceCurrencyEl.style.fontWeight = '';
         }
     }
 }
@@ -4350,8 +4396,18 @@ closeCart() {
     
     this.singleProductViewActive = true;
     this.renderSingleProduct(product);
+    
+    // FIX: Scroll to single product view after DOM renders
+    requestAnimationFrame(() => {
+        const singleView = document.querySelector('.single-product-view');
+        if (singleView) {
+            singleView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.documentElement.scrollTop = 0;
+        if (mainContent) mainContent.scrollTop = 0;
+    });
 }
-
 
   renderSingleProduct(product) {
     let container = document.getElementById('single-product-view-container');
@@ -4378,11 +4434,14 @@ closeCart() {
           <div class="product-meta">
             <h2>${product.title}</h2>
             <div class="price-container">
-              ${product.sale_price ? `
-                <span class="original-price">${this.features.currencySymbol}${product.price}</span>
-                <span class="sale-price">${this.features.currencySymbol}${product.sale_price}</span>
+              ${product.sale_price && product.original_price ? `
+                <span class="original-price">${this.currencySymbol}${product.original_price}</span>
+                <span class="sale-price">${this.currencySymbol}${product.sale_price}</span>
+              ` : product.sale_price ? `
+                <span class="original-price">${this.currencySymbol}${product.price}</span>
+                <span class="sale-price">${this.currencySymbol}${product.sale_price}</span>
               ` : `
-                <span class="price">${this.features.currencySymbol}${product.price}</span>
+                <span class="price">${this.currencySymbol}${product.price}</span>
               `}
             </div>
             <p class="product-description">${product.description}</p>
@@ -4404,16 +4463,6 @@ closeCart() {
     </div>
     `;
 
-    
-// Replace the form submit listener with button click listener
-const submitBtn = container.querySelector('#review-submit-btn');
-if (submitBtn) {
-    this.addEventListener(submitBtn, 'click', (e) => {
-        e.preventDefault();
-        const form = document.getElementById('review-form');
-        this.submitReview(form, product);
-    });
-}
     // Add event listeners
     const backBtn = productView.querySelector('.back-to-products');
     const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
@@ -4429,11 +4478,9 @@ if (submitBtn) {
 
     tabButtons.forEach(button => {
       this.addEventListener(button, 'click', () => {
-        // Update active tabs
         productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
           el.classList.remove('active');
         });
-        
         button.classList.add('active');
         const tabName = button.dataset.tab;
         const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
@@ -4441,9 +4488,33 @@ if (submitBtn) {
       });
     });
 
+    // Append to DOM first
     container.appendChild(productView);
     container.style.display = 'block';
-  }
+    
+    // Attach review form submit listener
+    const submitBtn = container.querySelector('#review-submit-btn');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const form = document.getElementById('review-form');
+            if (!form) return;
+            
+            const ratingInput = form.querySelector('input[name="rating"]:checked');
+            
+            if (!ratingInput) {
+                alert('Please select a rating');
+                return;
+            }
+            
+            const productId = parseInt(form.querySelector('#review-product-id').value);
+            const product = this.products.find(p => p.id === productId);
+            if (product) {
+                this.submitReview(form, product);
+            }
+        });
+    }
+}
 
 
 
@@ -4568,49 +4639,70 @@ formatDate(dateString) {
 }
 
 
+// In cartique_3.js, find submitReview() and add:
 async submitReview(form, product) {
-    const rating = form.querySelector('input[name="rating"]:checked')?.value;
-    const comment = form.querySelector('#review-comment').value.trim();
+    const ratingInput = form.querySelector('input[name="rating"]:checked');
+    const rating = ratingInput ? parseInt(ratingInput.value) : null;
+    const comment = form.querySelector('#review-comment')?.value?.trim() || '';
     
     if (!rating) {
         alert('Please select a rating');
         return;
     }
     
-    const reviewData = {
-        productId: product.id,
-        rating: parseInt(rating),
-        comment: comment || null
-    };
+    const payload = { productId: product.id, rating, comment: comment || null };
     
-    const endpoint = this.features.reviews?.apiEndpoint || 'productreview/productReviews';
-    const url = `${endpoint}/${product.id}`;
+    if (this.callbacks?.onReviewSubmit) {
+        this.callbacks.onReviewSubmit({
+            ...payload,
+            onSuccess: (result) => {
+                if (!product.reviews) product.reviews = [];
+                product.reviews.unshift({
+                    id: Date.now(),
+                    productId: result.productId,
+                    customerId: result.customerId,
+                    customer: result.customer || { id: result.customerId, name: 'You' },
+                    rating: result.rating,
+                    comment: result.comment,
+                    status: result.status || 'approved',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+                const reviewsTab = document.querySelector('[data-tab-content="reviews"]');
+                if (reviewsTab) reviewsTab.innerHTML = this.renderProductReviews(product);
+                form.reset();
+            },
+            onError: (error) => {
+                console.error('Review submission failed:', error);
+            }
+        });
+        return;
+    }
     
-    console.log('Submitting review to:', url, reviewData);
-    
-    // Add review to product data
+    this.submitReviewVanilla(payload, product);
+    form.reset();
+}
+
+
+
+submitReviewVanilla(payload, product) {
     if (!product.reviews) product.reviews = [];
     product.reviews.unshift({
         id: Date.now(),
-        productId: product.id,
+        productId: payload.productId,
         customerId: 0,
-        customer: { id: 0, name: 'You', email: '' },
-        rating: parseInt(rating),
-        comment: comment || null,
+        customer: { id: 0, name: 'Guest' },
+        rating: payload.rating,
+        comment: payload.comment,
         status: 'approved',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
     });
     
-    // SURGICAL FIX: Only update the reviews tab content, don't rebuild entire view
     const reviewsTab = document.querySelector('[data-tab-content="reviews"]');
-    if (reviewsTab) {
-        reviewsTab.innerHTML = this.renderProductReviews(product);
-    }
-    
-    // Reset the form
-    form.reset();
+    if (reviewsTab) reviewsTab.innerHTML = this.renderProductReviews(product);
 }
+
 
 
   returnToListView() {
