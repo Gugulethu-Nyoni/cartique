@@ -1,15 +1,26 @@
 {
   "name": "@semantq/cartique",
-  "version": "1.0.0",
-  "description": "A semantq native eCommerce UI module.",
+  "version": "1.0.1",
+  "description": "A framework-agnostic, plug-and-play eCommerce product gallery with cart, filters, reviews, and infinite scroll. Natively integrated with the Semantq ecosystem.",
   "main": "cartique.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "browser",
-    "library",
-    "cartique"
+    "semantq",
+    "cartique",
+    "ecommerce",
+    "product-gallery",
+    "shopping-cart",
+    "product-filter",
+    "reviews",
+    "infinite-scroll",
+    "framework-agnostic",
+    "vanilla-js",
+    "shop",
+    "storefront",
+    "ui-library"
   ],
   "author": "Gugulethu Nyoni <dev@semantq.com>",
   "license": "MIT",
@@ -20,5 +31,10 @@
   "homepage": "https://github.com/Gugulethu-Nyoni/cartique#readme",
   "bugs": {
     "url": "https://github.com/Gugulethu-Nyoni/cartique/issues"
-  }
+  },
+  "files": [
+    "cartique.js",
+    "README.md",
+    "LICENSE"
+  ]
 }
