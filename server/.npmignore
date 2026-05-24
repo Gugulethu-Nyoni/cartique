@@ -1,5 +1,6 @@
 # Development dependencies
 node_modules/
+DUMP/
 
 # Local assets
 public/

@@ -1,7 +1,7 @@
 {
-  "name": "cartique",
-  "version": "1.0.10",
-  "description": "A JS Based Framework agnostic eCommerce UI library.",
+  "name": "@semantq/cartique",
+  "version": "1.0.0",
+  "description": "A semantq native eCommerce UI module.",
   "main": "cartique.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
