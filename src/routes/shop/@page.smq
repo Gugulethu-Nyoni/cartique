@@ -1,5 +1,5 @@
 @script
-import CartiqueShop from '$global/shop/CartiqueShop';
+import CartiqueShop from '$components/cartique/CartiqueShop';
 @end
 
 @style
