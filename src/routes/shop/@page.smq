@@ -1,5 +1,10 @@
 @script
 import CartiqueShop from '$components/cartique/CartiqueShop';
+
+import TopBar from '$global/shop/TopBar';
+import Header from '$global/shop/Header';
+import Footer from '$global/shop/Footer';
+
 @end
 
 @style
@@ -7,4 +12,12 @@ import CartiqueShop from '$components/cartique/CartiqueShop';
 @end
 
 @html
+
+<TopBar />
+
+<Header />
+
+
 <CartiqueShop />
+
+<Footer />
