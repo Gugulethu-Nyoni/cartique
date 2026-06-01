@@ -2107,27 +2107,24 @@ const CARTIQUE_CSS = `
   }
 }
 
+
 /* =============================================
    Z-INDEX LAYERING SYSTEM
    ============================================= */
 .shopping-cart-icon {
-  z-index: 999 !important;
-}
-
-#toast-container .toast:not(.active) {
-  pointer-events: none;
+  z-index: 9998 !important;  /* Below cart overlay (9999) but above page header */
 }
 
 .cartique-mega-wrapper .mega-content {
   z-index: 1000 !important;
 }
 
-.cart-slide {
-  z-index: 10000 !important;
+.cart-overlay {
+  z-index: 9999 !important;  /* Just below cart slider */
 }
 
-.cart-overlay {
-  z-index: 9999 !important;
+.cart-slide {
+  z-index: 10000 !important;  /* Top of everything */
 }
 
 @media (max-width: 767px) {
@@ -3089,6 +3086,26 @@ loadMoreProducts() {
   }
 
 
+  // Add this method to the Cartique class
+getProductStock(product) {
+    // Handle direct stock property
+    if (typeof product.stock === 'number') return product.stock;
+    
+    // Handle stock in variants
+    if (product.variants?.length) {
+        return product.variants.reduce((total, v) => {
+            return total + (typeof v.stock === 'number' ? v.stock : 0);
+        }, 0);
+    }
+    
+    // No stock data available - assume unlimited
+    return Infinity;
+}
+
+
+
+
+
  async init() {
   try {
     // Inject CSS (must be first)
@@ -3663,7 +3680,98 @@ renderProducts(layout, data) {
             salePriceCurrencyEl.style.fontWeight = '';
         }
     }
+
+    // STOCK MANAGEMENT: Handle Add to Cart button state and stock display
+    const stockCount = this.getProductStock(product);
+    const addToCartBtn = element.querySelector('.cartique_add_to_cart');
+    
+    if (addToCartBtn) {
+        // Store stock data as dataset attributes for later validation
+        addToCartBtn.dataset.stock = stockCount;
+        addToCartBtn.dataset.productId = product.id;
+        
+        if (stockCount === 0) {
+            // Out of stock - disable button
+            addToCartBtn.disabled = true;
+            addToCartBtn.style.opacity = '0.5';
+            addToCartBtn.style.cursor = 'not-allowed';
+            addToCartBtn.title = 'Out of Stock';
+            
+            // Update button text to show out of stock
+            const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
+            if (btnText && btnText.textContent?.includes('ADD TO CART')) {
+                btnText.textContent = 'OUT OF STOCK';
+            }
+        } else if (stockCount > 0 && stockCount <= 5) {
+            // Low stock - enable but show warning
+            addToCartBtn.disabled = false;
+            addToCartBtn.style.opacity = '1';
+            addToCartBtn.style.cursor = 'pointer';
+            addToCartBtn.title = `Only ${stockCount} left in stock`;
+            
+            // Optionally show stock count on the button
+            const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
+            if (btnText && btnText.textContent?.includes('OUT OF STOCK')) {
+                btnText.textContent = 'ADD TO CART';
+            }
+        } else {
+            // Normal stock - enable button
+            addToCartBtn.disabled = false;
+            addToCartBtn.style.opacity = '1';
+            addToCartBtn.style.cursor = 'pointer';
+            addToCartBtn.title = '';
+            
+            const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
+            if (btnText && btnText.textContent?.includes('OUT OF STOCK')) {
+                btnText.textContent = 'ADD TO CART';
+            }
+        }
+    }
+
+    // Optional: Add stock indicator near the product
+    const existingStockIndicator = element.querySelector('.cartique-stock-indicator');
+    if (existingStockIndicator) {
+        existingStockIndicator.remove();
+    }
+    
+    if (stockCount === 0) {
+        const stockIndicator = document.createElement('div');
+        stockIndicator.className = 'cartique-stock-indicator out-of-stock';
+        stockIndicator.textContent = 'Out of Stock';
+        stockIndicator.style.cssText = `
+            color: #ff4444;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+            text-transform: uppercase;
+        `;
+        
+        // Insert after the add to cart button or at the end of the element
+        if (addToCartBtn && addToCartBtn.parentNode) {
+            addToCartBtn.parentNode.insertBefore(stockIndicator, addToCartBtn.nextSibling);
+        } else {
+            element.appendChild(stockIndicator);
+        }
+    } else if (stockCount > 0 && stockCount <= 5) {
+        const stockIndicator = document.createElement('div');
+        stockIndicator.className = 'cartique-stock-indicator low-stock';
+        stockIndicator.textContent = `Only ${stockCount} left`;
+        stockIndicator.style.cssText = `
+            color: #ff8c00;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        `;
+        
+        if (addToCartBtn && addToCartBtn.parentNode) {
+            addToCartBtn.parentNode.insertBefore(stockIndicator, addToCartBtn.nextSibling);
+        } else {
+            element.appendChild(stockIndicator);
+        }
+    }
 }
+
+
 
 
 
@@ -3750,24 +3858,16 @@ showCartPage() {
     // Close the slide-in cart
     this.closeCart();
     
-    // If we're in single product view, clean that up first
-    if (this.singleProductViewActive) {
-        const singleProductView = document.getElementById('single-product-view-container');
-        if (singleProductView) singleProductView.style.display = 'none';
-    }
-    
-    // Hide product displays, sidebar, controls, menu
+    // Hide product displays and sidebar
     const productDisplays = document.getElementById('cartique-product-displays');
     const sidebar = document.getElementById('cartique-sidebar');
     const menuAnchor = document.getElementById('cartique-menu-anchor-top');
     const controls = document.getElementById('cartique-controls');
-    const footer = document.getElementById('cartique-product-footer');
     
     if (productDisplays) productDisplays.style.display = 'none';
     if (sidebar) sidebar.style.display = 'none';
     if (menuAnchor) menuAnchor.style.display = 'none';
     if (controls) controls.style.display = 'none';
-    if (footer) footer.style.display = 'none';
     
     // Make main content full width
     const mainContent = document.getElementById('cartique-main-content');
@@ -3777,8 +3877,17 @@ showCartPage() {
     
     this.singleProductViewActive = true;
     this.renderCartPage();
+    
+    // FIX: Scroll to top of cart page
+    requestAnimationFrame(() => {
+        const cartPage = document.getElementById('cartique-cart-page');
+        if (cartPage) {
+            cartPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (mainContent) mainContent.scrollTop = 0;
+    });
 }
-
 
 renderCartPage() {
     const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
@@ -3988,10 +4097,23 @@ increasePageQty(productId) {
     const index = cart.findIndex(item => item.id === productId);
 
     if (index !== -1) {
+        const product = this.products.find(p => p.id === productId);
+        const availableStock = product ? this.getProductStock(product) : 0;
+        const newQuantity = cart[index].cart_quantity + 1;
+        
+        if (newQuantity > availableStock) {
+            this.showStockAlert(
+                `Cannot add more. Maximum available: ${availableStock}`
+            );
+            return;
+        }
+        
         cart[index].cart_quantity += 1;
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
     }
 }
+
+
 
 removePageItem(productId) {
     let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
@@ -4042,25 +4164,43 @@ removePageItem(productId) {
     const product = this.products.find(p => p.id === productId);
 
     if (!product) {
-      console.error('Product not found:', productId);
-      return;
+        console.error('Product not found:', productId);
+        return;
+    }
+
+    // STOCK CHECK
+    const availableStock = this.getProductStock(product);
+    if (availableStock === 0) {
+        this.showStockAlert('This product is out of stock');
+        return;
     }
 
     let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
     const existingIndex = cart.findIndex(item => item.id === product.id);
 
     if (existingIndex === -1) {
-      cart.push({
-        ...product,
-        cart_quantity: 1
-      });
+        // New item - can add 1
+        cart.push({
+            ...product,
+            cart_quantity: 1
+        });
     } else {
-      cart[existingIndex].cart_quantity += 1;
+        // Existing item - check if adding more exceeds stock
+        const newQuantity = cart[existingIndex].cart_quantity + 1;
+        if (newQuantity > availableStock) {
+            this.showStockAlert(
+                `Only ${availableStock} available. You already have ${cart[existingIndex].cart_quantity} in cart.`
+            );
+            return;
+        }
+        cart[existingIndex].cart_quantity = newQuantity;
     }
 
     localStorage.setItem('cartiqueCart', JSON.stringify(cart));
     this.showCart();
-  }
+}
+
+
 
   showCart() {
     const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
@@ -4246,17 +4386,30 @@ closeCart() {
     }
   }
 
-  increaseQtyItem(event) {
+ increaseQtyItem(event) {
     const productId = parseInt(event.target.id.replace('increase_quantity_', ''));
     let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
     const index = cart.findIndex(item => item.id === productId);
 
     if (index !== -1) {
-      cart[index].cart_quantity += 1;
-      localStorage.setItem('cartiqueCart', JSON.stringify(cart));
-      this.showCart();
+        const product = this.products.find(p => p.id === productId);
+        const availableStock = product ? this.getProductStock(product) : 0;
+        const newQuantity = cart[index].cart_quantity + 1;
+        
+        if (newQuantity > availableStock) {
+            this.showStockAlert(
+                `Cannot add more. Only ${availableStock} available in total.`
+            );
+            return;
+        }
+        
+        cart[index].cart_quantity = newQuantity;
+        localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        this.showCart();
     }
-  }
+}
+
+
 
   closeCart() {
     const cartSlide = document.getElementById('cart-slide');
@@ -4350,6 +4503,71 @@ closeCart() {
     }, 5000);
 }
 
+
+
+showStockAlert(message) {
+    // Check if toast container exists, create if not
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+
+    // Create stock alert toast following the same pattern as checkout alert
+    const toast = document.createElement('div');
+    toast.className = 'toast stock-alert';
+    toast.innerHTML = `
+        <div class="toast-content">
+            <span class="svg">⚠️</span>
+            <div class="message">
+                <span class="text text-1">Stock Alert</span>
+                <span class="text text-2">${message}</span>
+            </div>
+        </div>
+        <button class="close">&times;</button>
+    `;
+
+    // Add stock-specific styling while maintaining consistency
+    toast.style.cssText = `
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+    `;
+
+    // Update text colors for visibility
+    const titleEl = toast.querySelector('.text-1');
+    const messageEl = toast.querySelector('.text-2');
+    if (titleEl) titleEl.style.color = '#856404';
+    if (messageEl) messageEl.style.color = '#856404';
+
+    toastContainer.appendChild(toast);
+    
+    // Show with animation
+    setTimeout(() => toast.classList.add('active'), 10);
+    
+    // Close button handler
+    const closeBtn = toast.querySelector('.close');
+    const closeToast = () => {
+        toast.classList.remove('active');
+        setTimeout(() => toast.remove(), 300);
+    };
+    
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeToast);
+    }
+    
+    // Auto dismiss after 4 seconds (slightly faster than checkout since it's an error)
+    const autoDismiss = setTimeout(() => {
+        closeToast();
+    }, 4000);
+    
+    // Clean up timeout if manually closed
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            clearTimeout(autoDismiss);
+        }, { once: true });
+    }
+}
 
 
   clearToastTimeouts() {
