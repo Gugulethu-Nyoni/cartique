@@ -1,6 +1,6 @@
 {
   "name": "@semantq/cartique",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "A framework-agnostic, plug-and-play eCommerce product gallery with cart, filters, reviews, and infinite scroll. Natively integrated with the Semantq ecosystem.",
   "main": "cartique.js",
   "type": "module",

@@ -3088,21 +3088,26 @@ loadMoreProducts() {
 
   // Add this method to the Cartique class
 getProductStock(product) {
-    // Handle direct stock property
-    if (typeof product.stock === 'number') return product.stock;
+    // Check for inventory directly on product
+    if (typeof product.inventory === 'number') {
+        return product.inventory;
+    }
     
-    // Handle stock in variants
+    // Check for totalInventory (from your API)
+    if (typeof product.totalInventory === 'number') {
+        return product.totalInventory;
+    }
+    
+    // Check variants for inventory
     if (product.variants?.length) {
         return product.variants.reduce((total, v) => {
-            return total + (typeof v.stock === 'number' ? v.stock : 0);
+            return total + (typeof v.inventory === 'number' ? v.inventory : 0);
         }, 0);
     }
     
-    // No stock data available - assume unlimited
-    return Infinity;
+    // Default: assume in stock if no inventory data
+    return 10;
 }
-
-
 
 
 

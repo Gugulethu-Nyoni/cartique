@@ -6,3 +6,4 @@ Semantq Native Ecommerce Front End UI
 - VRIANT FILTERS
 - MAKE ADD TO CART VISIBLE ALWAYS
 - More configs
+- Add templates
