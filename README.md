@@ -3,7 +3,7 @@ Semantq Native Ecommerce Front End UI
 
 ## TODO
 - SEARCHABLE CATEGORIES (SUB CATEGORIES)
-- VRIANT FILTERS
+- VARIANT FILTERS
 - MAKE ADD TO CART VISIBLE ALWAYS
 - More configs
 - Add templates
