@@ -7,3 +7,4 @@ Semantq Native Ecommerce Front End UI
 - MAKE ADD TO CART VISIBLE ALWAYS
 - More configs
 - Add templates
+- SEO categories URLs
