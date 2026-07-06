@@ -1,5 +1,5 @@
 import Cartique from './cartique.js';
-import { products } from './clothes.js';
+import { products } from './herbs2.js';
 
 const currencySymbol = 'R';
 

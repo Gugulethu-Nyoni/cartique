@@ -2144,6 +2144,298 @@ const CARTIQUE_CSS = `
     z-index: 9999 !important;
   }
 }
+
+
+/*  BULK PRICING UIs CSS */
+
+  /* =============================================
+   BULK PRICING - Shared Styles
+   ============================================= */
+
+.cartique-bulk-pricing {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #1a1a1a;
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1.4;
+    font-family: var(--font-family);
+}
+
+.cartique-bulk-pricing .bulk-label {
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #ffd700;
+    display: block;
+}
+
+.cartique-bulk-pricing .bulk-price {
+    font-weight: 600;
+    font-size: 14px;
+    display: block;
+    color: #ffffff;
+}
+
+.cartique-bulk-pricing .bulk-min-qty {
+    font-size: 11px;
+    opacity: 0.7;
+    display: block;
+    color: #ffffff;
+}
+
+/* Grid View */
+.cartique-product-grid .cartique-bulk-pricing {
+    margin: 4px 15px 8px;
+    text-align: center;
+}
+
+/* List View */
+.cartique-bulk-pricing.list-view {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    font-size: 11px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.cartique-bulk-pricing.list-view .bulk-label,
+.cartique-bulk-pricing.list-view .bulk-price,
+.cartique-bulk-pricing.list-view .bulk-min-qty {
+    display: inline;
+}
+
+.cartique-bulk-pricing.list-view .bulk-label {
+    font-size: 9px;
+}
+
+.cartique-bulk-pricing.list-view .bulk-price {
+    font-size: 12px;
+}
+
+.cartique-bulk-pricing.list-view .bulk-min-qty {
+    font-size: 10px;
+}
+
+/* =============================================
+   SINGLE PRODUCT - Bulk Pricing
+   ============================================= */
+
+.cartique-bulk-pricing.single-product {
+    margin: 12px 0 16px;
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border-left: 4px solid #1a1a1a;
+    color: #1a1a1a;
+    border-radius: 0 4px 4px 0;
+}
+
+.cartique-bulk-pricing.single-product .bulk-header {
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: #1a1a1a;
+    letter-spacing: 0.5px;
+}
+
+.cartique-bulk-pricing.single-product .bulk-header.active {
+    color: #28a745;
+}
+
+.cartique-bulk-pricing.single-product .bulk-price {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+    display: block;
+    margin: 2px 0;
+}
+
+.cartique-bulk-pricing.single-product .bulk-min-qty {
+    font-size: 12px;
+    color: #6c757d;
+    display: block;
+}
+
+/* =============================================
+   CART SLIDE-IN - Bulk Status
+   ============================================= */
+
+.cart-bulk-status {
+    margin-top: 6px;
+    padding: 4px 0;
+    font-size: 11px;
+    font-family: var(--font-family);
+    border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.cart-bulk-status .bulk-heading {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.cart-bulk-status .bulk-heading.active {
+    color: #28a745;
+}
+
+.cart-bulk-status .bulk-price-display {
+    font-weight: 500;
+    font-size: 13px;
+    color: #1a1a1a;
+}
+
+.cart-bulk-status .bulk-min-qty {
+    color: #6c757d;
+    font-size: 10px;
+}
+
+/* =============================================
+   CART PAGE - Bulk Status
+   ============================================= */
+
+.cart-page-bulk-status {
+    margin: 4px 0 8px;
+    font-size: 12px;
+    font-family: var(--font-family);
+}
+
+.cart-page-bulk-status .bulk-heading {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.cart-page-bulk-status .bulk-heading-active {
+    font-weight: 600;
+    color: #28a745;
+    font-size: 12px;
+}
+
+.cart-page-bulk-status .bulk-price-available {
+    font-weight: 500;
+    color: #1a1a1a;
+    font-size: 13px;
+}
+
+.cart-page-bulk-status .bulk-min-qty {
+    color: #6c757d;
+    font-size: 11px;
+}
+
+.cart-page-bulk-status.active {
+    background: #f0faf0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border-left: 3px solid #28a745;
+}
+
+/* Price strikethrough for bulk active state */
+.cart-page-item-price .original-price-strikethrough {
+    text-decoration: line-through;
+    color: #6c757d;
+    font-size: 14px;
+    margin-right: 8px;
+}
+
+.cart-page-item-price .bulk-price-active {
+    color: #28a745;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.cart-page-item-price .retail-price {
+    color: #1a1a1a;
+    font-weight: 600;
+}
+
+/* =============================================
+   RESPONSIVE - Bulk Pricing
+   ============================================= */
+
+@media (max-width: 768px) {
+    .cartique-bulk-pricing {
+        font-size: 11px;
+        padding: 5px 8px;
+    }
+
+    .cartique-bulk-pricing .bulk-price {
+        font-size: 12px;
+    }
+
+    .cartique-bulk-pricing .bulk-min-qty {
+        font-size: 10px;
+    }
+
+    .cartique-bulk-pricing.single-product {
+        padding: 10px 12px;
+        margin: 10px 0 12px;
+    }
+
+    .cartique-bulk-pricing.single-product .bulk-price {
+        font-size: 16px;
+    }
+
+    .cartique-bulk-pricing.list-view {
+        font-size: 10px;
+        gap: 6px;
+        padding: 3px 10px;
+    }
+
+    .cart-bulk-status {
+        font-size: 10px;
+    }
+
+    .cart-bulk-status .bulk-price-display {
+        font-size: 12px;
+    }
+
+    .cart-page-bulk-status {
+        font-size: 11px;
+    }
+
+    .cart-page-item-price .original-price-strikethrough {
+        font-size: 12px;
+    }
+
+    .cart-page-item-price .bulk-price-active {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .cartique-bulk-pricing {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+
+    .cartique-bulk-pricing .bulk-price {
+        font-size: 11px;
+    }
+
+    .cartique-bulk-pricing.single-product {
+        padding: 8px 10px;
+    }
+
+    .cartique-bulk-pricing.single-product .bulk-price {
+        font-size: 14px;
+    }
+
+    .cartique-bulk-pricing.list-view {
+        font-size: 9px;
+        padding: 2px 8px;
+        gap: 4px;
+    }
+}
+
+
 `;
 
 
@@ -2924,6 +3216,151 @@ renderMobileUI() {
    ========================================================== */
 
 
+/* ==========================================================
+   START SECTION: HANDLE BULK PRICING 
+   ========================================================== */
+
+
+/* ==========================================================
+   START SECTION: HANDLE BULK PRICING 
+   ========================================================== */
+
+hasBulkPricing(variant) {
+    return variant?.bulkPrice != null && variant?.bulkMinimumQty != null;
+}
+
+/**
+ * Get bulk pricing display data
+ * One source of truth for all UI components
+ */
+getBulkPricingDisplay(variant, quantity = 0) {
+    const defaultDisplay = {
+        hasBulk: false,
+        isBulk: false,
+        retailPrice: variant?.price || 0,
+        bulkPrice: null,
+        unitPrice: variant?.price || 0,
+        minimumQty: null,
+        heading: null,
+        message: null,
+        displayPrice: null,
+        bulkDisplayPrice: null,
+        staticDisplay: {
+            label: null,
+            price: null,
+            minQty: null
+        }
+    };
+
+    if (!variant || !this.hasBulkPricing(variant)) {
+        return defaultDisplay;
+    }
+
+    const retailPrice = variant.price;
+    const bulkPrice = variant.bulkPrice;
+    const minimumQty = variant.bulkMinimumQty;
+    const isBulk = quantity >= minimumQty;
+    const unitPrice = isBulk ? bulkPrice : retailPrice;
+
+    return {
+        hasBulk: true,
+        isBulk: isBulk,
+        retailPrice: retailPrice,
+        bulkPrice: bulkPrice,
+        unitPrice: unitPrice,
+        minimumQty: minimumQty,
+        heading: isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+        message: `Minimum ${minimumQty} items`,
+        displayPrice: `${this.currencySymbol}${unitPrice} each`,
+        bulkDisplayPrice: `${this.currencySymbol}${bulkPrice} each`,
+        staticDisplay: {
+            label: 'BULK PRICE',
+            price: `${this.currencySymbol}${bulkPrice} each`,
+            minQty: `Minimum ${minimumQty} items`
+        }
+    };
+}
+
+/**
+ * Get selected variant
+ */
+getSelectedVariant(product) {
+    if (product.variants && product.variants.length > 0) {
+        return product.variants[0];
+    }
+    return {
+        id: product.id,
+        price: product.price || 0,
+        bulkPrice: product.bulkPrice,
+        bulkMinimumQty: product.bulkMinimumQty,
+        inventory: product.inventory || 0
+    };
+}
+
+/**
+ * Find variant by ID across all products
+ */
+findVariant(variantId) {
+    if (!variantId) return null;
+    
+    for (const product of this.products) {
+        if (product.variants) {
+            const variant = product.variants.find(v => v.id === variantId);
+            if (variant) return variant;
+        }
+        // Check if product itself is the variant
+        if (product.id === variantId) {
+            return {
+                id: product.id,
+                price: product.price || 0,
+                bulkPrice: product.bulkPrice,
+                bulkMinimumQty: product.bulkMinimumQty,
+                inventory: product.inventory || 0,
+                attributes: product.attributes || []
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * Calculate unit price - simple retail vs bulk
+ */
+getUnitPrice(variant, quantity = 1) {
+    const retailPrice = variant?.price || 0;
+    const bulkPrice = variant?.bulkPrice;
+    const bulkMinQty = variant?.bulkMinimumQty;
+
+    const isBulk = bulkPrice && bulkMinQty && quantity >= bulkMinQty;
+    const unitPrice = isBulk ? bulkPrice : retailPrice;
+
+    return {
+        unitPrice: unitPrice,
+        isBulk: isBulk,
+        retailPrice: retailPrice,
+        bulkPrice: bulkPrice,
+        bulkMinimumQty: bulkMinQty,
+        quantity: quantity,
+        totalPrice: unitPrice * quantity
+    };
+}
+
+/* ==========================================================
+   END SECTION: HANDLE BULK PRICING 
+   ========================================================== */
+
+
+/* ==========================================================
+   END SECTION: HANDLE BULK PRICING 
+   ========================================================== */
+
+
+
+
+
+
+
+
 
 /* ==========================================================
    START SECTION: INFINITE SCROLL
@@ -3509,7 +3946,7 @@ renderProducts(layout, data) {
 
 
 
-  createProductCard(product) {
+ createProductCard(product) {
     const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
     if (!wrapper) return null;
 
@@ -3517,7 +3954,31 @@ renderProducts(layout, data) {
     if (!productCardTemplate) return null;
 
     this.updateProductElement(productCardTemplate, product);
-    
+
+    // --- BULK PRICING: Grid Card ---
+    const variant = this.getSelectedVariant(product);
+    const bulkDisplay = this.getBulkPricingDisplay(variant);
+
+    if (bulkDisplay.hasBulk) {
+        // Find the currency-price-display container
+        const priceContainer = productCardTemplate.querySelector('.currency-price-display');
+        if (priceContainer) {
+            // Remove existing bulk indicator if any
+            const existing = priceContainer.querySelector('.cartique-bulk-pricing');
+            if (existing) existing.remove();
+
+            const bulkEl = document.createElement('div');
+            bulkEl.className = 'cartique-bulk-pricing';
+            bulkEl.innerHTML = `
+                <div class="bulk-label">${bulkDisplay.staticDisplay.label}</div>
+                <div class="bulk-price">${bulkDisplay.staticDisplay.price}</div>
+                <div class="bulk-min-qty">${bulkDisplay.staticDisplay.minQty}</div>
+            `;
+            priceContainer.appendChild(bulkEl);
+        }
+    }
+    // --- END BULK PRICING ---
+
     // Add image click handler
     const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
     if (imgContainer) {
@@ -3527,13 +3988,6 @@ renderProducts(layout, data) {
             e.preventDefault();
             this.showSingleProductView(product.id);
         });
-    }
-
-    // FIX: Add lazy loading
-    const img = productCardTemplate.querySelector('#image');
-    if (img) {
-        img.loading = 'lazy';
-        img.decoding = 'async';
     }
 
     // Add to cart button
@@ -3547,6 +4001,8 @@ renderProducts(layout, data) {
 }
 
 
+
+
   createProductListing(product) {
     const wrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
     if (!wrapper) return null;
@@ -3556,6 +4012,30 @@ renderProducts(layout, data) {
 
     productListingTemplate.classList.add('cartique-product-listing');
     this.updateProductElement(productListingTemplate, product);
+
+    // --- BULK PRICING: List Card ---
+    const variant = this.getSelectedVariant(product);
+    const bulkDisplay = this.getBulkPricingDisplay(variant);
+
+    if (bulkDisplay.hasBulk) {
+        // Find the currency-price-display container
+        const priceContainer = productListingTemplate.querySelector('.currency-price-display');
+        if (priceContainer) {
+            // Remove existing bulk indicator if any
+            const existing = priceContainer.querySelector('.cartique-bulk-pricing');
+            if (existing) existing.remove();
+
+            const bulkEl = document.createElement('div');
+            bulkEl.className = 'cartique-bulk-pricing list-view';
+            bulkEl.innerHTML = `
+                <span class="bulk-label">${bulkDisplay.staticDisplay.label}</span>
+                <span class="bulk-price">${bulkDisplay.staticDisplay.price}</span>
+                <span class="bulk-min-qty">${bulkDisplay.staticDisplay.minQty}</span>
+            `;
+            priceContainer.appendChild(bulkEl);
+        }
+    }
+    // --- END BULK PRICING ---
 
     // FIX: Add image click handler for single product view
     const imgContainer = productListingTemplate.querySelector('.cartique_product_image_container');
@@ -3584,7 +4064,6 @@ renderProducts(layout, data) {
 
     return productListingTemplate;
 }
-
 
   updateProductElement(element, product) {
     // Update all product fields EXCEPT currency
@@ -3926,22 +4405,66 @@ renderCartPage() {
         let itemsHTML = '';
         
         cart.forEach(product => {
-            const price = parseFloat(product.sale_price || product.price) || 0;
+            // Get variant for pricing
+            const variant = this.findVariant(product.variantId || product.id);
             const quantity = product.cart_quantity || 1;
-            const itemTotal = price * quantity;
+            
+            // Calculate pricing with bulk support
+            const pricing = this.getUnitPrice(variant, quantity);
+            const itemTotal = pricing.unitPrice * quantity;
             subtotal += itemTotal;
             
+            // Get bulk display data
+            const bulkDisplay = this.getBulkPricingDisplay(variant, quantity);
+            
+            // Build price HTML with bulk info
+            let priceHTML = '';
+            let bulkStatusHTML = '';
+            
+            if (bulkDisplay && bulkDisplay.hasBulk) {
+                if (bulkDisplay.isBulk) {
+                    // Bulk is active - show strikethrough retail + bulk price
+                    priceHTML = `
+                        <span class="original-price-strikethrough">${this.currencySymbol}${bulkDisplay.retailPrice.toFixed(2)}</span>
+                        <span class="bulk-price-active">${this.currencySymbol}${bulkDisplay.unitPrice.toFixed(2)}</span>
+                    `;
+                    bulkStatusHTML = `
+                        <div class="cart-page-bulk-status active">
+                            <span class="bulk-heading-active">✓ Bulk Price Applied</span>
+                            <span class="bulk-min-qty">${bulkDisplay.message}</span>
+                        </div>
+                    `;
+                } else {
+                    // Bulk available but not yet active
+                    priceHTML = `
+                        <span class="retail-price">${this.currencySymbol}${bulkDisplay.retailPrice.toFixed(2)}</span>
+                    `;
+                    bulkStatusHTML = `
+                        <div class="cart-page-bulk-status">
+                            <span class="bulk-heading">BULK PRICE</span>
+                            <span class="bulk-price-available">${bulkDisplay.bulkDisplayPrice}</span>
+                            <span class="bulk-min-qty">${bulkDisplay.message}</span>
+                        </div>
+                    `;
+                }
+            } else {
+                // No bulk pricing - standard display
+                priceHTML = `
+                    <span class="retail-price">${this.currencySymbol}${(product.price || variant?.price || 0).toFixed(2)}</span>
+                `;
+            }
+            
             itemsHTML += `
-                <div class="cart-page-item" data-product-id="${product.id}">
+                <div class="cart-page-item" data-product-id="${product.id}" data-variant-id="${product.variantId || ''}">
                     <div class="cart-page-item-image">
                         <img src="${product.image}" alt="${product.title}">
                     </div>
                     <div class="cart-page-item-details">
                         <h3>${product.title}</h3>
                         <p class="cart-page-item-price">
-                            ${this.currencySymbol}${price.toFixed(2)}
-                            ${product.sale_price ? `<span class="cart-page-item-original">${this.currencySymbol}${product.price}</span>` : ''}
+                            ${priceHTML}
                         </p>
+                        ${bulkStatusHTML}
                         <div class="cart-page-item-actions">
                             <div class="cart-page-quantity">
                                 <button class="cart-page-qty-btn decrease-page-qty" data-id="${product.id}">−</button>
@@ -3984,6 +4507,8 @@ renderCartPage() {
     // Attach event listeners
     this.attachCartPageEvents(cartPage);
 }
+
+
 
 attachCartPageEvents(cartPage) {
     // Back button
@@ -4224,43 +4749,42 @@ removePageItem(productId) {
     if (viewBtn) viewBtn.style.display = cart.length === 0 ? 'none' : 'block';
     if (checkoutBtn) checkoutBtn.style.display = cart.length === 0 ? 'none' : 'block';
 
-    // Calculate total
+    // Calculate subtotal with bulk pricing
     let subtotal = 0;
 
     // Render cart items
     cart.forEach(product => {
-      const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component');
-      if (!wrapper) return;
+        const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component');
+        if (!wrapper) return;
 
-      const cartItem = wrapper.firstElementChild.cloneNode(true);
-      
-      // Update product data
-      this.updateCartItem(cartItem, product);
-      
-      // Add event listeners
-      this.addCartItemEventListeners(cartItem, product.id);
-      
-      // Calculate subtotal
-      const price = parseFloat(product.sale_price || product.price) || 0;
-      const quantity = product.cart_quantity || 1;
-      subtotal += price * quantity;
-      
-      cartContainer.appendChild(cartItem);
+        const cartItem = wrapper.firstElementChild.cloneNode(true);
+        
+        // Update product data
+        this.updateCartItem(cartItem, product);
+        
+        // Add event listeners
+        this.addCartItemEventListeners(cartItem, product.id);
+        
+        // Calculate subtotal with bulk pricing
+        const variant = this.findVariant(product.variantId || product.id);
+        const quantity = product.cart_quantity || 1;
+        const pricing = this.getUnitPrice(variant, quantity);
+        subtotal += pricing.unitPrice * quantity;
+        
+        cartContainer.appendChild(cartItem);
     });
 
     // Update subtotal display
     const subtotalEl = document.getElementById('subtotal');
-    const currencyEl = document.getElementById('subtotal-currency');
+    const subtotalCurrencyEl = document.getElementById('subtotal-currency');
     
     if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2);
-    if (currencyEl && cart.length > 0) {
-      currencyEl.textContent = this.currencySymbol || '$';
-    }
+    if (subtotalCurrencyEl) subtotalCurrencyEl.textContent = this.currencySymbol || 'R';
 
     // Show the hidden blocks container
     const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
     if (hiddenBlocks) {
-      hiddenBlocks.style.display = 'block';
+        hiddenBlocks.style.display = 'block';
     }
 
     // Open cart slider and overlay
@@ -4270,6 +4794,8 @@ removePageItem(productId) {
     if (cartSlide) cartSlide.classList.add('open');
     if (overlay) overlay.style.display = 'block';
 }
+
+
 
 closeCart() {
     const cartSlide = document.getElementById('cart-slide');
@@ -4300,50 +4826,129 @@ closeCart() {
     const titleEl = cartItem.querySelector('#title');
     if (titleEl) titleEl.textContent = product.title || '';
 
-    // Update currency symbols
-    const currencyEls = cartItem.querySelectorAll('#currency');
-    currencyEls.forEach(el => el.textContent = this.currencySymbol || '$');
+    // Get variant - use product.variantId or find from product
+    let variant = null;
+    if (product.variantId) {
+        variant = this.findVariant(product.variantId);
+    }
+    if (!variant && product.variants && product.variants.length > 0) {
+        variant = product.variants[0];
+    }
+    if (!variant) {
+        variant = {
+            id: product.id,
+            price: product.price || 0,
+            bulkPrice: product.bulkPrice,
+            bulkMinimumQty: product.bulkMinimumQty,
+            inventory: product.inventory || 0
+        };
+    }
+    
+    const quantity = product.cart_quantity || 1;
 
-    // Handle pricing
+    // Calculate pricing
+    const pricing = this.getUnitPrice(variant, quantity);
+    const totalPrice = pricing.unitPrice * quantity;
+
+    // Get price elements
     const priceEl = cartItem.querySelector('#price');
     const salePriceEl = cartItem.querySelector('#sale_price');
-    
-    if (product.sale_price) {
-        // HAS SALE PRICE - show both
-        if (priceEl) {
-            priceEl.textContent = product.price;
-            priceEl.style.textDecoration = 'line-through';
+    const currencyEls = cartItem.querySelectorAll('#currency');
+
+    // Update currency symbols
+    currencyEls.forEach(el => el.textContent = this.currencySymbol || 'R');
+
+    // --- BULK PRICING: Cart Slide-in ---
+    // Remove existing bulk status message
+    const existingBulkMsg = cartItem.querySelector('.cart-bulk-status');
+    if (existingBulkMsg) existingBulkMsg.remove();
+
+    // Check if variant has bulk pricing
+    const bulkDisplay = this.getBulkPricingDisplay(variant, quantity);
+
+    if (bulkDisplay && bulkDisplay.hasBulk) {
+        // Find the cart item details container
+        const detailsDiv = cartItem.querySelector('.cart-item-details');
+        if (detailsDiv) {
+            const bulkStatus = document.createElement('div');
+            bulkStatus.className = 'cart-bulk-status';
+            bulkStatus.innerHTML = `
+                <div class="bulk-heading ${bulkDisplay.isBulk ? 'active' : ''}">
+                    ${bulkDisplay.heading}
+                </div>
+                <div class="bulk-price-display">
+                    ${bulkDisplay.bulkDisplayPrice}
+                </div>
+                <div class="bulk-min-qty">${bulkDisplay.message}</div>
+            `;
+            detailsDiv.appendChild(bulkStatus);
         }
-        if (salePriceEl) {
-            salePriceEl.textContent = product.sale_price;
-            salePriceEl.style.display = '';
+
+        // Update price display with strikethrough when bulk is active
+        if (bulkDisplay.isBulk) {
+            if (priceEl) {
+                priceEl.textContent = bulkDisplay.retailPrice;
+                priceEl.style.textDecoration = 'line-through';
+                priceEl.style.color = '#6c757d';
+                priceEl.style.fontSize = '14px';
+                priceEl.style.opacity = '0.7';
+            }
+            
+            if (salePriceEl) {
+                salePriceEl.textContent = bulkDisplay.unitPrice;
+                salePriceEl.style.display = 'inline';
+                salePriceEl.style.color = '#28a745';
+                salePriceEl.style.fontWeight = 'bold';
+                salePriceEl.style.fontSize = '18px';
+                
+                const parentSpan = salePriceEl.parentElement;
+                if (parentSpan) parentSpan.style.display = 'inline';
+            }
+        } else {
+            // Retail price - show normally
+            if (priceEl) {
+                priceEl.textContent = bulkDisplay.retailPrice;
+                priceEl.style.textDecoration = 'none';
+                priceEl.style.color = '';
+                priceEl.style.fontSize = '';
+                priceEl.style.opacity = '';
+            }
+            
+            if (salePriceEl) {
+                salePriceEl.textContent = '';
+                salePriceEl.style.display = 'none';
+                const parentSpan = salePriceEl.parentElement;
+                if (parentSpan) parentSpan.style.display = 'none';
+            }
         }
-        // Show all currency spans
-        currencyEls.forEach(el => el.parentElement.style.display = '');
     } else {
-        // NO SALE PRICE - hide the sale price section completely
+        // No bulk pricing - standard display
         if (priceEl) {
-            priceEl.textContent = product.price;
-            priceEl.style.textDecoration = '';
+            priceEl.textContent = product.price || variant?.price || 0;
+            priceEl.style.textDecoration = 'none';
+            priceEl.style.color = '';
+            priceEl.style.fontSize = '';
+            priceEl.style.opacity = '';
         }
+        
         if (salePriceEl) {
             salePriceEl.textContent = '';
             salePriceEl.style.display = 'none';
-            // FIX: Hide the parent span that contains the sale currency + sale price
-            const saleParentSpan = salePriceEl.parentElement;
-            if (saleParentSpan && saleParentSpan.tagName === 'SPAN') {
-                saleParentSpan.style.display = 'none';
-            }
+            const parentSpan = salePriceEl.parentElement;
+            if (parentSpan) parentSpan.style.display = 'none';
         }
     }
+    // --- END BULK PRICING ---
 
     // Set quantity
     const quantityInput = cartItem.querySelector('.quantity');
     if (quantityInput) {
-        quantityInput.value = product.cart_quantity || 1;
+        quantityInput.value = quantity;
         quantityInput.id = `quantity_${product.id}`;
     }
 }
+
+
 
   addCartItemEventListeners(cartItem, productId) {
     const removeBtn = cartItem.querySelector('#remove-item');
@@ -4636,54 +5241,80 @@ showStockAlert(message) {
     let container = document.getElementById('single-product-view-container');
     
     if (!container) {
-      container = document.createElement('div');
-      container.id = 'single-product-view-container';
-      document.getElementById('cartique-main-content').appendChild(container);
+        container = document.createElement('div');
+        container.id = 'single-product-view-container';
+        document.getElementById('cartique-main-content').appendChild(container);
     }
 
     container.innerHTML = '';
     
     const productView = document.createElement('div');
     productView.className = 'single-product-view';
-    productView.innerHTML = `
-      <button class="back-to-products">← Back to Products</button>
-      <div class="product-content-wrapper">
-        <div class="product-image-column">
-            <div class="product-image-container">
-                <img src="${product.image}" alt="${product.title}" loading="lazy">
-            </div>
-        </div>
-        <div class="product-info-column">
-          <div class="product-meta">
-            <h2>${product.title}</h2>
-            <div class="price-container">
-              ${product.sale_price && product.original_price ? `
+    
+    // --- BULK PRICING: Single Product View ---
+    const variant = this.getSelectedVariant(product);
+    const bulkDisplay = this.getBulkPricingDisplay(variant);
+    
+    // Build price HTML with bulk section
+    let priceHTML = `
+        <div class="price-container">
+            ${product.sale_price && product.original_price ? `
                 <span class="original-price">${this.currencySymbol}${product.original_price}</span>
                 <span class="sale-price">${this.currencySymbol}${product.sale_price}</span>
-              ` : product.sale_price ? `
+            ` : product.sale_price ? `
                 <span class="original-price">${this.currencySymbol}${product.price}</span>
                 <span class="sale-price">${this.currencySymbol}${product.sale_price}</span>
-              ` : `
+            ` : `
                 <span class="price">${this.currencySymbol}${product.price}</span>
-              `}
+            `}
+        </div>
+    `;
+    
+    // Add bulk pricing section if available
+    if (bulkDisplay && bulkDisplay.hasBulk && bulkDisplay.staticDisplay) {
+        priceHTML += `
+            <div class="cartique-bulk-pricing single-product">
+                <div class="bulk-header">${bulkDisplay.heading || 'BULK PRICE'}</div>
+                <div class="bulk-price-row">
+                    <span class="bulk-price">${bulkDisplay.bulkDisplayPrice || ''}</span>
+                </div>
+                <div class="bulk-min-row">
+                    <span class="bulk-min-qty">${bulkDisplay.message || ''}</span>
+                </div>
             </div>
-            <p class="product-description">${product.description}</p>
-          </div>
-          <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+        `;
+    }
+    // --- END BULK PRICING ---
+    
+    productView.innerHTML = `
+        <button class="back-to-products">← Back to Products</button>
+        <div class="product-content-wrapper">
+            <div class="product-image-column">
+                <div class="product-image-container">
+                    <img src="${product.image}" alt="${product.title}" loading="lazy">
+                </div>
+            </div>
+            <div class="product-info-column">
+                <div class="product-meta">
+                    <h2>${product.title}</h2>
+                    ${priceHTML}
+                    <p class="product-description">${product.description}</p>
+                </div>
+                <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+            </div>
         </div>
-      </div>
-      <div class="product-tabs-container">
-        <div class="product-tabs-header">
-            <button class="tab-button" data-tab="details">Product Details</button>
-            <button class="tab-button active" data-tab="reviews">Reviews</button>
+        <div class="product-tabs-container">
+            <div class="product-tabs-header">
+                <button class="tab-button" data-tab="details">Product Details</button>
+                <button class="tab-button active" data-tab="reviews">Reviews</button>
+            </div>
+            <div class="tab-content" data-tab-content="details">
+                ${this.renderProductDetails(product)}
+            </div>
+            <div class="tab-content active" data-tab-content="reviews">
+                ${this.renderProductReviews(product)}
+            </div>
         </div>
-        <div class="tab-content" data-tab-content="details">
-            ${this.renderProductDetails(product)}
-        </div>
-        <div class="tab-content active" data-tab-content="reviews">
-            ${this.renderProductReviews(product)}
-        </div>
-    </div>
     `;
 
     // Add event listeners
@@ -4692,23 +5323,23 @@ showStockAlert(message) {
     const tabButtons = productView.querySelectorAll('.tab-button');
 
     if (backBtn) {
-      this.addEventListener(backBtn, 'click', () => this.returnToListView());
+        this.addEventListener(backBtn, 'click', () => this.returnToListView());
     }
 
     if (addToCartBtn) {
-      this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
+        this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
     }
 
     tabButtons.forEach(button => {
-      this.addEventListener(button, 'click', () => {
-        productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
-          el.classList.remove('active');
+        this.addEventListener(button, 'click', () => {
+            productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            button.classList.add('active');
+            const tabName = button.dataset.tab;
+            const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
+            if (content) content.classList.add('active');
         });
-        button.classList.add('active');
-        const tabName = button.dataset.tab;
-        const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
-        if (content) content.classList.add('active');
-      });
     });
 
     // Append to DOM first
@@ -4738,6 +5369,8 @@ showStockAlert(message) {
         });
     }
 }
+
+
 
 
 
