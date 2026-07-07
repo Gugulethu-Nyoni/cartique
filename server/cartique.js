@@ -4175,16 +4175,16 @@ renderProducts(layout, data) {
         addToCartBtn.dataset.productId = product.id;
         
         if (stockCount === 0) {
-            // Out of stock - disable button
+            // SOLD OUT - disable button
             addToCartBtn.disabled = true;
             addToCartBtn.style.opacity = '0.5';
             addToCartBtn.style.cursor = 'not-allowed';
-            addToCartBtn.title = 'Out of Stock';
+            addToCartBtn.title = 'SOLD OUT';
             
-            // Update button text to show out of stock
+            // Update button text to show SOLD OUT
             const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
             if (btnText && btnText.textContent?.includes('ADD TO CART')) {
-                btnText.textContent = 'OUT OF STOCK';
+                btnText.textContent = 'SOLD OUT';
             }
         } else if (stockCount > 0 && stockCount <= 5) {
             // Low stock - enable but show warning
@@ -4195,7 +4195,7 @@ renderProducts(layout, data) {
             
             // Optionally show stock count on the button
             const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
-            if (btnText && btnText.textContent?.includes('OUT OF STOCK')) {
+            if (btnText && btnText.textContent?.includes('SOLD OUT')) {
                 btnText.textContent = 'ADD TO CART';
             }
         } else {
@@ -4206,7 +4206,7 @@ renderProducts(layout, data) {
             addToCartBtn.title = '';
             
             const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
-            if (btnText && btnText.textContent?.includes('OUT OF STOCK')) {
+            if (btnText && btnText.textContent?.includes('SOLD OUT')) {
                 btnText.textContent = 'ADD TO CART';
             }
         }
@@ -4221,7 +4221,7 @@ renderProducts(layout, data) {
     if (stockCount === 0) {
         const stockIndicator = document.createElement('div');
         stockIndicator.className = 'cartique-stock-indicator out-of-stock';
-        stockIndicator.textContent = 'Out of Stock';
+        stockIndicator.textContent = 'SOLD OUT';
         stockIndicator.style.cssText = `
             color: #ff4444;
             font-size: 12px;
@@ -4701,7 +4701,7 @@ removePageItem(productId) {
     // STOCK CHECK
     const availableStock = this.getProductStock(product);
     if (availableStock === 0) {
-        this.showStockAlert('This product is out of stock');
+        this.showStockAlert('This product is SOLD OUT');
         return;
     }
 
