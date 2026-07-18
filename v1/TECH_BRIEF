@@ -1,0 +1,339 @@
+# Cartique Ecommerce Module - Technical Brief
+
+## Overview
+Cartique is a standalone, vanilla JavaScript ecommerce frontend module designed for product catalog display, shopping cart management, and checkout functionality. It's built to be framework-agnostic and can be integrated into any web project with minimal configuration.
+
+## Architecture
+
+### Core Structure
+
+```
+Cartique/
+├── Core Engine
+│   ├── Configuration & Feature Management
+│   ├── Data State Management
+│   ├── Filtering & Search Logic
+│   └── Event System
+├── Rendering Components
+│   ├── Product Grid/List Views
+│   ├── Single Product View
+│   ├── Shopping Cart (Slide-in & Full Page)
+│   ├── Sidebar Filters
+│   ├── Category Menu
+│   └── Search & Sort Controls
+└── Integration Layer
+    ├── LocalStorage Cart Persistence
+    ├── Callback System
+    └── External Service Hooks
+```
+
+### Key Components
+
+#### 1. **Product Display System**
+- **Dual Layout Support**: Grid and list views with seamless switching
+- **Infinite Scroll**: Batch loading with intersection observer
+- **Single Product View**: Detailed product view with tabs for details and reviews
+- **Stock Management**: Real-time inventory display and validation
+
+#### 2. **Filtering & Search Engine**
+- **Multi-dimensional Filtering**: Category, price range, and variant attributes
+- **Real-time Search**: Debounced search across product titles and descriptions
+- **Category Navigation**: Mega menu and sidebar category filters with sync
+- **Sorting**: Multiple sort options (price, title, relevance)
+
+#### 3. **Shopping Cart System**
+- **Dual Interface**: Slide-in cart for quick access and full-page cart view
+- **Quantity Management**: Increment/decrement with stock validation
+- **Persistence**: LocalStorage-based cart persistence
+- **Real-time Updates**: Subtotal calculation and cart count updates
+
+#### 4. **Review & Rating System**
+- **Rating Display**: Star ratings with distribution visualization
+- **Review Submission**: Form-based review input with callback support
+- **Customer Attribution**: Support for logged-in and guest users
+
+## Data Flow Architecture
+
+```mermaid
+graph TD
+    A[Products Data] --> B[Cartique Engine]
+    B --> C[Filtering Pipeline]
+    C --> D[Product Display]
+    D --> E[User Interaction]
+    E --> F[Cart Management]
+    F --> G[LocalStorage]
+    G --> H[Checkout Flow]
+    H --> I[External Callbacks]
+```
+
+## Key Features
+
+### 1. **Modular Filtering System**
+```javascript
+// Example: Filter configuration
+{
+    sidebarFeatures: {
+        filters: {
+            category: ['Herbal', 'Supplements', 'Powders'],
+            priceRange: ['Under R100', 'R100-R200', 'Over R200'],
+            size: ['Small', 'Medium', 'Large']
+        }
+    }
+}
+```
+
+### 2. **Product Variant Support**
+```javascript
+// Product structure with variants
+{
+    id: 1,
+    title: "Soursop Leaves",
+    variants: [
+        {
+            price: 400,
+            attributes: [{ key: "quantity", value: "10 Leaves" }]
+        },
+        {
+            price: 80,
+            attributes: [{ key: "quantity", value: "100 Leaves" }]
+        }
+    ]
+}
+```
+
+### 3. **Wholesale Pricing Ready**
+- Supports tiered pricing structures
+- Unit-based pricing (kg, g, L, leaves)
+- Minimum quantity validation
+- Volume discount calculations
+
+## Integration Guide
+
+### Basic Setup
+
+```html
+<!-- 1. Include Cartique CSS -->
+<link rel="stylesheet" href="cartique.css">
+
+<!-- 2. Add Container -->
+<div id="cartique"></div>
+
+<!-- 3. Include Components Template -->
+<template id="cartique-components">
+    <!-- Cartique HTML components -->
+</template>
+
+<!-- 4. Include Cartique JS -->
+<script src="cartique.js"></script>
+```
+
+### Initialization
+
+```javascript
+// Initialize with product data
+const cartique = new Cartique(
+    products,                    // Array of product objects
+    {                            // Features configuration
+        grid: true,
+        pagination: true,
+        columns: 3,
+        sidebar: true,
+        search: true,
+        sorting: true,
+        theme: 'light',
+        themeColor: '#2a2a2a',
+        containerId: 'cartique',
+        checkoutUrl: '/checkout',
+        currencySymbol: 'R'
+    },
+    {                            // Callbacks
+        onReviewSubmit: handleReviewSubmit,
+        onCheckout: handleCheckout,
+        onAddToCart: handleAddToCart
+    }
+);
+```
+
+## State Management
+
+### Cart State (LocalStorage)
+```javascript
+// Cart data structure
+{
+    cartiqueCart: [
+        {
+            id: 1,
+            title: "Soursop Leaves",
+            price: 400,
+            quantity: 2,
+            total: 800,
+            // ... product data
+        }
+    ]
+}
+```
+
+### Filter State
+```javascript
+// Active filters
+{
+    activeCategoryId: null,      // Current category filter
+    activeFilters: {             // Attribute filters
+        category: ['Herbal'],
+        priceRange: ['R100-R200']
+    },
+    currentSearchQuery: '',      // Search text
+    currentSortType: 'price-asc' // Sort option
+}
+```
+
+## Extension Points
+
+### 1. **Callback System**
+```javascript
+{
+    onReviewSubmit: async ({ productId, rating, comment, onSuccess, onError }) => {
+        // Custom review submission logic
+        const result = await api.submitReview({ productId, rating, comment });
+        if (result.success) {
+            onSuccess(result);
+        } else {
+            onError(result.error);
+        }
+    }
+}
+```
+
+### 2. **Custom Product Rendering**
+```javascript
+// Override product card creation
+Cartique.prototype.createProductCard = function(product) {
+    // Custom rendering logic
+};
+```
+
+### 3. **Stock Management Integration**
+```javascript
+// The module automatically handles stock checking
+// with customizable threshold alerts
+stockThreshold: 5  // Show "low stock" warning when <= 5
+```
+
+## Performance Optimizations
+
+### 1. **Lazy Loading**
+- Images load with `loading="lazy"` attribute
+- Products batch-loaded with infinite scroll
+- Non-visible components defer rendering
+
+### 2. **Event Management**
+- Debounced search inputs (300ms delay)
+- Centralized event listener management
+- Cleanup on component destruction
+
+### 3. **DOM Efficiency**
+- Document fragments for batch rendering
+- Template cloning for product cards
+- Minimal DOM reflows
+
+## Wholesale Integration Architecture
+
+The module is structured to support wholesale pricing through:
+
+### 1. **Product Variant Enhancement**
+```javascript
+// Add wholesale fields to variants
+{
+    isWholesale: true,
+    minWholesaleQty: 10,
+    wholesaleUnit: "leaves",
+    wholesalePricing: {
+        tiers: [
+            { minQty: 10, price: 400 },
+            { minQty: 100, price: 80 }
+        ]
+    }
+}
+```
+
+### 2. **Cart Quantity Validation**
+```javascript
+// Stock validation with wholesale support
+getProductStock(product) {
+    // Check inventory levels
+    // Calculate wholesale availability
+    // Return available quantity
+}
+```
+
+## Deployment Considerations
+
+### 1. **Environment Configuration**
+- Theme color customization
+- Currency symbol setting
+- Checkout URL configuration
+
+### 2. **Responsive Design**
+- Mobile-optimized sidebar (slide-in)
+- Touch-friendly interface
+- Viewport-aware rendering
+
+### 3. **Accessibility**
+- ARIA labels
+- Keyboard navigation support
+- Focus management
+
+## Future Extension Points
+
+1. **Payment Gateway Integration**
+   - Yoco, PayFast, or custom payment processors
+   - Real-time payment status updates
+
+2. **Advanced Wholesale Features**
+   - Bulk discount rules
+   - Customer-specific pricing
+   - Minimum order quantities
+
+3. **Analytics Integration**
+   - Product view tracking
+   - Cart abandonment monitoring
+   - Conversion funnels
+
+4. **Multi-language Support**
+   - i18n implementation
+   - RTL layout support
+   - Regional pricing
+
+## Troubleshooting Guide
+
+### Common Issues
+
+1. **Products Not Displaying**
+   - Verify `products` array is properly formatted
+   - Check `containerId` matches DOM element
+   - Review browser console for errors
+
+2. **Filter Not Working**
+   - Ensure variant attributes are properly structured
+   - Check filter configuration matches product data
+   - Verify active filter state updates
+
+3. **Cart Not Persisting**
+   - Verify LocalStorage is available
+   - Check for storage quota issues
+   - Review JSON serialization of cart data
+
+## Support & Maintenance
+
+### Version Compatibility
+- **ES6+**: Supports modern JavaScript
+- **Browsers**: Chrome, Firefox, Safari, Edge (latest 2 versions)
+- **Dependencies**: None (vanilla JS)
+
+### Debug Mode
+```javascript
+// Enable debug logging
+localStorage.setItem('cartiqueDebug', 'true');
+```
+
+This brief provides a comprehensive overview of the Cartique module's structure, usage, and extension capabilities, enabling developers to effectively integrate and customize the ecommerce functionality for their specific needs.

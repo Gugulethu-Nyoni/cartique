@@ -1,0 +1,99 @@
+Color (most varied)
+Black - Products: 1, 2, 3, 6, 7, 9, 10
+
+White - Products: 1, 2, 7, 9, 11
+
+Red - Products: 2
+
+Navy Blue - Products: 3
+
+Indigo - Products: 4
+
+Black/White - Products: 5
+
+Navy - Products: 5
+
+Heather Grey - Products: 6
+
+Royal Blue - Products: 7
+
+Forest Green - Products: 8
+
+Deep Blue - Products: 8
+
+Blue - Products: 10
+
+Best test: Select Black → Should show 7 products
+
+Size (numeric sizes)
+7 - Products: 2, 9
+
+8 - Products: 1, 2, 5, 9
+
+9 - Products: 1, 2, 5, 7
+
+10 - Products: 1, 7, 11
+
+Best test: Select 8 → Should show 4 products
+
+Size (letter sizes)
+S - Products: 10
+
+M - Products: 3, 6, 8
+
+L - Products: 3, 6, 8
+
+Note: Your filter generation treats all sizes as strings. You may need to filter both numeric and letter sizes together.
+
+Gender
+Men - Products: 1, 4, 11
+
+Unisex - Products: 2, 3, 5, 6, 7, 8, 9, 10
+
+Best test: Select Men → Should show 3 products
+
+Boolean attributes (will show as "true" in filters)
+shell_toe - Products: 2
+
+limited_edition - Products: 2 (Red variant only)
+
+water_resistant - Products: 3
+
+sidestripe - Products: 5
+
+hood - Products: 6, 10
+
+pouch_pocket - Products: 6
+
+waterproof - Products: 8, 10
+
+recycled_materials - Products: 8
+
+detachable_lining - Products: 8
+
+breathable - Products: 10
+
+Best test: Select waterproof → Should show 2 products (8, 10)
+
+Quick Verification Tests:
+Color: Black + Gender: Men
+
+Should show: Product 1 (Nike Air Max 270) only
+
+Size: 9 + Color: Black
+
+Should show: Product 1 (Nike size 9 Black)
+
+Style: Running + air_unit: Full-length
+
+Should show: Product 1 only
+
+material: Leather + size: 10
+
+Should show: Product 7 (Reebok size 10)
+
+No filters selected
+
+Should show all 11 products
+
+Debug tip: Add this to your handleFilterChange method to see what's being checked:

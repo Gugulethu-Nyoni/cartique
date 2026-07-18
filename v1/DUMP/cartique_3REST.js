@@ -1,0 +1,981 @@
+"use strict";
+
+export default class Cartique {
+  constructor(products, features = {}) {
+    // Validate required parameters
+    if (!products || !Array.isArray(products)) {
+      throw new Error('Cartique requires an array of products');
+    }
+
+    // Default features with better organization
+    this.defaultFeatures = {
+      // Layout
+      grid: true,
+      pagination: true,
+      columns: 3,
+      rows: 10,
+      
+      // UI Components
+      sidebar: true,
+      footer: true,
+      search: true,
+      sorting: true,
+      sale: false,
+      
+      // Configuration
+      theme: 'dark',
+      containerId: 'cartique',
+      containerClass: 'cartique-container',
+      checkoutUrl: '#',
+      checkoutUrlMode: 'self',
+      
+      // Display states
+      sidebarDisplay: 'block',
+      footerDisplay: 'block',
+      
+      // Filters
+      sidebarFeatures: {
+        filters: {
+          Color: ['Red', 'Blue', 'Green'],
+          Size: ['S', 'M', 'L'],
+          Brand: ['Adidas', 'Nike', 'Puma'],
+        },
+      },
+    };
+
+    // Merge features with proper deep merge for nested objects
+    this.features = this.deepMerge(this.defaultFeatures, features);
+
+    // Initialize
+    this.products = products;
+    this.filteredProducts = [...products];
+    this.currentSearchQuery = '';
+    this.currentSortType = '';
+    this.currentLayout = 'grid';
+    this.singleProductViewActive = false;
+    this.previousViewState = null;
+    
+    // DOM References
+    this.container = null;
+    this.templateHolder = null;
+    
+    // Event listener cleanup
+    this.eventListeners = new Map();
+    
+    // Timeouts for cleanup
+    this.toastTimer1 = null;
+    this.toastTimer2 = null;
+    this.redirectTimer = null;
+
+    // Initialize the component
+    this.init();
+  }
+
+  // Deep merge helper method
+  deepMerge(target, source) {
+    const output = { ...target };
+    
+    if (this.isObject(target) && this.isObject(source)) {
+      Object.keys(source).forEach(key => {
+        if (this.isObject(source[key])) {
+          if (!(key in target)) {
+            output[key] = source[key];
+          } else {
+            output[key] = this.deepMerge(target[key], source[key]);
+          }
+        } else {
+          output[key] = source[key];
+        }
+      });
+    }
+    
+    return output;
+  }
+
+  isObject(item) {
+    return item && typeof item === 'object' && !Array.isArray(item);
+  }
+
+  // Debounce with immediate option
+  debounce(func, wait, immediate = false) {
+    let timeout;
+    return function executedFunction(...args) {
+      const context = this;
+      const later = () => {
+        timeout = null;
+        if (!immediate) func.apply(context, args);
+      };
+      const callNow = immediate && !timeout;
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+      if (callNow) func.apply(context, args);
+    };
+  }
+
+  async init() {
+    try {
+      // Set display states
+      if (!this.features.sidebar) this.features.sidebarDisplay = 'none';
+      if (!this.features.footer) this.features.footerDisplay = 'none';
+
+      // Validate container exists
+      this.container = document.querySelector(`#${this.features.containerId}`);
+      if (!this.container) {
+        throw new Error(`Container with ID "${this.features.containerId}" not found`);
+      }
+
+      // Apply theme - BUT ONLY MINIMAL THEME SETTINGS TO AVOID DARK OVERLAY
+      this.applyMinimalTheme();
+      
+      // Inject critical CSS
+      this.injectCriticalCSS();
+      
+      // Fetch templates
+      await this.fetchAndExtractComponents();
+      
+      // Render components
+      await this.renderAllComponents();
+      
+      // Set up event listeners
+      this.setupEventListeners();
+      
+      // Complete initialization
+      this.completeInitialization();
+      
+    } catch (error) {
+      console.error('Failed to initialize Cartique:', error);
+      this.showErrorMessage('Failed to load product catalog');
+    }
+  }
+
+  applyMinimalTheme() {
+    // ONLY set the accent color to maintain original look
+    const root = document.documentElement;
+    root.style.setProperty('--theme-accent', '#333333');
+    
+    // Add theme class to container for CSS targeting
+    const containerElement = document.getElementById(this.features.containerId);
+    containerElement.classList.add(`theme-${this.features.theme}`);
+  }
+
+  injectCriticalCSS() {
+    const criticalCSS = `
+      #${this.features.containerId} {
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .cartique-container {
+        position: relative;
+        min-height: 100vh;
+      }
+    `;
+
+    const style = document.createElement('style');
+    style.textContent = criticalCSS;
+    document.head.appendChild(style);
+  }
+
+  completeInitialization() {
+    const container = document.getElementById(this.features.containerId);
+    if (container) {
+      container.style.visibility = 'visible';
+      container.style.opacity = '1';
+    }
+  }
+
+  async fetchAndExtractComponents() {
+    const cartiqueComponents = document.getElementById('cartique-components');
+    
+    if (!cartiqueComponents) {
+      throw new Error('Could not find #cartique-components in the DOM');
+    }
+
+    this.templateHolder = document.createElement('template');
+    this.templateHolder.innerHTML = cartiqueComponents.innerHTML;
+    
+    if (!this.templateHolder.content) {
+      throw new Error('Failed to create template holder for components');
+    }
+  }
+
+  async renderAllComponents() {
+    const renderMethods = [
+      this.renderMainFrame.bind(this),
+      this.renderSidebar.bind(this),
+      this.renderControls.bind(this),
+      this.renderProductDisplays.bind(this),
+      this.renderFooter.bind(this),
+      this.renderCartSlider.bind(this),
+      this.renderCartItemTemplate.bind(this)
+    ];
+
+    // Render components sequentially
+    for (const method of renderMethods) {
+      await method();
+    }
+  }
+
+  async renderMainFrame() {
+    const mainFrameTemplate = document.createElement('template');
+    mainFrameTemplate.innerHTML = `
+      <div class="cartique-container" id="cartique-container">
+        <aside class="cartique-sidebar" id="cartique-sidebar" style="display: ${this.features.sidebarDisplay}"></aside>
+        <main class="cartique-main-content" id="cartique-main-content">
+          <div class="cartique-controls" id="cartique-controls">
+            <div class="cartique-search-container" id="cartique-search-container"></div>
+            <div class="cartique-sort-container" id="cartique-sort-container"></div>
+            <div class="cartique-view-toggles-container" id="cartique-view-toggles-container"></div>
+            <div class="shopping-cart-icon-container" id="shopping-cart-icon-container"></div>
+          </div>
+          <div class="cartique-product-displays" id="cartique-product-displays">
+            <div class="cartique-product-grid" id="cartique-product-grid"></div>
+            <div class="cartique-product-list" id="cartique-product-list"></div>
+          </div>
+          <footer class="cartique-product-footer" id="cartique-product-footer" style="display:${this.features.footerDisplay}"></footer>
+        </main>
+      </div>
+
+      <div id="cartique-hidden-blocks" style="display:none;"></div>
+      <div class="cart-overlay" id="cart-slide-overlay"></div>
+
+      <div id="toast-container">
+        <div class="toast">
+          <div class="toast-content">
+            <span class="svg">✓</span>
+            <div class="message">
+              <span class="text text-1">Success</span>
+              <span class="text text-2">
+                You will now be redirected to the login page to complete your checkout.
+              </span>
+            </div>
+          </div>
+          <i class="fa-solid fa-xmark close"></i>
+          <div class="progress"></div>
+        </div>
+      </div>
+    `;
+
+    this.container.appendChild(mainFrameTemplate.content.cloneNode(true));
+    
+    // Set up overlay click handler
+    const overlay = document.getElementById('cart-slide-overlay');
+    if (overlay) {
+      this.addEventListener(overlay, 'click', this.closeCart.bind(this));
+    }
+  }
+
+  async renderSidebar() {
+    const sidebarWrapper = this.templateHolder.content.getElementById('cartique-sidebar-component');
+    if (!sidebarWrapper) return;
+
+    const sidebarContainer = document.getElementById('cartique-sidebar');
+    if (!sidebarContainer) return;
+
+    sidebarContainer.innerHTML = '';
+    sidebarContainer.appendChild(sidebarWrapper.cloneNode(true));
+  }
+
+  async renderControls() {
+    // Search
+    const searchWrapper = this.templateHolder.content.getElementById('cartique-search-container-component');
+    if (searchWrapper) {
+      const searchContainer = document.getElementById('cartique-search-container');
+      searchContainer.innerHTML = '';
+      searchContainer.appendChild(searchWrapper.cloneNode(true));
+      
+      const searchInput = searchContainer.querySelector('.cartique-search');
+      if (searchInput) {
+        this.addEventListener(searchInput, 'input', 
+          this.debounce(this.handleSearch.bind(this), 300)
+        );
+      }
+    }
+
+    // Sort
+    const sortWrapper = this.templateHolder.content.getElementById('cartique-sort-container-component');
+    if (sortWrapper) {
+      const sortContainer = document.getElementById('cartique-sort-container');
+      sortContainer.innerHTML = '';
+      sortContainer.appendChild(sortWrapper.cloneNode(true));
+      
+      const sortDropdown = sortContainer.querySelector('.cartique-sort');
+      if (sortDropdown) {
+        this.addEventListener(sortDropdown, 'change', this.handleSort.bind(this));
+      }
+    }
+
+    // View toggles
+    const togglesWrapper = this.templateHolder.content.getElementById('cartique-view-toggles-container-component');
+    if (togglesWrapper) {
+      const togglesContainer = document.getElementById('cartique-view-toggles-container');
+      togglesContainer.innerHTML = '';
+      togglesContainer.appendChild(togglesWrapper.cloneNode(true));
+    }
+
+    // Cart icon
+    const cartIconWrapper = this.templateHolder.content.getElementById('shopping-cart-icon-container-component');
+    if (cartIconWrapper) {
+      const cartIconContainer = document.getElementById('shopping-cart-icon-container');
+      cartIconContainer.innerHTML = '';
+      cartIconContainer.appendChild(cartIconWrapper.cloneNode(true));
+      
+      const cartIcon = document.getElementById('shopping-cart-icon');
+      if (cartIcon) {
+        this.addEventListener(cartIcon, 'click', this.showCart.bind(this));
+      }
+    }
+  }
+
+  setupEventListeners() {
+    // Layout toggles
+    const gridButton = document.querySelector('.cartique-grid-view');
+    const listButton = document.querySelector('.cartique-list-view');
+    
+    if (gridButton) {
+      this.addEventListener(gridButton, 'click', () => this.setLayout('grid'));
+    }
+    
+    if (listButton) {
+      this.addEventListener(listButton, 'click', () => this.setLayout('list'));
+    }
+  }
+
+  addEventListener(element, event, handler) {
+    element.addEventListener(event, handler);
+    
+    // Store for cleanup
+    const key = `${element.id || element.className}-${event}`;
+    if (!this.eventListeners.has(key)) {
+      this.eventListeners.set(key, []);
+    }
+    this.eventListeners.get(key).push({ element, event, handler });
+  }
+
+  cleanupEventListeners() {
+    this.eventListeners.forEach((listeners, key) => {
+      listeners.forEach(({ element, event, handler }) => {
+        element.removeEventListener(event, handler);
+      });
+    });
+    this.eventListeners.clear();
+  }
+
+  async renderProductDisplays() {
+    const gridWrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
+    if (gridWrapper) {
+      const gridContainer = document.getElementById('cartique-product-grid');
+      gridContainer.innerHTML = '';
+      gridContainer.appendChild(gridWrapper.cloneNode(true));
+    }
+
+    const listWrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
+    if (listWrapper) {
+      const listContainer = document.getElementById('cartique-product-list');
+      listContainer.innerHTML = '';
+      listContainer.appendChild(listWrapper.cloneNode(true));
+    }
+
+    this.renderProducts('grid');
+  }
+
+  renderProducts(layout) {
+    const container = layout === 'grid' 
+      ? document.getElementById('cartique-product-grid')
+      : document.getElementById('cartique-product-list');
+
+    if (!container) return;
+
+    container.innerHTML = '';
+    container.classList.toggle('grid-view', layout === 'grid');
+    container.classList.toggle('list-view', layout === 'list');
+
+    // Determine visible products
+    const visibleProducts = this.features.pagination
+      ? this.filteredProducts.slice(0, this.features.rows * this.features.columns)
+      : this.filteredProducts;
+
+    // Create product elements
+    visibleProducts.forEach(product => {
+      const productElement = layout === 'grid'
+        ? this.createProductCard(product)
+        : this.createProductListing(product);
+      
+      if (productElement) {
+        container.appendChild(productElement);
+      }
+    });
+  }
+
+  createProductCard(product) {
+    const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
+    if (!wrapper) return null;
+
+    const productCardTemplate = wrapper.firstElementChild?.cloneNode(true);
+    if (!productCardTemplate) return null;
+
+    this.updateProductElement(productCardTemplate, product);
+    
+    // Add image click handler
+    const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
+    if (imgContainer) {
+      imgContainer.dataset.productId = product.id;
+      this.addEventListener(imgContainer, 'click', (e) => {
+        e.preventDefault();
+        this.showSingleProductView(product.id);
+      });
+    }
+
+    // Add to cart button
+    const addToCartBtn = productCardTemplate.querySelector('.cartique_add_to_cart');
+    if (addToCartBtn) {
+      addToCartBtn.id = product.id;
+      this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
+    }
+
+    return productCardTemplate;
+  }
+
+  createProductListing(product) {
+    const wrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
+    if (!wrapper) return null;
+
+    const productListingTemplate = wrapper.firstElementChild?.cloneNode(true);
+    if (!productListingTemplate) return null;
+
+    productListingTemplate.classList.add('cartique-product-listing');
+    this.updateProductElement(productListingTemplate, product);
+
+    const addToCartBtn = productListingTemplate.querySelector('.cartique_add_to_cart');
+    if (addToCartBtn) {
+      addToCartBtn.id = product.id;
+      this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
+    }
+
+    return productListingTemplate;
+  }
+
+  updateProductElement(element, product) {
+    for (const [key, value] of Object.entries(product)) {
+      const target = element.querySelector(`#${key}`);
+      if (!target) continue;
+
+      switch (target.tagName) {
+        case 'IMG':
+          target.src = value;
+          target.alt = product.title || '';
+          break;
+        case 'A':
+          target.href = value;
+          break;
+        default:
+          target.textContent = value;
+      }
+    }
+
+    // Handle sale price
+    const salePriceElement = element.querySelector('#sale_price');
+    if (salePriceElement) {
+      if (product.sale_price) {
+        salePriceElement.style.display = 'block';
+        const priceElement = element.querySelector('#price');
+        if (priceElement) priceElement.style.textDecoration = 'line-through';
+        
+        const salePriceCurrency = element.querySelector('#sale_price_currency');
+        if (salePriceCurrency) salePriceCurrency.textContent = product.currency;
+      } else {
+        salePriceElement.style.display = 'none';
+      }
+    }
+  }
+
+  setLayout(layout) {
+    const gridContainer = document.getElementById('cartique-product-grid');
+    const listContainer = document.getElementById('cartique-product-list');
+
+    if (gridContainer && listContainer) {
+      gridContainer.style.display = layout === 'grid' ? 'grid' : 'none';
+      listContainer.style.display = layout === 'list' ? 'block' : 'none';
+      this.currentLayout = layout;
+      this.renderProducts(layout);
+    }
+  }
+
+  async renderFooter() {
+    const wrapper = this.templateHolder.content.getElementById('cartique-product-footer-component');
+    if (wrapper) {
+      const footerContainer = document.getElementById('cartique-product-footer');
+      if (footerContainer) {
+        footerContainer.innerHTML = '';
+        footerContainer.appendChild(wrapper.firstElementChild.cloneNode(true));
+      }
+    }
+  }
+
+  async renderCartSlider() {
+    const wrapper = this.templateHolder.content.getElementById('cartique-cart-slider-component');
+    if (!wrapper) return;
+
+    const cartSlider = wrapper.firstElementChild.cloneNode(true);
+    const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+    
+    if (hiddenBlocks) {
+      hiddenBlocks.appendChild(cartSlider);
+      
+      // Add close button event
+      const closeBtn = cartSlider.querySelector('#cart-close-btn');
+      if (closeBtn) {
+        this.addEventListener(closeBtn, 'click', this.closeCart.bind(this));
+      }
+
+      // Add checkout button event
+      const checkoutBtn = cartSlider.querySelector('#checkout-url');
+      if (checkoutBtn) {
+        this.addEventListener(checkoutBtn, 'click', this.checkout.bind(this));
+      }
+    }
+  }
+
+  async renderCartItemTemplate() {
+    const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component');
+    if (!wrapper) return;
+
+    const itemTemplate = wrapper.firstElementChild.cloneNode(true);
+    const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+    
+    if (hiddenBlocks) {
+      hiddenBlocks.appendChild(itemTemplate);
+    }
+  }
+
+  handleSearch(event) {
+    const query = event.target.value.trim().toLowerCase();
+    this.currentSearchQuery = query;
+
+    this.filteredProducts = this.products.filter(product => {
+      const titleMatch = product.title?.toLowerCase().includes(query) || false;
+      const descMatch = product.description?.toLowerCase().includes(query) || false;
+      return titleMatch || descMatch;
+    });
+
+    this.renderProducts(this.currentLayout);
+  }
+
+  handleSort(event) {
+    const sortType = event.target.value;
+    this.currentSortType = sortType;
+
+    const sortedProducts = [...this.filteredProducts];
+
+    switch (sortType) {
+      case 'price-asc':
+        sortedProducts.sort((a, b) => (a.price || 0) - (b.price || 0));
+        break;
+      case 'price-desc':
+        sortedProducts.sort((a, b) => (b.price || 0) - (a.price || 0));
+        break;
+      case 'title-asc':
+        sortedProducts.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        break;
+      case 'title-desc':
+        sortedProducts.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+        break;
+      default:
+        // Keep original order
+        break;
+    }
+
+    this.filteredProducts = sortedProducts;
+    this.renderProducts(this.currentLayout);
+  }
+
+  addToCart(event) {
+    const productId = parseInt(event.target.id);
+    const product = this.products.find(p => p.id === productId);
+
+    if (!product) {
+      console.error('Product not found:', productId);
+      return;
+    }
+
+    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    const existingIndex = cart.findIndex(item => item.id === product.id);
+
+    if (existingIndex === -1) {
+      cart.push({
+        ...product,
+        cart_quantity: 1
+      });
+    } else {
+      cart[existingIndex].cart_quantity += 1;
+    }
+
+    localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+    this.showCart();
+  }
+
+  showCart() {
+    const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    const cartContainer = document.getElementById('cart-items-container');
+    
+    if (!cartContainer) return;
+
+    cartContainer.innerHTML = '';
+
+    // Show/hide empty cart message
+    const emptyMsg = document.getElementById('shopping-cart-empty');
+    const viewBtn = document.getElementById('view-cart-btn');
+    const checkoutBtn = document.getElementById('checkout-btn');
+    
+    if (emptyMsg) emptyMsg.classList.toggle('show', cart.length === 0);
+    if (viewBtn) viewBtn.style.display = cart.length === 0 ? 'none' : 'block';
+    if (checkoutBtn) checkoutBtn.style.display = cart.length === 0 ? 'none' : 'block';
+
+    // Calculate total
+    let subtotal = 0;
+
+    // Render cart items
+    cart.forEach(product => {
+      const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component');
+      if (!wrapper) return;
+
+      const cartItem = wrapper.firstElementChild.cloneNode(true);
+      
+      // Update product data
+      this.updateCartItem(cartItem, product);
+      
+      // Add event listeners
+      this.addCartItemEventListeners(cartItem, product.id);
+      
+      // Calculate subtotal
+      const price = parseFloat(product.sale_price || product.price) || 0;
+      const quantity = product.cart_quantity || 1;
+      subtotal += price * quantity;
+      
+      cartContainer.appendChild(cartItem);
+    });
+
+    // Update subtotal display
+    const subtotalEl = document.getElementById('subtotal');
+    const currencyEl = document.getElementById('subtotal-currency');
+    
+    if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2);
+    if (currencyEl && cart.length > 0) {
+      currencyEl.textContent = cart[0].currency || '';
+    }
+
+    // Open cart slider
+    const cartSlide = document.getElementById('cart-slide');
+    const overlay = document.getElementById('cart-slide-overlay');
+    
+    if (cartSlide) cartSlide.classList.add('open');
+    if (overlay) overlay.style.display = 'block';
+  }
+
+  updateCartItem(cartItem, product) {
+    // Update all product fields
+    Object.keys(product).forEach(key => {
+      const element = cartItem.querySelector(`#${key}`);
+      if (!element) return;
+
+      if (key === 'image') {
+        element.src = product[key];
+      } else if (key === 'sale_price' && product.sale_price) {
+        const priceElement = cartItem.querySelector('.cartique_cart_product_price');
+        if (priceElement) priceElement.style.textDecoration = 'line-through';
+        element.textContent = product[key];
+      } else if (key === 'price' && !product.sale_price) {
+        element.textContent = product[key];
+      } else if (key === 'currency') {
+        const currencyElements = cartItem.querySelectorAll(`#${key}`);
+        currencyElements.forEach(el => el.textContent = product[key]);
+      } else {
+        element.textContent = product[key];
+      }
+    });
+
+    // Set quantity
+    const quantityInput = cartItem.querySelector('.quantity');
+    if (quantityInput) {
+      quantityInput.value = product.cart_quantity || 1;
+      quantityInput.id = `quantity_${product.id}`;
+    }
+  }
+
+  addCartItemEventListeners(cartItem, productId) {
+    const removeBtn = cartItem.querySelector('#remove-item');
+    const decreaseBtn = cartItem.querySelector('.decrease-qty');
+    const increaseBtn = cartItem.querySelector('.increase-qty');
+
+    if (removeBtn) {
+      removeBtn.id = productId;
+      this.addEventListener(removeBtn, 'click', (e) => this.removeCartItem(e));
+    }
+
+    if (decreaseBtn) {
+      decreaseBtn.id = `decrease_quantity_${productId}`;
+      this.addEventListener(decreaseBtn, 'click', (e) => this.decreaseQtyItem(e));
+    }
+
+    if (increaseBtn) {
+      increaseBtn.id = `increase_quantity_${productId}`;
+      this.addEventListener(increaseBtn, 'click', (e) => this.increaseQtyItem(e));
+    }
+  }
+
+  removeCartItem(event) {
+    const productId = parseInt(event.target.id);
+    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    cart = cart.filter(product => product.id !== productId);
+    localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+    this.showCart();
+  }
+
+  decreaseQtyItem(event) {
+    const productId = parseInt(event.target.id.replace('decrease_quantity_', ''));
+    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    const index = cart.findIndex(item => item.id === productId);
+
+    if (index !== -1) {
+      if (cart[index].cart_quantity > 1) {
+        cart[index].cart_quantity -= 1;
+      } else {
+        cart.splice(index, 1);
+      }
+      
+      localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+      this.showCart();
+    }
+  }
+
+  increaseQtyItem(event) {
+    const productId = parseInt(event.target.id.replace('increase_quantity_', ''));
+    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+    const index = cart.findIndex(item => item.id === productId);
+
+    if (index !== -1) {
+      cart[index].cart_quantity += 1;
+      localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+      this.showCart();
+    }
+  }
+
+  closeCart() {
+    const cartSlide = document.getElementById('cart-slide');
+    const overlay = document.getElementById('cart-slide-overlay');
+    const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+
+    if (cartSlide) cartSlide.classList.remove('open');
+    if (overlay) overlay.style.display = 'none';
+    if (hiddenBlocks) hiddenBlocks.style.display = 'none';
+  }
+
+  checkout() {
+    this.closeCart();
+    this.showCheckoutAlert();
+  }
+
+  showCheckoutAlert() {
+    const toast = document.querySelector('.toast');
+    const closeIcon = document.querySelector('.close');
+    const progress = document.querySelector('.progress');
+
+    if (!toast || !closeIcon || !progress) return;
+
+    // Clear existing timeouts
+    this.clearToastTimeouts();
+
+    // Show toast
+    toast.classList.add('active');
+    progress.classList.add('active');
+
+    // Set timeouts
+    this.toastTimer1 = setTimeout(() => {
+      toast.classList.remove('active');
+    }, 2000);
+
+    this.toastTimer2 = setTimeout(() => {
+      progress.classList.remove('active');
+    }, 2300);
+
+    // Close handler
+    this.addEventListener(closeIcon, 'click', () => {
+      toast.classList.remove('active');
+      progress.classList.remove('active');
+      this.clearToastTimeouts();
+    });
+
+    // Redirect
+    this.redirectTimer = setTimeout(() => {
+      const cart = JSON.parse(localStorage.getItem('cartiqueCart'));
+      console.log('Checkout cart:', JSON.stringify(cart, null, 2));
+      
+      if (this.features.checkoutUrl && this.features.checkoutUrl !== '#') {
+        window.location.href = this.features.checkoutUrl;
+      }
+    }, 5000);
+  }
+
+  clearToastTimeouts() {
+    if (this.toastTimer1) clearTimeout(this.toastTimer1);
+    if (this.toastTimer2) clearTimeout(this.toastTimer2);
+    if (this.redirectTimer) clearTimeout(this.redirectTimer);
+  }
+
+  showSingleProductView(productId) {
+    productId = Number(productId);
+    const product = this.products.find(p => p.id === productId);
+
+    if (!product) {
+      console.error('Product not found:', productId);
+      return;
+    }
+
+    // Save current state
+    this.previousViewState = {
+      layout: this.currentLayout,
+      searchQuery: this.currentSearchQuery,
+      sortType: this.currentSortType,
+      scrollPosition: window.scrollY
+    };
+
+    // Hide main views
+    document.getElementById('cartique-product-displays').style.display = 'none';
+    document.getElementById('cartique-sidebar').style.display = 'none';
+    
+    this.singleProductViewActive = true;
+    this.renderSingleProduct(product);
+  }
+
+  renderSingleProduct(product) {
+    let container = document.getElementById('single-product-view-container');
+    
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'single-product-view-container';
+      document.getElementById('cartique-main-content').appendChild(container);
+    }
+
+    container.innerHTML = '';
+    
+    const productView = document.createElement('div');
+    productView.className = 'single-product-view';
+    productView.innerHTML = `
+      <button class="back-to-products">← Back to Products</button>
+      <div class="product-content-wrapper">
+        <div class="product-image-column">
+          <div class="product-image-container">
+            <img src="${product.image}" alt="${product.title}" loading="lazy">
+          </div>
+        </div>
+        <div class="product-info-column">
+          <div class="product-meta">
+            <h2>${product.title}</h2>
+            <div class="price-container">
+              ${product.sale_price ? `
+                <span class="original-price">${product.currency}${product.price}</span>
+                <span class="sale-price">${product.currency}${product.sale_price}</span>
+              ` : `
+                <span class="price">${product.currency}${product.price}</span>
+              `}
+            </div>
+            <p class="product-description">${product.description}</p>
+          </div>
+          <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+        </div>
+      </div>
+      <div class="product-tabs-container">
+        <div class="product-tabs-header">
+          <button class="tab-button active" data-tab="details">Product Details</button>
+          <button class="tab-button" data-tab="reviews">Reviews</button>
+        </div>
+        <div class="tab-content active" data-tab-content="details">
+          ${product.details || 'No additional details available.'}
+        </div>
+        <div class="tab-content" data-tab-content="reviews">
+          ${product.reviews || 'No reviews yet.'}
+        </div>
+      </div>
+    `;
+
+    // Add event listeners
+    const backBtn = productView.querySelector('.back-to-products');
+    const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
+    const tabButtons = productView.querySelectorAll('.tab-button');
+
+    if (backBtn) {
+      this.addEventListener(backBtn, 'click', () => this.returnToListView());
+    }
+
+    if (addToCartBtn) {
+      this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
+    }
+
+    tabButtons.forEach(button => {
+      this.addEventListener(button, 'click', () => {
+        // Update active tabs
+        productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
+          el.classList.remove('active');
+        });
+        
+        button.classList.add('active');
+        const tabName = button.dataset.tab;
+        const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
+        if (content) content.classList.add('active');
+      });
+    });
+
+    container.appendChild(productView);
+    container.style.display = 'block';
+  }
+
+  returnToListView() {
+    const singleProductView = document.getElementById('single-product-view-container');
+    const productDisplays = document.getElementById('cartique-product-displays');
+    const sidebar = document.getElementById('cartique-sidebar');
+
+    if (singleProductView) singleProductView.style.display = 'none';
+    if (productDisplays) productDisplays.style.display = 'block';
+    if (sidebar) sidebar.style.display = this.features.sidebarDisplay;
+
+    this.singleProductViewActive = false;
+
+    // Restore scroll position
+    if (this.previousViewState?.scrollPosition) {
+      window.scrollTo(0, this.previousViewState.scrollPosition);
+    }
+  }
+
+  showErrorMessage(message) {
+    // Create and show error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'cartique-error';
+    errorDiv.textContent = message;
+    errorDiv.style.cssText = `
+      padding: 1rem;
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+      border-radius: 4px;
+      margin: 1rem;
+      text-align: center;
+    `;
+    
+    this.container.prepend(errorDiv);
+  }
+
+  // Cleanup method for when component is destroyed
+  destroy() {
+    this.cleanupEventListeners();
+    this.clearToastTimeouts();
+    
+    // Remove any dynamically added elements
+    const singleProductView = document.getElementById('single-product-view-container');
+    if (singleProductView) singleProductView.remove();
+    
+    // Clear container
+    if (this.container) {
+      this.container.innerHTML = '';
+    }
+  }
+}

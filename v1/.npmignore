@@ -1,0 +1,20 @@
+# Development dependencies
+node_modules/
+DUMP/
+
+# Local assets
+public/
+prisma/
+
+# Demo / playground files
+index.html
+
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+
+# Lock files
+package-lock.json

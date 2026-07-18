@@ -1,0 +1,62 @@
+Outline of what each method does in the Cartique class:
+
+ Constructor & Core Methods
+- constructor(): Initializes the class with products and features, sets up defaults
+- deepMerge(): Helper for deep merging objects (features configuration)
+- isObject(): Checks if item is a plain object
+- debounce(): Creates debounced functions for performance (search input)
+- addEventListener(): Wrapper for addEventListener with cleanup tracking
+
+ Initialization & Setup
+- init(): Main initialization method - sets up container, themes, templates
+- applyMinimalTheme(): Applies theme settings to maintain original design
+- injectCriticalCSS(): Injects minimal CSS for initial display
+- completeInitialization(): Finalizes initialization by making container visible
+
+ Template & DOM Management
+- fetchAndExtractComponents(): Gets HTML templates from DOM template holder
+- renderAllComponents(): Orchestrates rendering of all UI components
+- renderMainFrame(): Creates main container structure with sidebar/main/footer
+- renderSidebar(): Renders sidebar with filter components
+- renderControls(): Renders search, sort, view toggle, and cart icon controls
+- renderProductDisplays(): Sets up grid/list product display containers
+- renderFooter(): Renders pagination footer
+- renderCartSlider(): Creates shopping cart slide-out panel
+- renderCartItemTemplate(): Creates template for cart items
+
+ Product Display & Rendering
+- renderProducts(): Renders products in current layout (grid/list)
+- createProductCard(): Creates individual grid product card
+- createProductListing(): Creates individual list product item
+- updateProductElement(): Populates product data into DOM elements
+- setLayout(): Switches between grid and list views
+
+ Event Handlers & User Interactions
+- setupEventListeners(): Sets up layout toggle events
+- cleanupEventListeners(): Removes all event listeners for cleanup
+- handleSearch(): Filters products based on search query
+- handleSort(): Sorts products by selected criteria (price/title)
+- showSingleProductView(): Shows detailed single product view
+- renderSingleProduct(): Renders detailed product page with tabs
+- returnToListView(): Returns from single product view to main listing
+
+ Shopping Cart Operations
+- addToCart(): Adds product to cart (localStorage)
+- showCart(): Displays cart slide-out with current items
+- updateCartItem(): Updates cart item DOM with product data
+- addCartItemEventListeners(): Adds events to cart items (remove/qty)
+- removeCartItem(): Removes item from cart
+- decreaseQtyItem(): Decreases cart item quantity
+- increaseQtyItem(): Increases cart item quantity
+- closeCart(): Closes cart slide-out
+
+ Checkout & Notifications
+- checkout(): Initiates checkout process
+- showCheckoutAlert(): Shows success toast and redirects
+- clearToastTimeouts(): Cleans up notification timers
+
+ Utility & Error Handling
+- showErrorMessage(): Displays error messages to user
+- destroy(): Cleanup method for component removal
+
+The class follows a modular structure with clear separation: initialization, template rendering, product display, cart management, and event handling.
