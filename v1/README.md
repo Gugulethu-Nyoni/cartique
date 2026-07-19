@@ -27,3 +27,6 @@ console.log(cart.sayHello());
 ## **License**  
 
 This project is licensed under the [MIT License](LICENSE).  
+
+# TODOs
+- Cartique ecommerce graph
