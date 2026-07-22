@@ -1,5 +1,6 @@
 # **Cartique**  
 **A Semantq, native eCommerce front-end UI library.**  
+- Add graph 
 
 ## **Installation**  
 
