@@ -26,11 +26,12 @@ export default class CartService {
         }
 
         // STOCK CHECK
-        const availableStock = this.getProductStock(product);
-        if (availableStock === 0) {
-            this.showStockAlert('This product is SOLD OUT');
-            return;
-        }
+        const inventory = await this.adapter.resolveInventory({
+            sellable: product,
+            variant: variant
+        });
+        const availableStock = inventory.quantity;
+
 
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const existingIndex = cart.findIndex(item => item.id === product.id);
@@ -97,5 +98,9 @@ export default class CartService {
         
         // Show the checkout alert
         this.showCheckoutAlert();
+    }
+
+    setAdapter(adapter) {
+        this.adapter = adapter;
     }
 }
