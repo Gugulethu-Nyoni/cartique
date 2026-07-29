@@ -5,11 +5,29 @@
  *
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
+ * Phase 3.6.2: Safe context method checks.
  */
 
 export default class CartRenderer {
     constructor(context = {}) {
         Object.assign(this, context);
+        
+        // Ensure eventListeners exists
+        if (!this.eventListeners) {
+            this.eventListeners = new Map();
+        }
+        
+        // Ensure addEventListener is bound
+        if (!this.addEventListener) {
+            this.addEventListener = (el, event, handler) => {
+                el.addEventListener(event, handler);
+                const key = `${el.id || el.className}-${event}`;
+                if (!this.eventListeners.has(key)) {
+                    this.eventListeners.set(key, []);
+                }
+                this.eventListeners.get(key).push({ element: el, event, handler });
+            };
+        }
     }
 
     /**
@@ -39,26 +57,34 @@ export default class CartRenderer {
 
         // Close button
         const closeBtn = cartSlider.querySelector('#cart-close-btn');
-        if (closeBtn) {
-            this.addEventListener(closeBtn, 'click', this.closeCart.bind(this));
+        if (closeBtn && this.addEventListener) {
+            this.addEventListener(closeBtn, 'click', () => {
+                if (typeof this.closeCart === 'function') {
+                    this.closeCart();
+                }
+            });
         }
 
         // Checkout button
         const checkoutBtn = cartSlider.querySelector('#checkout-btn');
-        if (checkoutBtn) {
+        if (checkoutBtn && this.addEventListener) {
             this.addEventListener(checkoutBtn, 'click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.checkout();
+                if (typeof this.checkout === 'function') {
+                    this.checkout();
+                }
             });
         }
 
         // View Cart button
         const viewCartBtn = cartSlider.querySelector('#view-cart-btn');
-        if (viewCartBtn) {
+        if (viewCartBtn && this.addEventListener) {
             this.addEventListener(viewCartBtn, 'click', (e) => {
                 e.preventDefault();
-                this.showCartPage();
+                if (typeof this.showCartPage === 'function') {
+                    this.showCartPage();
+                }
             });
         }
     }
@@ -132,7 +158,14 @@ export default class CartRenderer {
             
             for (const product of cart) {
                 // Get variant using adapter
-                const variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
+                let variant = null;
+                try {
+                    variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
+                } catch (e) {
+                    console.warn('Variant resolution failed:', e.message);
+                    variant = { price: product.price || 0 };
+                }
+                
                 const quantity = product.cart_quantity || 1;
                 
                 // Get CommercialDecision from adapter
@@ -318,7 +351,14 @@ export default class CartRenderer {
             this.addCartItemEventListeners(cartItem, product.id);
             
             // Calculate subtotal with bulk pricing
-            const variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
+            let variant = null;
+            try {
+                variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
+            } catch (e) {
+                console.warn('Variant resolution failed:', e.message);
+                variant = { price: product.price || 0 };
+            }
+            
             const quantity = product.cart_quantity || 1;
             let decision;
             try {
@@ -396,12 +436,17 @@ export default class CartRenderer {
 
         // Get variant using adapter
         let variant = null;
-        if (product.variantId) {
-            variant = this.adapter?.resolveVariant(product, product.variantId);
+        try {
+            if (product.variantId) {
+                variant = this.adapter?.resolveVariant(product, product.variantId);
+            }
+            if (!variant && product.variants && product.variants.length > 0) {
+                variant = product.variants[0];
+            }
+        } catch (e) {
+            console.warn('Variant resolution failed:', e.message);
         }
-        if (!variant && product.variants && product.variants.length > 0) {
-            variant = product.variants[0];
-        }
+        
         if (!variant) {
             variant = {
                 id: product.id,
@@ -562,17 +607,17 @@ export default class CartRenderer {
         const decreaseBtn = cartItem.querySelector('.decrease-qty');
         const increaseBtn = cartItem.querySelector('.increase-qty');
 
-        if (removeBtn) {
+        if (removeBtn && this.addEventListener) {
             removeBtn.id = productId;
             this.addEventListener(removeBtn, 'click', (e) => this.removeCartItem(e));
         }
 
-        if (decreaseBtn) {
+        if (decreaseBtn && this.addEventListener) {
             decreaseBtn.id = `decrease_quantity_${productId}`;
             this.addEventListener(decreaseBtn, 'click', (e) => this.decreaseQtyItem(e));
         }
 
-        if (increaseBtn) {
+        if (increaseBtn && this.addEventListener) {
             increaseBtn.id = `increase_quantity_${productId}`;
             this.addEventListener(increaseBtn, 'click', (e) => this.increaseQtyItem(e));
         }
@@ -623,7 +668,15 @@ export default class CartRenderer {
                 console.warn('Product not found for quantity increase:', productId);
                 return;
             }
-            const variant = this.adapter?.resolveVariant(product, product.variantId);
+            
+            let variant = null;
+            try {
+                variant = this.adapter?.resolveVariant(product, product.variantId);
+            } catch (e) {
+                console.warn('Variant resolution failed:', e.message);
+                variant = { inventory: 10 };
+            }
+            
             let inventory;
             try {
                 inventory = await this.adapter?.resolveInventory({
@@ -634,13 +687,16 @@ export default class CartRenderer {
                 console.warn('Inventory resolution failed:', e.message);
                 inventory = { quantity: 10 };
             }
+            
             const availableStock = inventory?.quantity || 0;
             const newQuantity = cart[index].cart_quantity + 1;
             
             if (newQuantity > availableStock) {
-                this.showStockAlert(
-                    `Cannot add more. Only ${availableStock} available in total.`
-                );
+                if (typeof this.showStockAlert === 'function') {
+                    this.showStockAlert(
+                        `Cannot add more. Only ${availableStock} available in total.`
+                    );
+                }
                 return;
             }
             
@@ -732,44 +788,54 @@ export default class CartRenderer {
      */
     attachCartPageEvents(cartPage) {
         const backBtn = cartPage.querySelector('#cart-page-back');
-        if (backBtn) {
+        if (backBtn && this.addEventListener) {
             this.addEventListener(backBtn, 'click', () => this.closeCartPage());
         }
 
         const continueBtns = cartPage.querySelectorAll('#cart-page-back-btn, #cart-page-continue');
         continueBtns.forEach(btn => {
-            this.addEventListener(btn, 'click', () => this.closeCartPage());
+            if (this.addEventListener) {
+                this.addEventListener(btn, 'click', () => this.closeCartPage());
+            }
         });
 
         cartPage.querySelectorAll('.decrease-page-qty').forEach(btn => {
-            this.addEventListener(btn, 'click', (e) => {
-                const productId = parseInt(e.target.dataset.id);
-                this.decreasePageQty(productId);
-                this.renderCartPage();
-            });
+            if (this.addEventListener) {
+                this.addEventListener(btn, 'click', (e) => {
+                    const productId = parseInt(e.target.dataset.id);
+                    this.decreasePageQty(productId);
+                    this.renderCartPage();
+                });
+            }
         });
 
         cartPage.querySelectorAll('.increase-page-qty').forEach(btn => {
-            this.addEventListener(btn, 'click', (e) => {
-                const productId = parseInt(e.target.dataset.id);
-                this.increasePageQty(productId);
-                this.renderCartPage();
-            });
+            if (this.addEventListener) {
+                this.addEventListener(btn, 'click', (e) => {
+                    const productId = parseInt(e.target.dataset.id);
+                    this.increasePageQty(productId);
+                    this.renderCartPage();
+                });
+            }
         });
 
         cartPage.querySelectorAll('.cart-page-remove').forEach(btn => {
-            this.addEventListener(btn, 'click', (e) => {
-                const productId = parseInt(e.target.dataset.id);
-                this.removePageItem(productId);
-                this.renderCartPage();
-            });
+            if (this.addEventListener) {
+                this.addEventListener(btn, 'click', (e) => {
+                    const productId = parseInt(e.target.dataset.id);
+                    this.removePageItem(productId);
+                    this.renderCartPage();
+                });
+            }
         });
 
         const checkoutBtn = cartPage.querySelector('#cart-page-checkout');
-        if (checkoutBtn) {
+        if (checkoutBtn && this.addEventListener) {
             this.addEventListener(checkoutBtn, 'click', (e) => {
                 e.preventDefault();
-                this.checkout();
+                if (typeof this.checkout === 'function') {
+                    this.checkout();
+                }
             });
         }
     }
@@ -804,7 +870,15 @@ export default class CartRenderer {
                 console.warn('Product not found for quantity increase:', productId);
                 return;
             }
-            const variant = this.adapter?.resolveVariant(product, product.variantId);
+            
+            let variant = null;
+            try {
+                variant = this.adapter?.resolveVariant(product, product.variantId);
+            } catch (e) {
+                console.warn('Variant resolution failed:', e.message);
+                variant = { inventory: 10 };
+            }
+            
             let inventory;
             try {
                 inventory = await this.adapter?.resolveInventory({
@@ -815,13 +889,16 @@ export default class CartRenderer {
                 console.warn('Inventory resolution failed:', e.message);
                 inventory = { quantity: 10 };
             }
+            
             const availableStock = inventory?.quantity || 0;
             const newQuantity = cart[index].cart_quantity + 1;
             
             if (newQuantity > availableStock) {
-                this.showStockAlert(
-                    `Cannot add more. Maximum available: ${availableStock}`
-                );
+                if (typeof this.showStockAlert === 'function') {
+                    this.showStockAlert(
+                        `Cannot add more. Maximum available: ${availableStock}`
+                    );
+                }
                 return;
             }
             
