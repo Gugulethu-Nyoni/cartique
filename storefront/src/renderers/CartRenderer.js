@@ -4,9 +4,7 @@
  * CartRenderer — Cart presentation logic
  *
  * Migrated from: cartique/storefront/src/Storefront.js
- * Phase 1: Pure extraction. No refactoring.
- *
- * TODO: Phase 2 — Move bulk pricing logic to PricingService.
+ * Phase 2C: Updated to use adapter for pricing and inventory
  */
 
 export default class CartRenderer {
@@ -75,7 +73,7 @@ export default class CartRenderer {
     /**
      * Renders the full cart page
      */
-    renderCartPage() {
+    async renderCartPage() {
         console.log('🔍 6. renderCartPage() called');
 
         const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
@@ -108,25 +106,42 @@ export default class CartRenderer {
             let subtotal = 0;
             let itemsHTML = '';
             
-            cart.forEach(product => {
-                // Get variant for pricing
-                const variant = this.findVariant(product.variantId || product.id);
+            for (const product of cart) {
+                // Get variant using adapter
+                const variant = this.adapter.resolveVariant(product, product.variantId || product.id);
                 const quantity = product.cart_quantity || 1;
                 
-                // Calculate pricing with bulk support
-                const pricing = await this.adapter.resolvePricing({
+                // Get pricing from adapter
+                const pricingResult = await this.adapter.resolvePricing({
                     sellable: { variants: [variant] },
                     variant: variant,
                     quantity: quantity,
                     customer: this.customer,
                     place: this.place
                 });
+                const pricing = pricingResult.legacy || pricingResult;
                 
                 const itemTotal = pricing.unitPrice * quantity;
                 subtotal += itemTotal;
                 
-                // Get bulk display data
-                const bulkDisplay = this.getBulkPricingDisplay(variant, quantity);
+                // Build bulk display from adapter result
+                const bulkDisplay = {
+                    hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+                    isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+                    retailPrice: pricing.retailPrice || variant?.price || 0,
+                    bulkPrice: pricing.bulkPrice || null,
+                    unitPrice: pricing.unitPrice || 0,
+                    minimumQty: pricing.bulkMinimumQty || null,
+                    heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+                    message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
+                    displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
+                    bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+                    staticDisplay: {
+                        label: 'BULK PRICE',
+                        price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+                        minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+                    }
+                };
                 
                 // Build price HTML with bulk info
                 let priceHTML = '';
@@ -190,7 +205,7 @@ export default class CartRenderer {
                         </div>
                     </div>
                 `;
-            });
+            }
             
             cartPage.innerHTML = `
                 <div class="cart-page-container">
@@ -222,7 +237,7 @@ export default class CartRenderer {
     /**
      * Shows the cart slider
      */
-    showCart() {
+    async showCart() {
         const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const cartContainer = document.getElementById('cart-items-container');
         
@@ -243,26 +258,34 @@ export default class CartRenderer {
         let subtotal = 0;
 
         // Render cart items
-        cart.forEach(product => {
+        for (const product of cart) {
             const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component');
             if (!wrapper) return;
 
             const cartItem = wrapper.firstElementChild.cloneNode(true);
             
             // Update product data
-            this.updateCartItem(cartItem, product);
+            await this.updateCartItem(cartItem, product);
             
             // Add event listeners
             this.addCartItemEventListeners(cartItem, product.id);
             
             // Calculate subtotal with bulk pricing
-            const variant = this.findVariant(product.variantId || product.id);
+            const variant = this.adapter.resolveVariant(product, product.variantId || product.id);
             const quantity = product.cart_quantity || 1;
-            const pricing = this.getUnitPrice(variant, quantity);
+            const pricingResult = await this.adapter.resolvePricing({
+                sellable: { variants: [variant] },
+                variant: variant,
+                quantity: quantity,
+                customer: this.customer,
+                place: this.place
+            });
+            const pricing = pricingResult.legacy || pricingResult;
+
             subtotal += pricing.unitPrice * quantity;
             
             cartContainer.appendChild(cartItem);
-        });
+        }
 
         // Update subtotal display
         const subtotalEl = document.getElementById('subtotal');
@@ -307,7 +330,7 @@ export default class CartRenderer {
     /**
      * Updates a cart item in the slider
      */
-    updateCartItem(cartItem, product) {
+    async updateCartItem(cartItem, product) {
         // Update image
         const imgEl = cartItem.querySelector('#image');
         if (imgEl) {
@@ -319,10 +342,10 @@ export default class CartRenderer {
         const titleEl = cartItem.querySelector('#title');
         if (titleEl) titleEl.textContent = product.title || '';
 
-        // Get variant - use product.variantId or find from product
+        // Get variant using adapter
         let variant = null;
         if (product.variantId) {
-            variant = this.findVariant(product.variantId);
+            variant = this.adapter.resolveVariant(product, product.variantId);
         }
         if (!variant && product.variants && product.variants.length > 0) {
             variant = product.variants[0];
@@ -339,8 +362,15 @@ export default class CartRenderer {
         
         const quantity = product.cart_quantity || 1;
 
-        // Calculate pricing
-        const pricing = this.getUnitPrice(variant, quantity);
+        // Get pricing from adapter
+        const pricingResult = await this.adapter.resolvePricing({
+            sellable: { variants: [variant] },
+            variant: variant,
+            quantity: quantity,
+            customer: this.customer,
+            place: this.place
+        });
+        const pricing = pricingResult.legacy || pricingResult;
         const totalPrice = pricing.unitPrice * quantity;
 
         // Get price elements
@@ -356,8 +386,24 @@ export default class CartRenderer {
         const existingBulkMsg = cartItem.querySelector('.cart-bulk-status');
         if (existingBulkMsg) existingBulkMsg.remove();
 
-        // Check if variant has bulk pricing
-        const bulkDisplay = this.getBulkPricingDisplay(variant, quantity);
+        // Build bulk display from adapter result
+        const bulkDisplay = {
+            hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            retailPrice: pricing.retailPrice || variant?.price || 0,
+            bulkPrice: pricing.bulkPrice || null,
+            unitPrice: pricing.unitPrice || 0,
+            minimumQty: pricing.bulkMinimumQty || null,
+            heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
+            displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
+            bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+            staticDisplay: {
+                label: 'BULK PRICE',
+                price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+                minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+            }
+        };
 
         if (bulkDisplay && bulkDisplay.hasBulk) {
             // Find the cart item details container
@@ -499,14 +545,19 @@ export default class CartRenderer {
     /**
      * Increases quantity in cart slider
      */
-    increaseQtyItem(event) {
+    async increaseQtyItem(event) {
         const productId = parseInt(event.target.id.replace('increase_quantity_', ''));
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const index = cart.findIndex(item => item.id === productId);
 
         if (index !== -1) {
             const product = this.products.find(p => p.id === productId);
-            const availableStock = product ? this.getProductStock(product) : 0;
+            const variant = this.adapter.resolveVariant(product, product.variantId);
+            const inventory = await this.adapter.resolveInventory({
+                sellable: product,
+                variant: variant
+            });
+            const availableStock = inventory.quantity || 0;
             const newQuantity = cart[index].cart_quantity + 1;
             
             if (newQuantity > availableStock) {
@@ -680,13 +731,18 @@ export default class CartRenderer {
     /**
      * Increases quantity on cart page
      */
-    increasePageQty(productId) {
+    async increasePageQty(productId) {
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const index = cart.findIndex(item => item.id === productId);
 
         if (index !== -1) {
             const product = this.products.find(p => p.id === productId);
-            const availableStock = product ? this.getProductStock(product) : 0;
+            const variant = this.adapter.resolveVariant(product, product.variantId);
+            const inventory = await this.adapter.resolveInventory({
+                sellable: product,
+                variant: variant
+            });
+            const availableStock = inventory.quantity || 0;
             const newQuantity = cart[index].cart_quantity + 1;
             
             if (newQuantity > availableStock) {

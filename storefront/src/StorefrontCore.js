@@ -108,8 +108,9 @@ export default class StorefrontCore {
     });
 
     // 7. Initialize Adapter (Phase 2A: legacy mode)
+    // 7. Initialize Adapter (kernel mode controlled by feature flag)
     this.adapter = new CartiqueAdapter(this.kernel, {
-        legacyMode: false,
+        legacyMode: this.features.kernelMode !== true,
         debug: this.features.debug || false
     });
 

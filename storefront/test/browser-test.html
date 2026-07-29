@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartique Storefront — Phase 1.5 Smoke Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f9fafb;
+        }
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 2rem;
+        }
+        .test-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+        }
+        .test-status.pass { background: #d1fae5; color: #065f46; }
+        .test-status.fail { background: #fecaca; color: #991b1b; }
+        .test-status.running { background: #fef3c7; color: #92400e; }
+        #results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .test-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+        .test-card.pass { border-color: #10b981; }
+        .test-card.fail { border-color: #ef4444; }
+        .test-card .name { font-weight: 600; }
+        .test-card .result { font-size: 0.875rem; margin-top: 0.5rem; }
+        #storefront {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            min-height: 200px;
+        }
+        .logs {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: #1f2937;
+            color: #e5e7eb;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>🧪 Cartique Storefront — Phase 1.5 Smoke Test</h1>
+        <span class="test-status running" id="status">Running...</span>
+    </div>
+
+    <div id="results">
+        <!-- Test cards will be populated here -->
+    </div>
+
+    <div id="storefront">
+        <p>Storefront will render here...</p>
+    </div>
+
+    <div class="logs" id="logs">
+        <div>⏳ Initializing tests...</div>
+    </div>
+
+    <script type="importmap">
+{
+    "imports": {
+        "@semantq/storefront": "/storefront/src/index.js"
+    }
+}
+</script>
+
+    <script type="module">
+        import * as Storefront from '@semantq/storefront';
+
+        const logs = document.getElementById('logs');
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+        const storefrontContainer = document.getElementById('storefront');
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            const prefix = type === 'pass' ? '✅' : type === 'fail' ? '❌' : 'ℹ️';
+            entry.textContent = `${prefix} ${message}`;
+            entry.style.color = type === 'pass' ? '#10b981' : type === 'fail' ? '#ef4444' : '#e5e7eb';
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`[Test] ${message}`);
+        }
+
+        function createTestCard(name) {
+            const card = document.createElement('div');
+            card.className = 'test-card';
+            card.id = `test-${name.replace(/\s/g, '-')}`;
+            card.innerHTML = `
+                <div class="name">${name}</div>
+                <div class="result">⏳ Pending...</div>
+            `;
+            results.appendChild(card);
+            return card;
+        }
+
+        function updateTestCard(card, passed, message) {
+            card.classList.add(passed ? 'pass' : 'fail');
+            card.querySelector('.result').textContent = passed ? `✅ ${message}` : `❌ ${message}`;
+        }
+
+        // ==========================================================
+        // TEST 1: Imports
+        // ==========================================================
+        const testImports = createTestCard('1. Imports');
+        try {
+            const required = ['StorefrontCore', 'ProductRenderer', 'CollectionRenderer', 'CartRenderer'];
+            const missing = required.filter(name => !Storefront[name]);
+            if (missing.length === 0) {
+                updateTestCard(testImports, true, 'All imports resolved');
+                log('All imports resolved', 'pass');
+            } else {
+                updateTestCard(testImports, false, `Missing: ${missing.join(', ')}`);
+                log(`Missing imports: ${missing.join(', ')}`, 'fail');
+            }
+        } catch (error) {
+            updateTestCard(testImports, false, error.message);
+            log(`Import error: ${error.message}`, 'fail');
+        }
+
+        // ==========================================================
+        // TEST 2: Instantiate StorefrontCore
+        // ==========================================================
+        const testInstantiate = createTestCard('2. Instantiate StorefrontCore');
+        try {
+            const { StorefrontCore } = Storefront;
+            const mockProducts = [
+                { id: 1, title: 'Test Product 1', price: 100 },
+                { id: 2, title: 'Test Product 2', price: 200 }
+            ];
+            const storefront = new StorefrontCore(mockProducts, {
+                containerId: 'storefront',
+                theme: 'light',
+                kernelMode: true,   // ← Enable kernel mode
+                debug: true         // ← Enable debug logging
+
+            });
+            updateTestCard(testInstantiate, true, 'StorefrontCore instantiated');
+            log('StorefrontCore instantiated successfully', 'pass');
+        } catch (error) {
+            updateTestCard(testInstantiate, false, error.message);
+            log(`Instantiation error: ${error.message}`, 'fail');
+        }
+
+        // ==========================================================
+        // TEST 3: Services
+        // ==========================================================
+        const testServices = createTestCard('3. Services');
+        try {
+            const { LocaleService, PricingService } = Storefront;
+            const context = { currencySymbol: 'R' };
+            
+            // Test LocaleService
+            const locale = new LocaleService(context);
+            const formatted = locale.formatPrice(123.45);
+            if (formatted === '123.45') {
+                log(`LocaleService.formatPrice(123.45) → ${formatted}`, 'pass');
+            } else {
+                log(`LocaleService.formatPrice(123.45) → ${formatted} (unexpected)`, 'fail');
+            }
+            
+            // Test PricingService
+            const pricing = new PricingService(context);
+            const hasBulk = pricing.hasBulkPricing({ bulkPrice: 10, bulkMinimumQty: 5 });
+            if (hasBulk === true) {
+                log('PricingService.hasBulkPricing() works', 'pass');
+            } else {
+                log('PricingService.hasBulkPricing() unexpected result', 'fail');
+            }
+            
+            updateTestCard(testServices, true, 'Services initialized');
+        } catch (error) {
+            updateTestCard(testServices, false, error.message);
+            log(`Services error: ${error.message}`, 'fail');
+        }
+
+        // ==========================================================
+        // TEST 4: Renderers
+        // ==========================================================
+        const testRenderers = createTestCard('4. Renderers');
+        try {
+            const { ProductRenderer, CartRenderer, CollectionRenderer } = Storefront;
+            const context = { 
+                features: { currencySymbol: 'R' },
+                products: [{ id: 1, title: 'Test' }],
+                templateHolder: { content: { getElementById: () => null } }
+            };
+            
+            const productRenderer = new ProductRenderer(context);
+            if (typeof productRenderer.createProductCard === 'function') {
+                log('ProductRenderer.createProductCard is a function', 'pass');
+            } else {
+                log('ProductRenderer.createProductCard is missing', 'fail');
+            }
+            
+            const cartRenderer = new CartRenderer(context);
+            if (typeof cartRenderer.renderCartSlider === 'function') {
+                log('CartRenderer.renderCartSlider is a function', 'pass');
+            } else {
+                log('CartRenderer.renderCartSlider is missing', 'fail');
+            }
+            
+            updateTestCard(testRenderers, true, 'Renderers initialized');
+        } catch (error) {
+            updateTestCard(testRenderers, false, error.message);
+            log(`Renderers error: ${error.message}`, 'fail');
+        }
+
+        // ==========================================================
+        // TEST 5: Theme
+        // ==========================================================
+        const testTheme = createTestCard('5. Theme');
+        try {
+            const { DefaultTheme } = Storefront;
+            const theme = new DefaultTheme({
+                features: { containerId: 'storefront', themeColor: '#2a2a2a' }
+            });
+            if (typeof theme.injectCSS === 'function') {
+                log('DefaultTheme.injectCSS is a function', 'pass');
+            }
+            if (typeof theme.applyTheme === 'function') {
+                log('DefaultTheme.applyTheme is a function', 'pass');
+            }
+            updateTestCard(testTheme, true, 'Theme initialized');
+        } catch (error) {
+            updateTestCard(testTheme, false, error.message);
+            log(`Theme error: ${error.message}`, 'fail');
+        }
+
+        // ==========================================================
+        // FINAL STATUS
+        // ==========================================================
+        const passed = document.querySelectorAll('.test-card.pass').length;
+        const total = document.querySelectorAll('.test-card').length;
+        
+        if (passed === total) {
+            status.className = 'test-status pass';
+            status.textContent = '✅ All tests passed';
+            log('🎉 All tests passed! Phase 1.5 validation complete.', 'pass');
+        } else {
+            status.className = 'test-status fail';
+            status.textContent = `❌ ${total - passed} tests failed`;
+            log(`⚠️ ${total - passed} tests failed. Please review logs.`, 'fail');
+        }
+
+        // ==========================================================
+        // EXPOSE FOR DEBUGGING
+        // ==========================================================
+        window.__Storefront = Storefront;
+        console.log('🔧 Debug: window.__Storefront');
+    </script>
+</body>
+</html>
