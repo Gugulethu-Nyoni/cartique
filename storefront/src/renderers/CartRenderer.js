@@ -114,7 +114,14 @@ export default class CartRenderer {
                 const quantity = product.cart_quantity || 1;
                 
                 // Calculate pricing with bulk support
-                const pricing = this.getUnitPrice(variant, quantity);
+                const pricing = await this.adapter.resolvePricing({
+                    sellable: { variants: [variant] },
+                    variant: variant,
+                    quantity: quantity,
+                    customer: this.customer,
+                    place: this.place
+                });
+                
                 const itemTotal = pricing.unitPrice * quantity;
                 subtotal += itemTotal;
                 
