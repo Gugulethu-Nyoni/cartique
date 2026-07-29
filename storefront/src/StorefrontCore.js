@@ -1,80 +1,73 @@
-import { deepMerge } from './utils/object.js';
-import DefaultTheme  from './theme/DefaultTheme.js';
-import NotificationService  from './services/NotificationService.js';
-import CartiqueAdapter from './adapters/CartiqueAdapter.js';
-
-
-// storefront/src/StorefrontCore.js
-
 /**
- * StorefrontCore - Core engine for Cartique storefront
+ * @semantq/storefront
+ *
+ * StorefrontCore — Core engine for Cartique storefront
  * 
  * This class handles the main lifecycle, state management,
  * and core functionality of the storefront.
  */
 
+import { deepMerge } from './utils/object.js';
+import DefaultTheme from './theme/DefaultTheme.js';
+import NotificationService from './services/NotificationService.js';
+import CartiqueAdapter from './adapters/CartiqueAdapter.js';
+import PricingService from './services/PricingService.js';
+import CartService from './services/CartService.js';
+import LocaleService from './services/LocaleService.js';
+
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
     // 1. Validation
     if (!products || !Array.isArray(products)) {
-        throw new Error('Cartique requires an array of products');
+      throw new Error('Cartique requires an array of products');
     }
 
     // 2. Default Configuration & Feature Merging
     this.defaultFeatures = {
-        grid: true,
-        pagination: true,
-        columns: 3,
-        rows: 10,
-        sidebar: true,
-        footer: true,
-        search: true,
-        sorting: true,
-        sale: false,
-        theme: 'light',
-        themeColor: '#2a2a2a', 
-        containerId: 'cartique',
-        containerClass: 'cartique-container',
-        checkoutUrl: '#',
-        checkoutUrlMode: 'self',
-        sidebarDisplay: 'block',
-        footerDisplay: 'block',
-        menu: {
-            enabled: false,
-            type: 'inline', // 'mega', 'inline', 'stacked'
-            position: 'top', // 'top', 'sidebar', 'custom'
-            containerId: 'cartique-catalogue-menu',
-            label: 'Categories',
-            showCounts: true,
-            megaMenuColumns: 3
-        },
-        sidebarFeatures: {
-            filters: {}, // Dynamically injected from extractVariantFilters
-        }
+      grid: true,
+      pagination: true,
+      columns: 3,
+      rows: 10,
+      sidebar: true,
+      footer: true,
+      search: true,
+      sorting: true,
+      sale: false,
+      theme: 'light',
+      themeColor: '#2a2a2a',
+      containerId: 'cartique',
+      containerClass: 'cartique-container',
+      checkoutUrl: '#',
+      checkoutUrlMode: 'self',
+      sidebarDisplay: 'block',
+      footerDisplay: 'block',
+      menu: {
+        enabled: false,
+        type: 'inline',
+        position: 'top',
+        containerId: 'cartique-catalogue-menu',
+        label: 'Categories',
+        showCounts: true,
+        megaMenuColumns: 3
+      },
+      sidebarFeatures: {
+        filters: {}
+      }
     };
 
-    // Deep merge to ensure nested objects like sidebarFeatures aren't overwritten
     this.features = deepMerge(this.defaultFeatures, features);
     this.currencySymbol = this.features.currencySymbol || '$';
 
     // 3. Data State Management
     this.products = products;
     this.filteredProducts = [...products];
-    this.categories = this._extractCategories(); 
-    
-    // Initialize search state
+    this.categories = this._extractCategories();
     this.currentSearchQuery = '';
-
-    // Register URL state restorers
     this.urlStateRestorers = [];
-
-    this.registerUrlStateRestorer(this.restoreCartState);
-    this.registerUrlStateRestorer(this.restoreSearchState);
-
     this.currentSortType = '';
     this.currentLayout = 'grid';
     this.activeCategoryId = null;
-    this.activeFilters = {}; // Key format: { color: Set(['Red']), size: Set(['XL']) }
+    this.activeFilters = {};
     this.singleProductViewActive = false;
     this.previousViewState = null;
 
@@ -82,79 +75,93 @@ export default class StorefrontCore {
     this.container = null;
     this.templateHolder = null;
     this.eventListeners = new Map();
-    
-    // Cleanup Timers
     this.toastTimer1 = null;
     this.toastTimer2 = null;
     this.redirectTimer = null;
-
     this.itemsPerBatch = this.features.itemsPerPage || 12;
     this.loadedCount = this.itemsPerBatch;
-
     this.callbacks = callbacks || {};
     this.kernel = kernel;
 
     // 5. Initialize Theme
     this.theme = new DefaultTheme({
-        features: this.features,
-        containerId: this.features.containerId
+      features: this.features,
+      containerId: this.features.containerId
     });
 
-        // 6. Initialize Notification Service
-    this.notification = new NotificationService({
-        container: this.container,
+    // 6. Initialize Services
+    this.services = {
+      pricing: new PricingService({
+        currencySymbol: this.currencySymbol,
+        products: this.products,
+        formatPrice: this.formatPrice.bind(this),
         features: this.features,
         callbacks: this.callbacks
+      }),
+      cart: new CartService({
+        products: this.products,
+        features: this.features,
+        callbacks: this.callbacks
+      }),
+      locale: new LocaleService({
+        currencySymbol: this.currencySymbol,
+        features: this.features,
+        callbacks: this.callbacks
+      })
+    };
+
+    // 7. Initialize Notification Service
+    this.notification = new NotificationService({
+      container: this.container,
+      features: this.features,
+      callbacks: this.callbacks
     });
 
-    // 7. Initialize Adapter (Phase 2A: legacy mode)
-    // 7. Initialize Adapter (kernel mode controlled by feature flag)
+    // 8. Initialize Adapter
     this.adapter = new CartiqueAdapter(this.kernel, {
-        legacyMode: this.features.kernelMode !== true,
-        debug: this.features.debug || false
+      legacyMode: this.features.kernelMode !== true,
+      debug: this.features.debug || false
     });
 
-    // 8. Pass adapter to services
+    // 9. Pass adapter to services
     if (this.services?.pricing?.setAdapter) {
-        this.services.pricing.setAdapter(this.adapter);
+      this.services.pricing.setAdapter(this.adapter);
     }
     if (this.services?.cart?.setAdapter) {
-        this.services.cart.setAdapter(this.adapter);
+      this.services.cart.setAdapter(this.adapter);
     }
 
-    // 9. Fire off the Engine
+    // 10. Register URL state restorers
+    this.registerUrlStateRestorer(this.restoreCartState);
+    this.registerUrlStateRestorer(this.restoreSearchState);
+
+    // 11. Fire off the Engine
     this.init();
   }
 
-
-
-      /**
-     * Extracts unique categories from products
-     * @returns {Array} Array of category objects { id, name, count }
-     */
-    _extractCategories() {
-        const catMap = new Map();
-        this.products.forEach(product => {
-            product.categories?.forEach(cat => {
-                if (!catMap.has(cat.id)) {
-                    catMap.set(cat.id, { id: cat.id, name: cat.name, count: 0 });
-                }
-                catMap.get(cat.id).count++;
-            });
-        });
-        return Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-    }
+  /**
+   * Extracts unique categories from products
+   * @returns {Array} Array of category objects { id, name, count }
+   */
+  _extractCategories() {
+    const catMap = new Map();
+    this.products.forEach(product => {
+      product.categories?.forEach(cat => {
+        if (!catMap.has(cat.id)) {
+          catMap.set(cat.id, { id: cat.id, name: cat.name, count: 0 });
+        }
+        catMap.get(cat.id).count++;
+      });
+    });
+    return Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
 
   // ==========================================================
   // PUBLIC API
   // ==========================================================
 
   /**
-   * Opens the cart page programmatically.
-   * This is the public method for external integration.
-   * 
-   * @example
-   * cartique.openCart();
+   * Opens the cart page programmatically
    */
   openCart() {
     console.log('🔍 4. openCart() called');
@@ -166,69 +173,60 @@ export default class StorefrontCore {
   // ==========================================================
 
   /**
-   * Returns the current browser URL state.
-   * @returns {Object} { pathname, hash, params }
+   * Returns the current browser URL state
    */
   getCurrentRoute() {
     return {
-        pathname: window.location.pathname,
-        hash: window.location.hash.toLowerCase(),
-        params: new URLSearchParams(window.location.search)
+      pathname: window.location.pathname,
+      hash: window.location.hash.toLowerCase(),
+      params: new URLSearchParams(window.location.search)
     };
   }
 
   /**
-   * Restores Cartique UI state from the current URL.
-   * Called once after initialisation.
+   * Restores Cartique UI state from the current URL
    */
-  restoreStateFromUrl() {
+  async restoreStateFromUrl() {
     console.log('🔍 1. restoreStateFromUrl() called');
-    this.restoreCartState();
+    await this.restoreCartState();
   }
 
   /**
-   * Restores cart state from URL.
-   * Checks for #cart hash or ?ui=cart query parameter.
+   * Restores cart state from URL
    */
   restoreCartState() {
     console.log('🔍 2. restoreCartState() called');
     const route = this.getCurrentRoute();
     console.log('🔍    route.hash:', route.hash);
     console.log('🔍    route.params.get("ui"):', route.params.get('ui'));
-    
+
     if (route.hash === '#cart' || route.params.get('ui') === 'cart') {
-        console.log('🔍 3. Cart route detected — calling openCart()');
-        this.openCart();
+      console.log('🔍 3. Cart route detected — calling openCart()');
+      this.openCart();
     }
   }
 
   /**
-   * Restores search state from URL.
-   * Checks for ?search=query parameter.
+   * Restores search state from URL
    */
-  restoreSearchState() {
+  async restoreSearchState() {
     const route = this.getCurrentRoute();
     const query = route.params.get('search');
 
     if (query !== null) {
-        this.performSearch(query);
+      await this.performSearch(query);
     }
   }
 
   /**
-   * Registers a URL state restorer function.
-   * Prevents duplicate registration of the same restorer.
-   * Restorers are executed in registration order.
-   * 
-   * @param {Function} restorer - The restorer function
+   * Registers a URL state restorer function
    */
   registerUrlStateRestorer(restorer) {
     if (typeof restorer !== 'function') {
-        return;
+      return;
     }
-
     if (!this.urlStateRestorers.includes(restorer)) {
-        this.urlStateRestorers.push(restorer);
+      this.urlStateRestorers.push(restorer);
     }
   }
 
@@ -237,51 +235,38 @@ export default class StorefrontCore {
   // ==========================================================
 
   /**
-   * Sets the current search query and executes the search operation.
-   * This is the only supported public way to change search state.
-   * 
-   * @param {string} query - The search/filter query
-   * @example cartique.setSearchQuery("oud");
+   * Sets the current search query
    */
-  setSearchQuery(query = '') {
-    this.performSearch(query);
+  async setSearchQuery(query = '') {
+    await this.performSearch(query);
   }
 
   /**
-   * Clears the current search query.
-   * @example cartique.clearSearchQuery();
+   * Clears the current search query
    */
-  clearSearchQuery() {
-    this.setSearchQuery('');
+  async clearSearchQuery() {
+    await this.setSearchQuery('');
   }
 
   /**
-   * Returns the current search query.
-   * @returns {string} The current search query
-   * @example const query = cartique.getSearchQuery();
+   * Returns the current search query
    */
   getSearchQuery() {
     return this.currentSearchQuery;
   }
 
   /**
-   * Internal API. Do not call directly.
-   * Use setSearchQuery() from outside Cartique.
-   * 
-   * Executes the search operation against the current catalogue.
-   * Updates search state and invokes the filtering pipeline.
-   * 
-   * @param {string} rawQuery - The raw search query
+   * Executes the search operation
    */
-  performSearch(rawQuery = '') {
+  async performSearch(rawQuery = '') {
     const normalisedQuery = String(rawQuery).trim();
 
     if (normalisedQuery === this.currentSearchQuery) {
-        return;
+      return;
     }
 
     this.currentSearchQuery = normalisedQuery;
-    this.applyAllFilters();
+    await this.applyAllFilters();
   }
 
   // ==========================================================
@@ -291,7 +276,7 @@ export default class StorefrontCore {
   /**
    * Returns to the product list view
    */
-  returnToListView() {
+  async returnToListView() {
     const singleProductView = document.getElementById('single-product-view-container');
     const productDisplays = document.getElementById('cartique-product-displays');
     const sidebar = document.getElementById('cartique-sidebar');
@@ -305,23 +290,23 @@ export default class StorefrontCore {
     if (controls) controls.style.display = '';
     if (menuAnchor) menuAnchor.style.display = '';
     if (footer) footer.style.display = this.features.footerDisplay;
-    
-    // Restore full-width state based on sidebar config
+
     const mainContent = document.getElementById('cartique-main-content');
     if (mainContent) {
-        if (this.features.sidebarDisplay === 'none') {
-            mainContent.classList.add('cartique-full-width');
-        } else {
-            mainContent.classList.remove('cartique-full-width');
-        }
+      if (this.features.sidebarDisplay === 'none') {
+        mainContent.classList.add('cartique-full-width');
+      } else {
+        mainContent.classList.remove('cartique-full-width');
+      }
     }
 
     this.singleProductViewActive = false;
 
-    // Restore scroll position
     if (this.previousViewState?.scrollPosition) {
-        window.scrollTo(0, this.previousViewState.scrollPosition);
+      window.scrollTo(0, this.previousViewState.scrollPosition);
     }
+
+    await this.renderProductDisplays();
   }
 
   // ==========================================================
@@ -337,10 +322,9 @@ export default class StorefrontCore {
       this.theme.injectCSS();
       this.theme.applyTheme();
 
-
       // 1. Sync display states from features
-      const sidebarEnabled = this.features.sidebar && 
-                            (this.features.sidebarFeatures?.enabled !== false);
+      const sidebarEnabled = this.features.sidebar &&
+        (this.features.sidebarFeatures?.enabled !== false);
       this.features.sidebarDisplay = sidebarEnabled ? 'block' : 'none';
       this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
@@ -349,28 +333,28 @@ export default class StorefrontCore {
       if (!this.container) {
         throw new Error(`Container with ID "${this.features.containerId}" not found`);
       }
-      
+
       // 3. Component Loading
       await this.fetchAndExtractComponents();
-      
+
       // 4. Injects main structural components into the DOM
       await this.renderAllComponents();
 
       // 5. Prepare Product Layout Shelves
       this.initializeContainers();
-      
+
       // 6. Dynamic Filter Injection
       if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
-          this.renderSidebarFilters(); 
+        this.renderSidebarFilters();
       }
-      
+
       // 7. Initial Product Render
-      this.renderProductDisplays();
+      await this.renderProductDisplays();
 
       // 8. Interactivity & Completion
       this.setupEventListeners();
-      this.completeInitialization();
-      
+      await this.completeInitialization();
+
     } catch (error) {
       console.error('Failed to initialize Cartique:', error);
       this.notification.showErrorMessage('Failed to load product catalog');
@@ -381,20 +365,18 @@ export default class StorefrontCore {
    * Initializes product display containers
    */
   initializeContainers() {
-    // Prepare Grid Container
     const gridWrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
     const gridContainer = document.getElementById('cartique-product-grid');
     if (gridWrapper && gridContainer) {
-        gridContainer.innerHTML = ''; // Clean slate
-        gridContainer.appendChild(gridWrapper.cloneNode(true));
+      gridContainer.innerHTML = '';
+      gridContainer.appendChild(gridWrapper.cloneNode(true));
     }
 
-    // Prepare List Container
     const listWrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
     const listContainer = document.getElementById('cartique-product-list');
     if (listWrapper && listContainer) {
-        listContainer.innerHTML = ''; // Clean slate
-        listContainer.appendChild(listWrapper.cloneNode(true));
+      listContainer.innerHTML = '';
+      listContainer.appendChild(listWrapper.cloneNode(true));
     }
   }
 
@@ -403,14 +385,14 @@ export default class StorefrontCore {
    */
   async fetchAndExtractComponents() {
     const cartiqueComponents = document.getElementById('cartique-components');
-    
+
     if (!cartiqueComponents) {
       throw new Error('Could not find #cartique-components in the DOM');
     }
 
     this.templateHolder = document.createElement('template');
     this.templateHolder.innerHTML = cartiqueComponents.innerHTML;
-    
+
     if (!this.templateHolder.content) {
       throw new Error('Failed to create template holder for components');
     }
@@ -421,44 +403,41 @@ export default class StorefrontCore {
    */
   async renderAllComponents() {
     const renderMethods = [
-        this.renderMainFrame.bind(this),          
-        this.renderSidebar.bind(this),
-        this.renderCatalogueMenu.bind(this),     
-        this.renderControls.bind(this),
-        this.renderProductDisplays.bind(this),
-        this.renderFooter.bind(this),
-        this.renderCartSlider.bind(this),
-        this.renderCartItemTemplate.bind(this)
+      this.renderMainFrame.bind(this),
+      this.renderSidebar.bind(this),
+      this.renderCatalogueMenu.bind(this),
+      this.renderControls.bind(this),
+      this.renderProductDisplays.bind(this),
+      this.renderFooter.bind(this),
+      this.renderCartSlider.bind(this),
+      this.renderCartItemTemplate.bind(this)
     ];
 
     for (const method of renderMethods) {
-        try {
-            await method();
-        } catch (error) {
-            console.error(`Render failed for method: ${method.name}`, error);
-        }
+      try {
+        await method();
+      } catch (error) {
+        console.error(`Render failed for method: ${method.name}`, error);
+      }
     }
 
-    // FIX: Apply sidebar visibility
     const sidebar = document.getElementById('cartique-sidebar');
     if (sidebar) {
-        sidebar.style.display = this.features.sidebarDisplay;
-        // Toggle full-width class on main content
-        const mainContent = document.getElementById('cartique-main-content');
-        if (mainContent) {
-            if (this.features.sidebarDisplay === 'none') {
-                mainContent.classList.add('cartique-full-width');
-            } else {
-                mainContent.classList.remove('cartique-full-width');
-            }
+      sidebar.style.display = this.features.sidebarDisplay;
+      const mainContent = document.getElementById('cartique-main-content');
+      if (mainContent) {
+        if (this.features.sidebarDisplay === 'none') {
+          mainContent.classList.add('cartique-full-width');
+        } else {
+          mainContent.classList.remove('cartique-full-width');
         }
+      }
     }
 
-    // FIX: Only render sidebar filters if sidebar is enabled
-    const sidebarEnabled = this.features.sidebar && 
-                          (this.features.sidebarFeatures?.enabled !== false);
+    const sidebarEnabled = this.features.sidebar &&
+      (this.features.sidebarFeatures?.enabled !== false);
     if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
-        this.renderSidebarFilters(); 
+      this.renderSidebarFilters();
     }
   }
 
@@ -466,14 +445,13 @@ export default class StorefrontCore {
    * Sets up event listeners
    */
   setupEventListeners() {
-    // Layout toggles
     const gridButton = document.querySelector('.cartique-grid-view');
     const listButton = document.querySelector('.cartique-list-view');
-    
+
     if (gridButton) {
       this.addEventListener(gridButton, 'click', () => this.setLayout('grid'));
     }
-    
+
     if (listButton) {
       this.addEventListener(listButton, 'click', () => this.setLayout('list'));
     }
@@ -482,15 +460,14 @@ export default class StorefrontCore {
   /**
    * Completes initialization and restores state
    */
-  completeInitialization() {
+  async completeInitialization() {
     const container = document.getElementById(this.features.containerId);
     if (container) {
       container.style.visibility = 'visible';
       container.style.opacity = '1';
     }
 
-    // Restore state from URL after everything is rendered
-    this.restoreStateFromUrl();
+    await this.restoreStateFromUrl();
   }
 
   /**
@@ -499,12 +476,10 @@ export default class StorefrontCore {
   destroy() {
     this.cleanupEventListeners();
     this.clearToastTimeouts();
-    
-    // Remove any dynamically added elements
+
     const singleProductView = document.getElementById('single-product-view-container');
     if (singleProductView) singleProductView.remove();
-    
-    // Clear container
+
     if (this.container) {
       this.container.innerHTML = '';
     }
