@@ -1,23 +1,29 @@
 /**
  * @semantq/storefront/services
  *
- * NotificationService — Toast and alert management
+ * NotificationService — UI notifications
  *
- * Migrated from: cartique/storefront/src/Storefront.js
- * Phase 1: Pure extraction. No refactoring.
+ * Safe for both browser and Node.js environments.
+ * Phase 3.7.1: Removed green emoji, replaced with checkmark icon.
  */
 
 export default class NotificationService {
-    constructor(context) {
+    constructor(context = {}) {
         Object.assign(this, context);
+        this.toastTimer1 = null;
+        this.redirectTimer = null;
     }
 
     /**
      * Shows an error message
-     * @param {string} message - The error message
      */
     showErrorMessage(message) {
-        // Create and show error message
+        // Only run in browser
+        if (typeof document === 'undefined') {
+            console.warn('[NotificationService] showErrorMessage called in non-browser environment:', message);
+            return;
+        }
+
         const errorDiv = document.createElement('div');
         errorDiv.className = 'cartique-error';
         errorDiv.textContent = message;
@@ -31,43 +37,72 @@ export default class NotificationService {
             text-align: center;
         `;
         
-        this.container.prepend(errorDiv);
+        if (this.container) {
+            this.container.prepend(errorDiv);
+        } else {
+            document.body.prepend(errorDiv);
+        }
     }
 
     /**
      * Shows checkout alert toast
      */
     showCheckoutAlert() {
+        if (typeof document === 'undefined') {
+            console.warn('[NotificationService] showCheckoutAlert called in non-browser environment');
+            return;
+        }
+
         const toast = document.querySelector('.toast');
         const closeIcon = document.querySelector('.toast .close');
 
         if (!toast || !closeIcon) return;
 
-        // Clear existing timeouts
         this.clearToastTimeouts();
 
-        // Show toast
+        // Update toast content - remove green emoji, use checkmark icon
+        const svgEl = toast.querySelector('.svg');
+        if (svgEl) {
+            svgEl.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            `;
+            svgEl.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                background: #4caf50;
+                border-radius: 50%;
+                color: white;
+                flex-shrink: 0;
+            `;
+        }
+
         toast.classList.add('active');
 
-        // Close handler
         const closeHandler = () => {
             toast.classList.remove('active');
             this.clearToastTimeouts();
         };
         
-        this.addEventListener(closeIcon, 'click', closeHandler, { once: true });
+        if (this.addEventListener) {
+            this.addEventListener(closeIcon, 'click', closeHandler, { once: true });
+        } else {
+            closeIcon.addEventListener('click', closeHandler);
+        }
 
-        // Auto-hide after 5 seconds and redirect
         this.toastTimer1 = setTimeout(() => {
             toast.classList.remove('active');
         }, 5000);
 
-        // Redirect after 5 seconds
         this.redirectTimer = setTimeout(() => {
             const cart = JSON.parse(localStorage.getItem('cartiqueCart'));
             console.log('Checkout cart:', JSON.stringify(cart, null, 2));
             
-            if (this.features.checkoutUrl && this.features.checkoutUrl !== '#') {
+            if (this.features?.checkoutUrl && this.features.checkoutUrl !== '#') {
                 const mode = this.features.checkoutUrlMode || 'self';
                 if (mode === '_blank') {
                     window.open(this.features.checkoutUrl, '_blank');
@@ -80,10 +115,13 @@ export default class NotificationService {
 
     /**
      * Shows stock alert toast
-     * @param {string} message - The alert message
      */
     showStockAlert(message) {
-        // Check if toast container exists, create if not
+        if (typeof document === 'undefined') {
+            console.warn('[NotificationService] showStockAlert called in non-browser environment:', message);
+            return;
+        }
+
         let toastContainer = document.getElementById('toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
@@ -91,7 +129,6 @@ export default class NotificationService {
             document.body.appendChild(toastContainer);
         }
 
-        // Create stock alert toast following the same pattern as checkout alert
         const toast = document.createElement('div');
         toast.className = 'toast stock-alert';
         toast.innerHTML = `
@@ -105,13 +142,11 @@ export default class NotificationService {
             <button class="close">&times;</button>
         `;
 
-        // Add stock-specific styling while maintaining consistency
         toast.style.cssText = `
             background: #fff3cd;
             border-left: 4px solid #ffc107;
         `;
 
-        // Update text colors for visibility
         const titleEl = toast.querySelector('.text-1');
         const messageEl = toast.querySelector('.text-2');
         if (titleEl) titleEl.style.color = '#856404';
@@ -119,10 +154,8 @@ export default class NotificationService {
 
         toastContainer.appendChild(toast);
         
-        // Show with animation
         setTimeout(() => toast.classList.add('active'), 10);
         
-        // Close button handler
         const closeBtn = toast.querySelector('.close');
         const closeToast = () => {
             toast.classList.remove('active');
@@ -133,12 +166,10 @@ export default class NotificationService {
             closeBtn.addEventListener('click', closeToast);
         }
         
-        // Auto dismiss after 4 seconds (slightly faster than checkout since it's an error)
         const autoDismiss = setTimeout(() => {
             closeToast();
         }, 4000);
         
-        // Clean up timeout if manually closed
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
                 clearTimeout(autoDismiss);
