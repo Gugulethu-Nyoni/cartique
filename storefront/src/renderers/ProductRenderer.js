@@ -3,8 +3,8 @@
  *
  * ProductRenderer — Product presentation logic
  *
- * Migrated from: cartique/storefront/src/Storefront.js
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
+ * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  */
 
 export default class ProductRenderer {
@@ -53,7 +53,12 @@ export default class ProductRenderer {
         if (!container) {
             container = document.createElement('div');
             container.id = 'single-product-view-container';
-            document.getElementById('cartique-main-content').appendChild(container);
+            const mainContentEl = document.getElementById('cartique-main-content');
+            if (mainContentEl) {
+                mainContentEl.appendChild(container);
+            } else {
+                document.body.appendChild(container);
+            }
         }
 
         container.innerHTML = '';
@@ -683,7 +688,10 @@ export default class ProductRenderer {
             ? document.getElementById('cartique-product-grid')
             : document.getElementById('cartique-product-list');
 
-        if (!container) return;
+        if (!container) {
+            console.warn(`[ProductRenderer] Container #cartique-product-${layout} not found`);
+            return;
+        }
 
         // 1. RESET STATE: Reset the count for the infinite scroll batch
         this.itemsPerBatch = this.features.itemsPerPage || 12;
@@ -726,41 +734,45 @@ export default class ProductRenderer {
         }
     }
 
-    renderMainFrame() {
+    async renderMainFrame() {
+        // Ensure container exists
+        const containerId = this.features.containerId || 'cartique';
+        let container = this.container || document.getElementById(containerId);
+        
+        if (!container) {
+            if (this.features.debug) {
+                console.warn(`#${containerId} missing. Creating demo mount.`);
+            }
+            container = document.createElement('div');
+            container.id = containerId;
+            document.getElementById('cartique')?.appendChild(container) || document.body.appendChild(container);
+            this.container = container;
+        }
+
         const mainFrameTemplate = document.createElement('template');
         mainFrameTemplate.innerHTML = `
             <div class="cartique-container" id="cartique-container">
-                
                 <aside class="cartique-sidebar" id="cartique-sidebar" style="display: ${this.features.sidebarDisplay}">
                     <div id="cartique-menu-anchor-sidebar" class="cartique-menu-anchor"></div>
-                    <div id="cartique-sidebar-content"></div> 
+                    <div id="cartique-sidebar-content"></div>
                 </aside>
-
                 <main class="cartique-main-content" id="cartique-main-content">
-                    
                     <div id="cartique-menu-anchor-top" class="cartique-menu-anchor"></div>
-
                     <div class="cartique-controls" id="cartique-controls">
                         <div class="cartique-search-container" id="cartique-search-container"></div>
                         <div class="cartique-sort-container" id="cartique-sort-container"></div>
                         <div class="cartique-view-toggles-container" id="cartique-view-toggles-container"></div>
                         <div class="shopping-cart-icon-container" id="shopping-cart-icon-container"></div>
                     </div>
-
                     <div class="cartique-product-displays" id="cartique-product-displays">
                         <div class="cartique-product-grid" id="cartique-product-grid"></div>
                         <div class="cartique-product-list" id="cartique-product-list"></div>
                     </div>
-
                     <footer class="cartique-product-footer" id="cartique-product-footer" style="display:${this.features.footerDisplay}"></footer>
                 </main>
             </div>
-            <!--
-            <div id="cartique-hidden-blocks" style="display:none;"></div>
-            --> 
             <div id="cartique-hidden-blocks"></div>
             <div class="cart-overlay" id="cart-slide-overlay"></div>
-
             <div id="toast-container">
                 <div class="toast">
                     <div class="toast-content">
@@ -775,31 +787,61 @@ export default class ProductRenderer {
             </div>
         `;
 
-        this.container.appendChild(mainFrameTemplate.content.cloneNode(true));
+        container.appendChild(mainFrameTemplate.content.cloneNode(true));
         
-        // Set up overlay click handler
         const overlay = document.getElementById('cart-slide-overlay');
         if (overlay) {
             this.addEventListener(overlay, 'click', this.closeCart.bind(this));
         }
     }
 
-    renderSidebar() {
+    async renderSidebar() {
         const sidebarWrapper = this.templateHolder.content.getElementById('cartique-sidebar-component');
         if (!sidebarWrapper) return;
 
-        const sidebarContainer = document.getElementById('cartique-sidebar');
-        if (!sidebarContainer) return;
+        let sidebarContainer = document.getElementById('cartique-sidebar');
+        if (!sidebarContainer) {
+            // Create sidebar container if missing
+            const mainContent = document.getElementById('cartique-main-content');
+            if (mainContent) {
+                sidebarContainer = document.createElement('aside');
+                sidebarContainer.id = 'cartique-sidebar';
+                sidebarContainer.className = 'cartique-sidebar';
+                mainContent.prepend(sidebarContainer);
+            } else {
+                console.warn('No #cartique-main-content found for sidebar');
+                return;
+            }
+        }
 
         sidebarContainer.innerHTML = '';
         sidebarContainer.appendChild(sidebarWrapper.cloneNode(true));
     }
 
-    renderControls() {
+    async renderControls() {
+        // Helper to ensure container exists
+        const ensureContainer = (id) => {
+            let el = document.getElementById(id);
+            if (!el) {
+                el = document.createElement('div');
+                el.id = id;
+                const controls = document.getElementById('cartique-controls');
+                if (controls) {
+                    controls.appendChild(el);
+                } else {
+                    const mainContent = document.getElementById('cartique-main-content');
+                    if (mainContent) {
+                        mainContent.appendChild(el);
+                    }
+                }
+            }
+            return el;
+        };
+
         // Search
         const searchWrapper = this.templateHolder.content.getElementById('cartique-search-container-component');
         if (searchWrapper) {
-            const searchContainer = document.getElementById('cartique-search-container');
+            const searchContainer = ensureContainer('cartique-search-container');
             searchContainer.innerHTML = '';
             searchContainer.appendChild(searchWrapper.cloneNode(true));
             
@@ -814,7 +856,7 @@ export default class ProductRenderer {
         // Sort
         const sortWrapper = this.templateHolder.content.getElementById('cartique-sort-container-component');
         if (sortWrapper) {
-            const sortContainer = document.getElementById('cartique-sort-container');
+            const sortContainer = ensureContainer('cartique-sort-container');
             sortContainer.innerHTML = '';
             sortContainer.appendChild(sortWrapper.cloneNode(true));
             
@@ -827,7 +869,7 @@ export default class ProductRenderer {
         // View toggles
         const togglesWrapper = this.templateHolder.content.getElementById('cartique-view-toggles-container-component');
         if (togglesWrapper) {
-            const togglesContainer = document.getElementById('cartique-view-toggles-container');
+            const togglesContainer = ensureContainer('cartique-view-toggles-container');
             togglesContainer.innerHTML = '';
             togglesContainer.appendChild(togglesWrapper.cloneNode(true));
         }
@@ -835,7 +877,7 @@ export default class ProductRenderer {
         // Cart icon
         const cartIconWrapper = this.templateHolder.content.getElementById('shopping-cart-icon-container-component');
         if (cartIconWrapper) {
-            const cartIconContainer = document.getElementById('shopping-cart-icon-container');
+            const cartIconContainer = ensureContainer('shopping-cart-icon-container');
             cartIconContainer.innerHTML = '';
             cartIconContainer.appendChild(cartIconWrapper.cloneNode(true));
             
@@ -846,15 +888,26 @@ export default class ProductRenderer {
         }
     }
 
-    renderFooter() {
+    async renderFooter() {
         const wrapper = this.templateHolder.content.getElementById('cartique-product-footer-component');
-        if (wrapper) {
-            const footerContainer = document.getElementById('cartique-product-footer');
-            if (footerContainer) {
-                footerContainer.innerHTML = '';
-                footerContainer.appendChild(wrapper.firstElementChild.cloneNode(true));
+        if (!wrapper) return;
+
+        let footerContainer = document.getElementById('cartique-product-footer');
+        if (!footerContainer) {
+            const mainContent = document.getElementById('cartique-main-content');
+            if (mainContent) {
+                footerContainer = document.createElement('footer');
+                footerContainer.id = 'cartique-product-footer';
+                footerContainer.className = 'cartique-product-footer';
+                mainContent.appendChild(footerContainer);
+            } else {
+                console.warn('No #cartique-main-content found for footer');
+                return;
             }
         }
+
+        footerContainer.innerHTML = '';
+        footerContainer.appendChild(wrapper.firstElementChild.cloneNode(true));
     }
 
     async setLayout(layout) {
