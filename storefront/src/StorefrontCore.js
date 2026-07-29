@@ -131,7 +131,7 @@ export default class StorefrontCore {
       callbacks: this.callbacks
     });
 
-    // 8. Initialize Adapter
+    // 8. Initialize Adapter (SINGLE initialization - removed duplicates)
     this.adapter = new CartiqueAdapter(this.kernel, {
       legacyMode: this.features.kernelMode !== true,
       debug: this.features.debug || false,
@@ -146,7 +146,7 @@ export default class StorefrontCore {
       this.services.cart.setAdapter(this.adapter);
     }
 
-    // 10. Create minimal renderer context
+    // 10. Create minimal renderer context (NO RENDER METHODS)
     this.rendererContext = {
       // Data
       products: this.products,
@@ -157,7 +157,6 @@ export default class StorefrontCore {
       // Utilities (from imports)
       addEventListener,
       debounce,
-      cleanupEventListeners: cleanupEventListeners.bind(this),
       
       // Services
       services: this.services,
@@ -205,19 +204,6 @@ export default class StorefrontCore {
       // Formatting
       formatPrice: this.formatPrice.bind(this),
       formatDate: this.formatDate.bind(this),
-      
-      // Render methods (delegated)
-      renderMainFrame: this.renderMainFrame.bind(this),
-      renderSidebar: this.renderSidebar.bind(this),
-      renderControls: this.renderControls.bind(this),
-      renderFooter: this.renderFooter.bind(this),
-      renderCartSlider: this.renderCartSlider.bind(this),
-      renderCartItemTemplate: this.renderCartItemTemplate.bind(this),
-      renderSingleProduct: this.renderSingleProduct.bind(this),
-      renderProductDetails: this.renderProductDetails.bind(this),
-      renderProductReviews: this.renderProductReviews.bind(this),
-      renderStars: this.renderStars.bind(this),
-      submitReview: this.submitReview.bind(this),
       
       // Customer and place
       customer: this.customer || null,
@@ -389,7 +375,7 @@ export default class StorefrontCore {
   }
 
   // ==========================================================
-  // DELEGATED RENDERER METHODS
+  // DELEGATED RENDERER METHODS (KEEP THESE)
   // ==========================================================
 
   /**
@@ -453,34 +439,6 @@ export default class StorefrontCore {
    */
   async submitReview(form, product) {
     await this.productRenderer.submitReview(form, product);
-  }
-
-  /**
-   * Renders the main frame
-   */
-  async renderMainFrame() {
-    await this.productRenderer.renderMainFrame();
-  }
-
-  /**
-   * Renders the sidebar
-   */
-  async renderSidebar() {
-    await this.productRenderer.renderSidebar();
-  }
-
-  /**
-   * Renders controls
-   */
-  async renderControls() {
-    await this.productRenderer.renderControls();
-  }
-
-  /**
-   * Renders the footer
-   */
-  async renderFooter() {
-    await this.productRenderer.renderFooter();
   }
 
   /**
@@ -600,36 +558,6 @@ export default class StorefrontCore {
       await this.collectionRenderer.loadMoreProducts();
     } catch (error) {
       console.warn('loadMoreProducts failed:', error.message);
-    }
-  }
-
-  /**
-   * Renders the cart slider
-   */
-  async renderCartSlider() {
-    if (!this.cartRenderer) {
-      console.warn('CartRenderer not available');
-      return;
-    }
-    try {
-      await this.cartRenderer.renderCartSlider();
-    } catch (error) {
-      console.warn('renderCartSlider failed:', error.message);
-    }
-  }
-
-  /**
-   * Renders the cart item template
-   */
-  async renderCartItemTemplate() {
-    if (!this.cartRenderer) {
-      console.warn('CartRenderer not available');
-      return;
-    }
-    try {
-      await this.cartRenderer.renderCartItemTemplate();
-    } catch (error) {
-      console.warn('renderCartItemTemplate failed:', error.message);
     }
   }
 
@@ -765,8 +693,6 @@ export default class StorefrontCore {
 
       // Update notification container
       this.notification.container = this.container;
-
-      // Update renderer context container
       this.rendererContext.container = this.container;
 
       // 3. Component Loading
@@ -775,18 +701,10 @@ export default class StorefrontCore {
       // 4. Injects main structural components into the DOM
       await this.renderAllComponents();
 
-      // 5. Prepare Product Layout Shelves
-      this.initializeContainers();
-
-      // 6. Dynamic Filter Injection
-      if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
-        this.renderSidebarFilters();
-      }
-
-      // 7. Initial Product Render
+      // 5. Initial Product Render
       await this.renderProductDisplays();
 
-      // 8. Interactivity & Completion
+      // 6. Interactivity & Completion
       this.setupEventListeners();
       await this.completeInitialization();
 
@@ -794,13 +712,6 @@ export default class StorefrontCore {
       console.error('Failed to initialize Cartique:', error);
       this.notification.showErrorMessage('Failed to load product catalog');
     }
-  }
-
-  /**
-   * Initializes product display containers
-   */
-  initializeContainers() {
-    this.productRenderer.initializeContainers();
   }
 
   /**
@@ -830,51 +741,39 @@ export default class StorefrontCore {
   }
 
   /**
-   * Renders all main components
+   * Renders all main components — calls renderers directly
    */
   async renderAllComponents() {
-    // Check if container exists
-    if (!this.container) {
-      console.warn('Container not found, skipping renderAllComponents');
-      return;
-    }
-
-    // Use the product renderer for main frame
     try {
       await this.productRenderer.renderMainFrame();
     } catch (e) {
       console.warn('renderMainFrame failed:', e.message);
     }
 
-    // Use the product renderer for sidebar
     try {
       await this.productRenderer.renderSidebar();
     } catch (e) {
       console.warn('renderSidebar failed:', e.message);
     }
 
-    // Use the collection renderer for menu
     try {
       await this.collectionRenderer.renderCatalogueMenu();
     } catch (e) {
       console.warn('renderCatalogueMenu failed:', e.message);
     }
 
-    // Use the product renderer for controls
     try {
       await this.productRenderer.renderControls();
     } catch (e) {
       console.warn('renderControls failed:', e.message);
     }
 
-    // Use the product renderer for footer
     try {
       await this.productRenderer.renderFooter();
     } catch (e) {
       console.warn('renderFooter failed:', e.message);
     }
 
-    // Use the cart renderer
     try {
       await this.cartRenderer.renderCartSlider();
     } catch (e) {
@@ -901,10 +800,15 @@ export default class StorefrontCore {
       }
     }
 
+    // Render sidebar filters if enabled
     const sidebarEnabled = this.features.sidebar &&
       (this.features.sidebarFeatures?.enabled !== false);
     if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
-      this.renderSidebarFilters();
+      try {
+        await this.collectionRenderer.renderSidebarFilters();
+      } catch (e) {
+        console.warn('renderSidebarFilters failed:', e.message);
+      }
     }
   }
 
@@ -916,11 +820,11 @@ export default class StorefrontCore {
     const listButton = document.querySelector('.cartique-list-view');
 
     if (gridButton) {
-      addEventListener(gridButton, 'click', () => this.setLayout('grid'));
+      this.addEventListener(gridButton, 'click', () => this.setLayout('grid'));
     }
 
     if (listButton) {
-      addEventListener(listButton, 'click', () => this.setLayout('list'));
+      this.addEventListener(listButton, 'click', () => this.setLayout('list'));
     }
   }
 
