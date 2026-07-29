@@ -7,11 +7,19 @@
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks.
  * Phase 3.6.3: Callback-based UI interactions.
+ * Phase 3.7.1: Shared state integration.
+ *
+ * Single ownership: Layout + Product Display
  */
 
 export default class ProductRenderer {
-    constructor(context) {
+    constructor(context = {}) {
         Object.assign(this, context);
+        
+        // Validate shared state
+        if (!this.state) {
+            throw new Error('ProductRenderer requires shared state object');
+        }
         
         // Ensure eventListeners exists
         if (!this.eventListeners) {
@@ -48,11 +56,13 @@ export default class ProductRenderer {
             };
         }
         
-        // Callback properties (set by StorefrontCore)
+        // CALLBACK CONTRACT
         this.onSearch = null;
         this.onSort = null;
-        this.onProductClick = null;
         this.onBackToList = null;
+        this.onFilterChange = null;
+        this.onClearFilters = null;
+        this.onLayoutChange = null;
     }
 
     async renderSingleProduct(product) {
@@ -63,9 +73,9 @@ export default class ProductRenderer {
 
         // Save current state
         this.previousViewState = {
-            layout: this.currentLayout,
-            searchQuery: this.currentSearchQuery,
-            sortType: this.currentSortType,
+            layout: this.state.currentLayout,
+            searchQuery: this.state.currentSearchQuery,
+            sortType: this.state.currentSortType,
             scrollPosition: window.scrollY
         };
 
@@ -88,9 +98,10 @@ export default class ProductRenderer {
             mainContent.classList.add('cartique-full-width');
         }
         
-        this.singleProductViewActive = true;
+        this.state.singleProductViewActive = true;
+        this.singleProductViewActive = true; // Legacy alias
         
-        // Render the single product view (this is the actual rendering part)
+        // Render the single product view
         let container = document.getElementById('single-product-view-container');
         
         if (!container) {
@@ -214,7 +225,7 @@ export default class ProductRenderer {
                         ${priceHTML}
                         <p class="product-description">${product.description || ''}</p>
                     </div>
-                    <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+                    <button class="spv-cartique_add_to_cart" data-product-id="${product.id}">ADD TO CART</button>
                 </div>
             </div>
             <div class="product-tabs-container">
@@ -238,11 +249,8 @@ export default class ProductRenderer {
 
         if (backBtn && this.addEventListener) {
             this.addEventListener(backBtn, 'click', () => {
-                // Use callback if available, otherwise fallback
                 if (typeof this.onBackToList === 'function') {
                     this.onBackToList();
-                } else if (typeof this.returnToListView === 'function') {
-                    this.returnToListView();
                 }
             });
         }
@@ -507,26 +515,23 @@ export default class ProductRenderer {
         }
         // --- END BULK PRICING ---
 
-        // Add image click handler - use callback if available
+        // Image click handler — calls renderSingleProduct directly
         const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
         if (imgContainer && this.addEventListener) {
             imgContainer.dataset.productId = product.id;
             imgContainer.style.cursor = 'pointer';
-            this.addEventListener(imgContainer, 'click', (e) => {
+            this.addEventListener(imgContainer, 'click', async (e) => {
                 e.preventDefault();
-                // Use callback if available
-                if (typeof this.onProductClick === 'function') {
-                    this.onProductClick(product);
-                } else if (typeof this.showSingleProductView === 'function') {
-                    this.showSingleProductView(product.id);
+                if (typeof this.renderSingleProduct === 'function') {
+                    await this.renderSingleProduct(product);
                 }
             });
         }
 
-        // Add to cart button
+        // Add to cart button — use dataset instead of id
         const addToCartBtn = productCardTemplate.querySelector('.cartique_add_to_cart');
         if (addToCartBtn && this.addEventListener) {
-            addToCartBtn.id = product.id;
+            addToCartBtn.dataset.productId = product.id;
             this.addEventListener(addToCartBtn, 'click', (e) => {
                 if (typeof this.addToCart === 'function') {
                     this.addToCart(e);
@@ -624,17 +629,15 @@ export default class ProductRenderer {
         }
         // --- END BULK PRICING ---
 
-        // Image click handler - use callback if available
+        // Image click handler — calls renderSingleProduct directly
         const imgContainer = productListingTemplate.querySelector('.cartique_product_image_container');
         if (imgContainer && this.addEventListener) {
             imgContainer.dataset.productId = product.id;
             imgContainer.style.cursor = 'pointer';
-            this.addEventListener(imgContainer, 'click', (e) => {
+            this.addEventListener(imgContainer, 'click', async (e) => {
                 e.preventDefault();
-                if (typeof this.onProductClick === 'function') {
-                    this.onProductClick(product);
-                } else if (typeof this.showSingleProductView === 'function') {
-                    this.showSingleProductView(product.id);
+                if (typeof this.renderSingleProduct === 'function') {
+                    await this.renderSingleProduct(product);
                 }
             });
         }
@@ -645,9 +648,10 @@ export default class ProductRenderer {
             img.decoding = 'async';
         }
 
+        // Add to cart button — use dataset instead of id
         const addToCartBtn = productListingTemplate.querySelector('.cartique_add_to_cart');
         if (addToCartBtn && this.addEventListener) {
-            addToCartBtn.id = product.id;
+            addToCartBtn.dataset.productId = product.id;
             this.addEventListener(addToCartBtn, 'click', (e) => {
                 if (typeof this.addToCart === 'function') {
                     this.addToCart(e);
@@ -860,8 +864,8 @@ export default class ProductRenderer {
     }
 
     async renderProductDisplays() {
-        const displayData = this.filteredProducts || this.products || [];
-        const layout = this.currentLayout || 'grid';
+        const displayData = this.state.filteredProducts || this.products || [];
+        const layout = this.state.currentLayout || 'grid';
 
         const gridContainer = document.getElementById('cartique-product-grid');
         const listContainer = document.getElementById('cartique-product-list');
@@ -893,11 +897,14 @@ export default class ProductRenderer {
             return;
         }
 
-        this.itemsPerBatch = this.features?.itemsPerPage || 12;
-        this.loadedCount = this.itemsPerBatch;
+        this.state.itemsPerBatch = this.features?.itemsPerPage || 12;
+        this.state.loadedCount = this.state.itemsPerBatch;
+        this.itemsPerBatch = this.state.itemsPerBatch;
+        this.loadedCount = this.state.loadedCount;
+        
         container.innerHTML = '';
         
-        const productsToRender = data || this.filteredProducts || [];
+        const productsToRender = data || this.state.filteredProducts || [];
 
         if (productsToRender.length === 0) {
             container.innerHTML = `
@@ -910,7 +917,7 @@ export default class ProductRenderer {
             return;
         }
 
-        const initialSlice = productsToRender.slice(0, this.itemsPerBatch);
+        const initialSlice = productsToRender.slice(0, this.state.itemsPerBatch);
         const fragment = document.createDocumentFragment();
         
         for (const product of initialSlice) {
@@ -929,7 +936,7 @@ export default class ProductRenderer {
 
         container.appendChild(fragment);
 
-        if (productsToRender.length > this.itemsPerBatch && typeof this.setupInfiniteScroll === 'function') {
+        if (productsToRender.length > this.state.itemsPerBatch && typeof this.setupInfiniteScroll === 'function') {
             this.setupInfiniteScroll();
         }
     }
@@ -1042,7 +1049,7 @@ export default class ProductRenderer {
             return el;
         };
 
-        // Search - use onSearch callback
+        // Search — uses onSearch callback
         const searchWrapper = this.templateHolder?.content?.getElementById('cartique-search-container-component');
         if (searchWrapper) {
             const searchContainer = ensureContainer('cartique-search-container');
@@ -1066,7 +1073,7 @@ export default class ProductRenderer {
             }
         }
 
-        // Sort - use onSort callback
+        // Sort — uses onSort callback
         const sortWrapper = this.templateHolder?.content?.getElementById('cartique-sort-container-component');
         if (sortWrapper) {
             const sortContainer = ensureContainer('cartique-sort-container');
@@ -1134,15 +1141,20 @@ export default class ProductRenderer {
         footerContainer.appendChild(wrapper.firstElementChild.cloneNode(true));
     }
 
+    /**
+     * Sets the layout — delegates to StorefrontCore via callback
+     */
     async setLayout(layout) {
-        const gridContainer = document.getElementById('cartique-product-grid');
-        const listContainer = document.getElementById('cartique-product-list');
-
-        if (gridContainer && listContainer) {
-            gridContainer.style.display = layout === 'grid' ? 'grid' : 'none';
-            listContainer.style.display = layout === 'list' ? 'block' : 'none';
-            this.currentLayout = layout;
-            await this.renderProducts(layout);
+        if (!['grid', 'list'].includes(layout)) {
+            console.warn('Invalid layout:', layout);
+            return;
+        }
+        
+        if (this.state.currentLayout === layout) return;
+        
+        // Delegate to StorefrontCore via callback
+        if (typeof this.onLayoutChange === 'function') {
+            this.onLayoutChange(layout);
         }
     }
 }
