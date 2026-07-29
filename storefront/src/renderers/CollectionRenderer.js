@@ -6,6 +6,7 @@
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks and recursion prevention.
+ * Phase 3.6.3: Callback-based UI interactions.
  */
 
 export default class CollectionRenderer {
@@ -29,9 +30,43 @@ export default class CollectionRenderer {
             };
         }
         
-        // Prevent recursion flag
+        // Prevent recursion flags
         this._isRenderingMenu = false;
         this._isRenderingFilters = false;
+        
+        // Callback properties (set by StorefrontCore)
+        this.onFilterApplied = null;
+        this.onCategorySelect = null;
+    }
+
+    /**
+     * Handles search query from ProductRenderer
+     * @param {string} query - The search query
+     */
+    handleSearch(query) {
+        this.currentSearchQuery = query || '';
+        this.applyAllFilters();
+    }
+
+    /**
+     * Handles sort from ProductRenderer
+     * @param {string} sortType - The sort type (price-asc, price-desc, title-asc, title-desc)
+     */
+    handleSort(sortType) {
+        if (!sortType) return;
+        
+        this.currentSortType = sortType;
+        this.applyAllFilters();
+    }
+
+    /**
+     * Returns to product list view (called from ProductRenderer)
+     */
+    handleBackToList() {
+        // Reset single product view state
+        this.singleProductViewActive = false;
+        // Re-render products
+        this.applyAllFilters();
     }
 
     /**
@@ -106,9 +141,12 @@ export default class CollectionRenderer {
                         // Re-render menu WITHOUT recursion
                         await this._renderMenuInternal();
                         
-                        // Apply filters via callback
-                        if (typeof this.applyAllFilters === 'function') {
-                            await this.applyAllFilters();
+                        // Apply filters and notify
+                        await this.applyAllFilters();
+                        
+                        // Trigger callback if set
+                        if (typeof this.onCategorySelect === 'function') {
+                            this.onCategorySelect(this.activeCategoryId);
                         }
                     });
                 }
@@ -171,9 +209,7 @@ export default class CollectionRenderer {
             });
         }
 
-        if (typeof this.renderProductDisplays === 'function') {
-            await this.renderProductDisplays();
-        }
+        await this._notifyFilterApplied();
     }
 
     /**
@@ -184,6 +220,7 @@ export default class CollectionRenderer {
         if (!this.products || !Array.isArray(this.products)) {
             console.warn('Products not available for filtering');
             this.filteredProducts = [];
+            await this._notifyFilterApplied();
             return;
         }
 
@@ -209,8 +246,8 @@ export default class CollectionRenderer {
             // 2. Search Query Filter
             const query = this.currentSearchQuery || '';
             const matchesSearch = !query || 
-                (product.title?.toLowerCase().includes(query) || 
-                 product.description?.toLowerCase().includes(query));
+                (product.title?.toLowerCase().includes(query.toLowerCase()) || 
+                 product.description?.toLowerCase().includes(query.toLowerCase()));
 
             if (!matchesSearch) return false;
 
@@ -239,8 +276,50 @@ export default class CollectionRenderer {
             return matchesAttributes;
         });
 
+        // Apply sort if active
+        if (this.currentSortType) {
+            this._applySort();
+        }
+
         this.loadedCount = 0;
-        if (typeof this.renderProductDisplays === 'function') {
+        await this._notifyFilterApplied();
+    }
+
+    /**
+     * Apply sort to filtered products
+     */
+    _applySort() {
+        const sortType = this.currentSortType;
+        if (!sortType || !this.filteredProducts) return;
+
+        switch (sortType) {
+            case 'price-asc':
+                this.filteredProducts.sort((a, b) => (a.price || 0) - (b.price || 0));
+                break;
+            case 'price-desc':
+                this.filteredProducts.sort((a, b) => (b.price || 0) - (a.price || 0));
+                break;
+            case 'title-asc':
+                this.filteredProducts.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                break;
+            case 'title-desc':
+                this.filteredProducts.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Notify that filters have been applied
+     * Calls onFilterApplied callback if set
+     */
+    async _notifyFilterApplied() {
+        // Update the product renderer with filtered products
+        if (typeof this.onFilterApplied === 'function') {
+            await this.onFilterApplied(this.filteredProducts);
+        } else if (typeof this.renderProductDisplays === 'function') {
+            // Fallback: call renderProductDisplays directly
             await this.renderProductDisplays();
         }
     }
@@ -464,9 +543,7 @@ export default class CollectionRenderer {
         });
 
         this.activeFilters = activeFilters;
-        if (typeof this.applyAllFilters === 'function') {
-            await this.applyAllFilters();
-        }
+        await this.applyAllFilters();
     }
 
     /**
@@ -570,12 +647,12 @@ export default class CollectionRenderer {
         this.activeFilters = {};
         this.filteredProducts = null;
         this.loadedCount = 0;
+        this.currentSearchQuery = '';
+        this.currentSortType = '';
+        this.activeCategoryId = null;
 
-        const layout = this.currentLayout || 'grid';
-        if (typeof this.renderProducts === 'function') {
-            await this.renderProducts(layout, this.products);
-        }
-        
+        // Re-render
+        await this.applyAllFilters();
         console.log('Filters cleared, state reset.');
     }
 
@@ -731,40 +808,5 @@ export default class CollectionRenderer {
             console.log(`Success: Added ${nextBatch.length} items. Total: ${this.loadedCount}`);
             console.groupEnd();
         }, 400);
-    }
-
-    /**
-     * Handles sort
-     */
-    async handleSort(event) {
-        const sortType = event?.target?.value;
-        if (!sortType) return;
-        
-        this.currentSortType = sortType;
-
-        const sortedProducts = [...(this.filteredProducts || this.products || [])];
-
-        switch (sortType) {
-            case 'price-asc':
-                sortedProducts.sort((a, b) => (a.price || 0) - (b.price || 0));
-                break;
-            case 'price-desc':
-                sortedProducts.sort((a, b) => (b.price || 0) - (a.price || 0));
-                break;
-            case 'title-asc':
-                sortedProducts.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                break;
-            case 'title-desc':
-                sortedProducts.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
-                break;
-            default:
-                break;
-        }
-
-        this.filteredProducts = sortedProducts;
-        this.loadedCount = 0;
-        if (typeof this.renderProductDisplays === 'function') {
-            await this.renderProductDisplays();
-        }
     }
 }
