@@ -4,69 +4,91 @@
  * CartRenderer — Cart presentation logic
  *
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
+ * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  */
 
 export default class CartRenderer {
-    constructor(context) {
+    constructor(context = {}) {
         Object.assign(this, context);
     }
 
     /**
      * Renders the cart slider
      */
-    renderCartSlider() {
-        const wrapper = this.templateHolder.content.getElementById('cartique-cart-slider-component');
-        if (!wrapper) return;
+    async renderCartSlider() {
+        const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-slider-component');
+        if (!wrapper) {
+            console.warn('Cart slider component template not found');
+            return;
+        }
 
-        const cartSlider = wrapper.firstElementChild.cloneNode(true);
-        const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
-        
-        if (hiddenBlocks) {
-            hiddenBlocks.appendChild(cartSlider);
-            
-            // Close button
-            const closeBtn = cartSlider.querySelector('#cart-close-btn');
-            if (closeBtn) {
-                this.addEventListener(closeBtn, 'click', this.closeCart.bind(this));
-            }
+        const cartSlider = wrapper.firstElementChild?.cloneNode(true);
+        if (!cartSlider) {
+            console.warn('Cart slider element not found in template');
+            return;
+        }
 
-            // FIX: Checkout - use the button directly, not the link
-            const checkoutBtn = cartSlider.querySelector('#checkout-btn');
-            if (checkoutBtn) {
-                this.addEventListener(checkoutBtn, 'click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.checkout();
-                });
-            }
+        let hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+        if (!hiddenBlocks) {
+            hiddenBlocks = document.createElement('div');
+            hiddenBlocks.id = 'cartique-hidden-blocks';
+            document.body.appendChild(hiddenBlocks);
+        }
 
-            // View Cart button
-            const viewCartBtn = cartSlider.querySelector('#view-cart-btn');
-            if (viewCartBtn) {
-                this.addEventListener(viewCartBtn, 'click', (e) => {
-                    e.preventDefault();
-                    this.showCartPage();
-                });
-            }
+        hiddenBlocks.appendChild(cartSlider);
+
+        // Close button
+        const closeBtn = cartSlider.querySelector('#cart-close-btn');
+        if (closeBtn) {
+            this.addEventListener(closeBtn, 'click', this.closeCart.bind(this));
+        }
+
+        // Checkout button
+        const checkoutBtn = cartSlider.querySelector('#checkout-btn');
+        if (checkoutBtn) {
+            this.addEventListener(checkoutBtn, 'click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.checkout();
+            });
+        }
+
+        // View Cart button
+        const viewCartBtn = cartSlider.querySelector('#view-cart-btn');
+        if (viewCartBtn) {
+            this.addEventListener(viewCartBtn, 'click', (e) => {
+                e.preventDefault();
+                this.showCartPage();
+            });
         }
     }
 
     /**
      * Renders the cart item template
      */
-    renderCartItemTemplate() {
-        const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component');
-        if (!wrapper) return;
-
-        const itemTemplate = wrapper.firstElementChild.cloneNode(true);
-        const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
-        
-        if (hiddenBlocks) {
-            // FIX: Add a class to identify this as the template and hide it
-            itemTemplate.classList.add('cart-item-template');
-            itemTemplate.style.display = 'none';
-            hiddenBlocks.appendChild(itemTemplate);
+    async renderCartItemTemplate() {
+        const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-item-component');
+        if (!wrapper) {
+            console.warn('Cart item template not found');
+            return;
         }
+
+        const itemTemplate = wrapper.firstElementChild?.cloneNode(true);
+        if (!itemTemplate) {
+            console.warn('Cart item element not found in template');
+            return;
+        }
+
+        let hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+        if (!hiddenBlocks) {
+            hiddenBlocks = document.createElement('div');
+            hiddenBlocks.id = 'cartique-hidden-blocks';
+            document.body.appendChild(hiddenBlocks);
+        }
+
+        itemTemplate.classList.add('cart-item-template');
+        itemTemplate.style.display = 'none';
+        hiddenBlocks.appendChild(itemTemplate);
     }
 
     /**
@@ -78,7 +100,10 @@ export default class CartRenderer {
         const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const mainContent = document.getElementById('cartique-main-content');
         
-        if (!mainContent) return;
+        if (!mainContent) {
+            console.warn('Main content container not found for cart page');
+            return;
+        }
 
         // Remove existing cart page if any
         const existingCartPage = document.getElementById('cartique-cart-page');
@@ -107,22 +132,28 @@ export default class CartRenderer {
             
             for (const product of cart) {
                 // Get variant using adapter
-                const variant = this.adapter.resolveVariant(product, product.variantId || product.id);
+                const variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
                 const quantity = product.cart_quantity || 1;
                 
                 // Get CommercialDecision from adapter
-                const decision = await this.adapter.resolvePricing({
-                    sellable: { variants: [variant] },
-                    variant: variant,
-                    quantity: quantity,
-                    customer: this.customer,
-                    place: this.place
-                });
+                let decision;
+                try {
+                    decision = await this.adapter?.resolvePricing({
+                        sellable: { variants: [variant] },
+                        variant: variant,
+                        quantity: quantity,
+                        customer: this.customer,
+                        place: this.place
+                    });
+                } catch (e) {
+                    console.warn('Pricing resolution failed for cart item:', e.message);
+                    decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
+                }
 
                 // Extract data from CommercialDecision directly
-                const item = decision.items?.[0] || {};
-                const adjustments = decision.adjustments || [];
-                const totals = decision.totals || {};
+                const item = decision?.items?.[0] || {};
+                const adjustments = decision?.adjustments || [];
+                const totals = decision?.totals || {};
                 
                 const hasBulk = adjustments.some(a => 
                     a.type === 'bulk_discount' || 
@@ -163,7 +194,6 @@ export default class CartRenderer {
                 
                 if (bulkDisplay && bulkDisplay.hasBulk) {
                     if (bulkDisplay.isBulk) {
-                        // Bulk is active - show strikethrough retail + bulk price
                         priceHTML = `
                             <span class="original-price-strikethrough">${this.currencySymbol}${this.formatPrice(bulkDisplay.retailPrice)}</span>
                             <span class="bulk-price-active">${this.currencySymbol}${this.formatPrice(bulkDisplay.unitPrice)}</span>
@@ -175,7 +205,6 @@ export default class CartRenderer {
                             </div>
                         `;
                     } else {
-                        // Bulk available but not yet active
                         priceHTML = `
                             <span class="retail-price">${this.currencySymbol}${this.formatPrice(bulkDisplay.retailPrice)}</span>
                         `;
@@ -188,7 +217,6 @@ export default class CartRenderer {
                         `;
                     }
                 } else {
-                    // No bulk pricing - standard display
                     priceHTML = `
                         <span class="retail-price">${this.currencySymbol}${this.formatPrice(product.price || variant?.price || 0)}</span>
                     `;
@@ -197,10 +225,10 @@ export default class CartRenderer {
                 itemsHTML += `
                     <div class="cart-page-item" data-product-id="${product.id}" data-variant-id="${product.variantId || ''}">
                         <div class="cart-page-item-image">
-                            <img src="${product.image}" alt="${product.title}">
+                            <img src="${product.image || ''}" alt="${product.title || ''}">
                         </div>
                         <div class="cart-page-item-details">
-                            <h3>${product.title}</h3>
+                            <h3>${product.title || ''}</h3>
                             <p class="cart-page-item-price">
                                 ${priceHTML}
                             </p>
@@ -243,8 +271,6 @@ export default class CartRenderer {
         }
 
         mainContent.appendChild(cartPage);
-
-        // Attach event listeners
         this.attachCartPageEvents(cartPage);
     }
 
@@ -255,7 +281,10 @@ export default class CartRenderer {
         const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const cartContainer = document.getElementById('cart-items-container');
         
-        if (!cartContainer) return;
+        if (!cartContainer) {
+            console.warn('Cart items container not found');
+            return;
+        }
 
         cartContainer.innerHTML = '';
 
@@ -273,10 +302,14 @@ export default class CartRenderer {
 
         // Render cart items
         for (const product of cart) {
-            const wrapper = this.templateHolder.content.getElementById('cartique-cart-item-component');
-            if (!wrapper) return;
+            const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-item-component');
+            if (!wrapper) {
+                console.warn('Cart item template not found');
+                continue;
+            }
 
-            const cartItem = wrapper.firstElementChild.cloneNode(true);
+            const cartItem = wrapper.firstElementChild?.cloneNode(true);
+            if (!cartItem) continue;
             
             // Update product data
             await this.updateCartItem(cartItem, product);
@@ -285,17 +318,23 @@ export default class CartRenderer {
             this.addCartItemEventListeners(cartItem, product.id);
             
             // Calculate subtotal with bulk pricing
-            const variant = this.adapter.resolveVariant(product, product.variantId || product.id);
+            const variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
             const quantity = product.cart_quantity || 1;
-            const decision = await this.adapter.resolvePricing({
-                sellable: { variants: [variant] },
-                variant: variant,
-                quantity: quantity,
-                customer: this.customer,
-                place: this.place
-            });
+            let decision;
+            try {
+                decision = await this.adapter?.resolvePricing({
+                    sellable: { variants: [variant] },
+                    variant: variant,
+                    quantity: quantity,
+                    customer: this.customer,
+                    place: this.place
+                });
+            } catch (e) {
+                console.warn('Pricing resolution failed for cart item:', e.message);
+                decision = { totals: { subtotal: { amount: 0 } } };
+            }
             
-            const totals = decision.totals || {};
+            const totals = decision?.totals || {};
             subtotal += totals.subtotal?.amount || 0;
             
             cartContainer.appendChild(cartItem);
@@ -333,11 +372,10 @@ export default class CartRenderer {
         if (cartSlide) cartSlide.classList.remove('open');
         if (overlay) overlay.style.display = 'none';
         
-        // Hide hidden blocks after transition completes
         if (hiddenBlocks) {
             setTimeout(() => {
                 hiddenBlocks.style.display = 'none';
-            }, 350); // Match the CSS transition duration
+            }, 350);
         }
     }
 
@@ -359,7 +397,7 @@ export default class CartRenderer {
         // Get variant using adapter
         let variant = null;
         if (product.variantId) {
-            variant = this.adapter.resolveVariant(product, product.variantId);
+            variant = this.adapter?.resolveVariant(product, product.variantId);
         }
         if (!variant && product.variants && product.variants.length > 0) {
             variant = product.variants[0];
@@ -377,18 +415,24 @@ export default class CartRenderer {
         const quantity = product.cart_quantity || 1;
 
         // Get CommercialDecision from adapter
-        const decision = await this.adapter.resolvePricing({
-            sellable: { variants: [variant] },
-            variant: variant,
-            quantity: quantity,
-            customer: this.customer,
-            place: this.place
-        });
+        let decision;
+        try {
+            decision = await this.adapter?.resolvePricing({
+                sellable: { variants: [variant] },
+                variant: variant,
+                quantity: quantity,
+                customer: this.customer,
+                place: this.place
+            });
+        } catch (e) {
+            console.warn('Pricing resolution failed for cart item:', e.message);
+            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
+        }
 
         // Extract data from CommercialDecision directly
-        const item = decision.items?.[0] || {};
-        const adjustments = decision.adjustments || [];
-        const totals = decision.totals || {};
+        const item = decision?.items?.[0] || {};
+        const adjustments = decision?.adjustments || [];
+        const totals = decision?.totals || {};
         
         const hasBulk = adjustments.some(a => 
             a.type === 'bulk_discount' || 
@@ -410,7 +454,6 @@ export default class CartRenderer {
         // Update currency symbols
         currencyEls.forEach(el => el.textContent = this.currencySymbol || 'R');
 
-        // --- BULK PRICING: Cart Slide-in ---
         // Remove existing bulk status message
         const existingBulkMsg = cartItem.querySelector('.cart-bulk-status');
         if (existingBulkMsg) existingBulkMsg.remove();
@@ -435,7 +478,6 @@ export default class CartRenderer {
         };
 
         if (bulkDisplay && bulkDisplay.hasBulk) {
-            // Find the cart item details container
             const detailsDiv = cartItem.querySelector('.cart-item-details');
             if (detailsDiv) {
                 const bulkStatus = document.createElement('div');
@@ -452,7 +494,6 @@ export default class CartRenderer {
                 detailsDiv.appendChild(bulkStatus);
             }
 
-            // Update price display with strikethrough when bulk is active
             if (bulkDisplay.isBulk) {
                 if (priceEl) {
                     priceEl.textContent = this.formatPrice(bulkDisplay.retailPrice);
@@ -473,7 +514,6 @@ export default class CartRenderer {
                     if (parentSpan) parentSpan.style.display = 'inline';
                 }
             } else {
-                // Retail price - show normally
                 if (priceEl) {
                     priceEl.textContent = this.formatPrice(bulkDisplay.retailPrice);
                     priceEl.style.textDecoration = 'none';
@@ -490,7 +530,6 @@ export default class CartRenderer {
                 }
             }
         } else {
-            // No bulk pricing - standard display
             if (priceEl) {
                 priceEl.textContent = this.formatPrice(product.price || variant?.price || 0);
                 priceEl.style.textDecoration = 'none';
@@ -506,7 +545,6 @@ export default class CartRenderer {
                 if (parentSpan) parentSpan.style.display = 'none';
             }
         }
-        // --- END BULK PRICING ---
 
         // Set quantity
         const quantityInput = cartItem.querySelector('.quantity');
@@ -580,13 +618,23 @@ export default class CartRenderer {
         const index = cart.findIndex(item => item.id === productId);
 
         if (index !== -1) {
-            const product = this.products.find(p => p.id === productId);
-            const variant = this.adapter.resolveVariant(product, product.variantId);
-            const inventory = await this.adapter.resolveInventory({
-                sellable: product,
-                variant: variant
-            });
-            const availableStock = inventory.quantity || 0;
+            const product = this.products?.find(p => p.id === productId);
+            if (!product) {
+                console.warn('Product not found for quantity increase:', productId);
+                return;
+            }
+            const variant = this.adapter?.resolveVariant(product, product.variantId);
+            let inventory;
+            try {
+                inventory = await this.adapter?.resolveInventory({
+                    sellable: product,
+                    variant: variant
+                });
+            } catch (e) {
+                console.warn('Inventory resolution failed:', e.message);
+                inventory = { quantity: 10 };
+            }
+            const availableStock = inventory?.quantity || 0;
             const newQuantity = cart[index].cart_quantity + 1;
             
             if (newQuantity > availableStock) {
@@ -606,12 +654,10 @@ export default class CartRenderer {
      * Shows the full cart page
      */
     showCartPage() {
-        // Close the slide-in cart
         console.log('🔍 5. showCartPage() called');
 
         this.closeCart();
         
-        // Hide product displays and sidebar
         const productDisplays = document.getElementById('cartique-product-displays');
         const sidebar = document.getElementById('cartique-sidebar');
         const menuAnchor = document.getElementById('cartique-menu-anchor-top');
@@ -622,7 +668,6 @@ export default class CartRenderer {
         if (menuAnchor) menuAnchor.style.display = 'none';
         if (controls) controls.style.display = 'none';
         
-        // Make main content full width
         const mainContent = document.getElementById('cartique-main-content');
         if (mainContent) {
             mainContent.classList.add('cartique-full-width');
@@ -631,7 +676,6 @@ export default class CartRenderer {
         this.singleProductViewActive = true;
         this.renderCartPage();
         
-        // FIX: Scroll to top of cart page
         requestAnimationFrame(() => {
             const cartPage = document.getElementById('cartique-cart-page');
             if (cartPage) {
@@ -649,16 +693,13 @@ export default class CartRenderer {
         const cartPage = document.getElementById('cartique-cart-page');
         if (cartPage) cartPage.remove();
 
-        // Check if we came from single product view
         const singleProductView = document.getElementById('single-product-view-container');
         const wasInSingleView = singleProductView && singleProductView.style.display === 'none' && 
                                 singleProductView.innerHTML !== '';
         
         if (wasInSingleView) {
-            // Return to single product view
             if (singleProductView) singleProductView.style.display = 'block';
         } else {
-            // Return to product grid
             const productDisplays = document.getElementById('cartique-product-displays');
             const sidebar = document.getElementById('cartique-sidebar');
             const menuAnchor = document.getElementById('cartique-menu-anchor-top');
@@ -666,16 +707,15 @@ export default class CartRenderer {
             const footer = document.getElementById('cartique-product-footer');
             
             if (productDisplays) productDisplays.style.display = 'block';
-            if (sidebar) sidebar.style.display = this.features.sidebarDisplay;
+            if (sidebar) sidebar.style.display = this.features?.sidebarDisplay;
             if (menuAnchor) menuAnchor.style.display = '';
             if (controls) controls.style.display = '';
-            if (footer) footer.style.display = this.features.footerDisplay;
+            if (footer) footer.style.display = this.features?.footerDisplay;
         }
         
-        // Restore full-width state
         const mainContent = document.getElementById('cartique-main-content');
         if (mainContent) {
-            if (this.features.sidebarDisplay === 'none' || wasInSingleView) {
+            if (this.features?.sidebarDisplay === 'none' || wasInSingleView) {
                 mainContent.classList.add('cartique-full-width');
             } else {
                 mainContent.classList.remove('cartique-full-width');
@@ -691,19 +731,16 @@ export default class CartRenderer {
      * Attaches events to cart page
      */
     attachCartPageEvents(cartPage) {
-        // Back button
         const backBtn = cartPage.querySelector('#cart-page-back');
         if (backBtn) {
             this.addEventListener(backBtn, 'click', () => this.closeCartPage());
         }
 
-        // Continue shopping buttons
         const continueBtns = cartPage.querySelectorAll('#cart-page-back-btn, #cart-page-continue');
         continueBtns.forEach(btn => {
             this.addEventListener(btn, 'click', () => this.closeCartPage());
         });
 
-        // Quantity decrease buttons
         cartPage.querySelectorAll('.decrease-page-qty').forEach(btn => {
             this.addEventListener(btn, 'click', (e) => {
                 const productId = parseInt(e.target.dataset.id);
@@ -712,7 +749,6 @@ export default class CartRenderer {
             });
         });
 
-        // Quantity increase buttons
         cartPage.querySelectorAll('.increase-page-qty').forEach(btn => {
             this.addEventListener(btn, 'click', (e) => {
                 const productId = parseInt(e.target.dataset.id);
@@ -721,7 +757,6 @@ export default class CartRenderer {
             });
         });
 
-        // Remove buttons
         cartPage.querySelectorAll('.cart-page-remove').forEach(btn => {
             this.addEventListener(btn, 'click', (e) => {
                 const productId = parseInt(e.target.dataset.id);
@@ -730,7 +765,6 @@ export default class CartRenderer {
             });
         });
 
-        // Checkout button
         const checkoutBtn = cartPage.querySelector('#cart-page-checkout');
         if (checkoutBtn) {
             this.addEventListener(checkoutBtn, 'click', (e) => {
@@ -765,13 +799,23 @@ export default class CartRenderer {
         const index = cart.findIndex(item => item.id === productId);
 
         if (index !== -1) {
-            const product = this.products.find(p => p.id === productId);
-            const variant = this.adapter.resolveVariant(product, product.variantId);
-            const inventory = await this.adapter.resolveInventory({
-                sellable: product,
-                variant: variant
-            });
-            const availableStock = inventory.quantity || 0;
+            const product = this.products?.find(p => p.id === productId);
+            if (!product) {
+                console.warn('Product not found for quantity increase:', productId);
+                return;
+            }
+            const variant = this.adapter?.resolveVariant(product, product.variantId);
+            let inventory;
+            try {
+                inventory = await this.adapter?.resolveInventory({
+                    sellable: product,
+                    variant: variant
+                });
+            } catch (e) {
+                console.warn('Inventory resolution failed:', e.message);
+                inventory = { quantity: 10 };
+            }
+            const availableStock = inventory?.quantity || 0;
             const newQuantity = cart[index].cart_quantity + 1;
             
             if (newQuantity > availableStock) {
