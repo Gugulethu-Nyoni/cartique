@@ -7,6 +7,8 @@
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks and recursion prevention.
  * Phase 3.6.3: Callback-based UI interactions.
+ *
+ * Single ownership: Search, Sort, Filters, Categories
  */
 
 export default class CollectionRenderer {
@@ -45,6 +47,7 @@ export default class CollectionRenderer {
      */
     handleSearch(query) {
         this.currentSearchQuery = query || '';
+        this.rendererContext.currentSearchQuery = this.currentSearchQuery;
         this.applyAllFilters();
     }
 
@@ -54,8 +57,8 @@ export default class CollectionRenderer {
      */
     handleSort(sortType) {
         if (!sortType) return;
-        
         this.currentSortType = sortType;
+        this.rendererContext.currentSortType = sortType;
         this.applyAllFilters();
     }
 
@@ -63,9 +66,8 @@ export default class CollectionRenderer {
      * Returns to product list view (called from ProductRenderer)
      */
     handleBackToList() {
-        // Reset single product view state
         this.singleProductViewActive = false;
-        // Re-render products
+        this.rendererContext.singleProductViewActive = false;
         this.applyAllFilters();
     }
 
@@ -137,6 +139,7 @@ export default class CollectionRenderer {
                         e.preventDefault();
                         const catId = item.getAttribute('data-cat-id');
                         this.activeCategoryId = (catId === 'all') ? null : catId;
+                        this.rendererContext.activeCategoryId = this.activeCategoryId;
                         
                         // Re-render menu WITHOUT recursion
                         await this._renderMenuInternal();
@@ -282,6 +285,7 @@ export default class CollectionRenderer {
         }
 
         this.loadedCount = 0;
+        this.rendererContext.filteredProducts = this.filteredProducts;
         await this._notifyFilterApplied();
     }
 
@@ -543,6 +547,7 @@ export default class CollectionRenderer {
         });
 
         this.activeFilters = activeFilters;
+        this.rendererContext.activeFilters = activeFilters;
         await this.applyAllFilters();
     }
 
@@ -650,6 +655,11 @@ export default class CollectionRenderer {
         this.currentSearchQuery = '';
         this.currentSortType = '';
         this.activeCategoryId = null;
+        this.rendererContext.activeFilters = {};
+        this.rendererContext.filteredProducts = null;
+        this.rendererContext.currentSearchQuery = '';
+        this.rendererContext.currentSortType = '';
+        this.rendererContext.activeCategoryId = null;
 
         // Re-render
         await this.applyAllFilters();
