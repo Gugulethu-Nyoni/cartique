@@ -14,6 +14,8 @@
  *   - resolveCatalog({ search, filters, sort, page, limit })
  *   - resolveVariant(sellable, variantId)  // UI helper
  *   - getSelectedVariant(sellable)         // UI helper
+ * 
+ * Phase 2D: Returns CommercialDecision directly, no legacy wrapper.
  */
 
 export default class CartiqueAdapter {
@@ -21,6 +23,7 @@ export default class CartiqueAdapter {
         this.kernel = kernel;
         this.legacyMode = options.legacyMode ?? true;
         this.debug = options.debug ?? false;
+        this.currencySymbol = options.currencySymbol || 'USD';
     }
 
     /**
@@ -32,30 +35,38 @@ export default class CartiqueAdapter {
         this.legacyMode = mode;
     }
 
+    /**
+     * Set currency symbol
+     */
+    setCurrencySymbol(symbol) {
+        this.currencySymbol = symbol;
+    }
+
     // ==========================================================
     // STOREFRONT CONTRACT
     // ==========================================================
 
     /**
      * Resolve pricing for a single sellable
-     * Returns: Legacy pricing object (Phase 2A) or wrapped CommercialDecision (Phase 2B)
+     * Returns: CommercialDecision directly (Phase 2D)
      */
     async resolvePricing(request) {
         if (!this.legacyMode && this.kernel) {
             return this._resolveWithKernel(request);
         }
-        return this._resolveLegacy(request);
+        // Phase 2D: Return CommercialDecision even in legacy mode
+        return this._resolveLegacyToDecision(request);
     }
 
     /**
      * Resolve entire cart
-     * Returns: Legacy cart object (Phase 2A) or wrapped CommercialDecision (Phase 2B)
+     * Returns: Cart resolution with CommercialDecision items (Phase 2D)
      */
     async resolveCart(request) {
         if (!this.legacyMode && this.kernel) {
             return this._resolveCartWithKernel(request);
         }
-        return this._resolveCartLegacy(request);
+        return this._resolveCartLegacyToDecision(request);
     }
 
     /**
@@ -104,9 +115,13 @@ export default class CartiqueAdapter {
     }
 
     // ==========================================================
-    // KERNEL RESOLVERS (Phase 2B)
+    // KERNEL RESOLVERS (Phase 2B/2D)
     // ==========================================================
 
+    /**
+     * Resolve pricing with kernel
+     * Returns CommercialDecision directly
+     */
     async _resolveWithKernel(request) {
         const sellable = request.sellable;
         const quantity = request.quantity || 1;
@@ -123,34 +138,26 @@ export default class CartiqueAdapter {
                 contexts: contexts
             });
 
-            // Return wrapped response with both legacy and decision
-            return {
-                legacy: {
-                    unitPrice: decision.items?.[0]?.unitPrice?.amount || 0,
-                    totalPrice: decision.totals?.subtotal?.amount || 0,
-                    isBulk: decision.adjustments?.some(a => a.type === 'bulk_discount') || false,
-                    retailPrice: decision.items?.[0]?.comparePrice?.amount || decision.items?.[0]?.unitPrice?.amount || 0,
-                    bulkPrice: null,
-                    bulkMinimumQty: null,
-                    quantity: quantity
-                },
-                decision: decision,
-                _fromKernel: true
-            };
+            // Phase 2D: Return CommercialDecision directly
+            return decision;
         } catch (error) {
             if (this.debug) {
                 console.warn('[CartiqueAdapter] Kernel resolve failed, falling back to legacy:', error);
             }
-            return this._resolveLegacy(request);
+            return this._resolveLegacyToDecision(request);
         }
     }
 
+    /**
+     * Resolve cart with kernel
+     * Returns aggregated CommercialDecision structure
+     */
     async _resolveCartWithKernel(request) {
         const items = request.items || [];
         const decisions = [];
 
         for (const item of items) {
-            const result = await this._resolveWithKernel({
+            const decision = await this._resolveWithKernel({
                 sellable: item.sellable,
                 variant: item.variant,
                 quantity: item.quantity || 1,
@@ -158,31 +165,37 @@ export default class CartiqueAdapter {
                 place: request.place,
                 contexts: request.contexts
             });
-            decisions.push(result);
+            decisions.push(decision);
         }
 
         // Aggregate decisions
         let subtotal = 0;
         let total = 0;
+        let tax = 0;
+        let shipping = 0;
         const allAdjustments = [];
 
-        for (const result of decisions) {
-            const decision = result.decision;
+        for (const decision of decisions) {
             if (decision) {
                 subtotal += decision.totals?.subtotal?.amount || 0;
                 total += decision.totals?.total?.amount || 0;
+                tax += decision.totals?.tax?.amount || 0;
+                shipping += decision.totals?.shipping?.amount || 0;
                 if (decision.adjustments) {
                     allAdjustments.push(...decision.adjustments);
                 }
             }
         }
 
+        // Return aggregated CommercialDecision-like structure
         return {
             items: decisions,
-            subtotal: subtotal,
-            total: total,
-            tax: 0,
-            shipping: 0,
+            totals: {
+                subtotal: { amount: subtotal, currency: this.currencySymbol },
+                total: { amount: total, currency: this.currencySymbol },
+                tax: { amount: tax, currency: this.currencySymbol },
+                shipping: { amount: shipping, currency: this.currencySymbol }
+            },
             adjustments: allAdjustments,
             _fromKernel: true,
             decisions: decisions
@@ -190,73 +203,161 @@ export default class CartiqueAdapter {
     }
 
     // ==========================================================
-    // LEGACY RESOLVERS (Phase 2A — Safe fallback)
+    // LEGACY TO COMMERCIAL DECISION CONVERTERS (Phase 2D)
     // ==========================================================
 
-    _resolveLegacy(request) {
+    /**
+     * Convert legacy pricing to CommercialDecision
+     * Phase 2D: Always returns CommercialDecision
+     */
+    _resolveLegacyToDecision(request) {
         const sellable = request.sellable;
         const variant = request.variant || this.getSelectedVariant(sellable);
         const quantity = request.quantity || 1;
 
+        // Handle case where variant is null
         if (!variant) {
-            return {
-                unitPrice: 0,
-                totalPrice: 0,
-                isBulk: false,
-                retailPrice: 0,
-                bulkPrice: null,
-                bulkMinimumQty: null,
-                quantity: quantity,
-                _legacy: true
-            };
+            return this._createEmptyDecision(request);
         }
 
         const retailPrice = variant.price || 0;
+        const comparePrice = variant.comparePrice || null;
         const bulkPrice = variant.bulkPrice;
         const bulkMinQty = variant.bulkMinimumQty;
         const isBulk = bulkPrice && bulkMinQty && quantity >= bulkMinQty;
         const unitPrice = isBulk ? bulkPrice : retailPrice;
+        const totalPrice = unitPrice * quantity;
 
-        return {
-            unitPrice: unitPrice,
-            totalPrice: unitPrice * quantity,
-            isBulk: isBulk,
-            retailPrice: retailPrice,
-            bulkPrice: bulkPrice,
-            bulkMinimumQty: bulkMinQty,
+        // Build adjustments array
+        const adjustments = [];
+        if (isBulk && bulkPrice !== null) {
+            adjustments.push({
+                type: 'bulk_discount',
+                label: 'Bulk Discount',
+                amount: (retailPrice - bulkPrice) * quantity,
+                currency: this.currencySymbol,
+                metadata: {
+                    retailPrice: retailPrice,
+                    bulkPrice: bulkPrice,
+                    minimumQty: bulkMinQty,
+                    quantity: quantity,
+                    savings: (retailPrice - bulkPrice) * quantity
+                }
+            });
+        }
+
+        // Build items array
+        const items = [{
+            sellableId: sellable?.id || 'unknown',
+            variantId: variant?.id || null,
             quantity: quantity,
-            _legacy: true
+            unitPrice: {
+                amount: unitPrice,
+                currency: this.currencySymbol
+            },
+            comparePrice: comparePrice ? {
+                amount: comparePrice,
+                currency: this.currencySymbol
+            } : null,
+            total: {
+                amount: totalPrice,
+                currency: this.currencySymbol
+            },
+            metadata: {
+                isBulk: isBulk,
+                hasBulkPricing: bulkPrice !== null && bulkMinQty !== null
+            }
+        }];
+
+        // Build CommercialDecision
+        return {
+            type: 'commercial_decision',
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            items: items,
+            adjustments: adjustments,
+            totals: {
+                subtotal: {
+                    amount: totalPrice,
+                    currency: this.currencySymbol
+                },
+                total: {
+                    amount: totalPrice,
+                    currency: this.currencySymbol
+                }
+            },
+            metadata: {
+                source: 'legacy-adapter',
+                legacyMode: true
+            }
         };
     }
 
-    _resolveCartLegacy(request) {
+    /**
+     * Convert legacy cart to CommercialDecision structure
+     * Phase 2D: Always returns CommercialDecision structure
+     */
+    _resolveCartLegacyToDecision(request) {
         const items = request.items || [];
+        const decisions = [];
         let subtotal = 0;
-        const resolvedItems = [];
 
         for (const item of items) {
-            const pricing = this._resolveLegacy({
+            const decision = this._resolveLegacyToDecision({
                 sellable: item.sellable,
                 variant: item.variant || this.getSelectedVariant(item.sellable),
                 quantity: item.quantity || 1
             });
-            subtotal += pricing.totalPrice;
-            resolvedItems.push({
-                ...item,
-                pricing: pricing
-            });
+            decisions.push(decision);
+            subtotal += decision.totals?.subtotal?.amount || 0;
         }
 
         return {
-            items: resolvedItems,
-            subtotal: subtotal,
-            total: subtotal,
-            tax: 0,
-            shipping: 0,
+            items: decisions,
+            totals: {
+                subtotal: { amount: subtotal, currency: this.currencySymbol },
+                total: { amount: subtotal, currency: this.currencySymbol },
+                tax: { amount: 0, currency: this.currencySymbol },
+                shipping: { amount: 0, currency: this.currencySymbol }
+            },
             adjustments: [],
-            _legacy: true
+            _legacy: true,
+            decisions: decisions
         };
     }
+
+    /**
+     * Create an empty CommercialDecision
+     */
+    _createEmptyDecision(request) {
+        const { sellable, quantity = 1 } = request;
+        return {
+            type: 'commercial_decision',
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            items: [{
+                sellableId: sellable?.id || 'unknown',
+                variantId: null,
+                quantity: quantity,
+                unitPrice: { amount: 0, currency: this.currencySymbol },
+                comparePrice: null,
+                total: { amount: 0, currency: this.currencySymbol }
+            }],
+            adjustments: [],
+            totals: {
+                subtotal: { amount: 0, currency: this.currencySymbol },
+                total: { amount: 0, currency: this.currencySymbol }
+            },
+            metadata: {
+                source: 'empty-decision',
+                legacyMode: true
+            }
+        };
+    }
+
+    // ==========================================================
+    // LEGACY RESOLVERS (Phase 2A — Safe fallback, kept for backward compatibility)
+    // ==========================================================
 
     _resolveInventoryLegacy(request) {
         const sellable = request.sellable;
@@ -273,5 +374,65 @@ export default class CartiqueAdapter {
     _resolveCatalogLegacy(query) {
         // Legacy catalog resolution — will be replaced by kernel.query() in Phase 2B
         return { items: [], total: 0 };
+    }
+
+    // ==========================================================
+    // LEGACY COMPATIBILITY (Deprecated — Phase 2D)
+    // ==========================================================
+
+    /**
+     * @deprecated Use resolvePricing() instead
+     * Legacy wrapper for backward compatibility
+     */
+    _resolveLegacy(request) {
+        const decision = this._resolveLegacyToDecision(request);
+        const item = decision.items?.[0] || {};
+        const adjustments = decision.adjustments || [];
+        const isBulk = adjustments.some(a => a.type === 'bulk_discount');
+        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
+
+        return {
+            unitPrice: item.unitPrice?.amount || 0,
+            totalPrice: item.total?.amount || 0,
+            isBulk: isBulk,
+            retailPrice: item.comparePrice?.amount || item.unitPrice?.amount || 0,
+            bulkPrice: bulkAdjustment?.metadata?.bulkPrice || null,
+            bulkMinimumQty: bulkAdjustment?.metadata?.minimumQty || null,
+            quantity: item.quantity || 1,
+            _legacy: true
+        };
+    }
+
+    /**
+     * @deprecated Use resolveCart() instead
+     * Legacy cart wrapper for backward compatibility
+     */
+    _resolveCartLegacy(request) {
+        const result = this._resolveCartLegacyToDecision(request);
+        return {
+            items: result.items.map((decision, index) => {
+                const item = decision.items?.[0] || {};
+                const originalItem = request.items?.[index] || {};
+                return {
+                    ...originalItem,
+                    pricing: {
+                        unitPrice: item.unitPrice?.amount || 0,
+                        totalPrice: item.total?.amount || 0,
+                        isBulk: decision.adjustments?.some(a => a.type === 'bulk_discount') || false,
+                        retailPrice: item.comparePrice?.amount || item.unitPrice?.amount || 0,
+                        bulkPrice: null,
+                        bulkMinimumQty: null,
+                        quantity: item.quantity || 1,
+                        _legacy: true
+                    }
+                };
+            }),
+            subtotal: result.totals?.subtotal?.amount || 0,
+            total: result.totals?.total?.amount || 0,
+            tax: result.totals?.tax?.amount || 0,
+            shipping: result.totals?.shipping?.amount || 0,
+            adjustments: result.adjustments || [],
+            _legacy: true
+        };
     }
 }
