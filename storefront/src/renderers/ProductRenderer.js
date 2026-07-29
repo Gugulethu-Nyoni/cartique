@@ -4,7 +4,7 @@
  * ProductRenderer — Product presentation logic
  *
  * Migrated from: cartique/storefront/src/Storefront.js
- * Phase 2: Replaced legacy commerce methods with adapter calls.
+ * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  */
 
 export default class ProductRenderer {
@@ -63,30 +63,47 @@ export default class ProductRenderer {
         
         // --- BULK PRICING: Single Product View ---
         const variant = this.adapter.getSelectedVariant(product);
-        const pricingResult = await this.adapter.resolvePricing({
+        const decision = await this.adapter.resolvePricing({
             sellable: product,
             variant: variant,
             quantity: 1,
             customer: this.customer,
             place: this.place
         });
-        const pricing = pricingResult.legacy || pricingResult;
+
+        // Extract data from CommercialDecision directly
+        const item = decision.items?.[0] || {};
+        const adjustments = decision.adjustments || [];
+        const totals = decision.totals || {};
         
+        const hasBulk = adjustments.some(a => 
+            a.type === 'bulk_discount' || 
+            a.label?.toLowerCase().includes('bulk')
+        );
+        const unitPrice = item.unitPrice?.amount || 0;
+        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
+        const totalPrice = totals.subtotal?.amount || 0;
+        
+        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
+        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
+        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
+        const savings = bulkAdjustment?.metadata?.savings || 0;
+
         const bulkDisplay = {
-            hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
-            isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
-            retailPrice: pricing.retailPrice || variant?.price || 0,
-            bulkPrice: pricing.bulkPrice || null,
-            unitPrice: pricing.unitPrice || 0,
-            minimumQty: pricing.bulkMinimumQty || null,
-            heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
-            message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
-            displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
-            bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+            hasBulk: hasBulk,
+            isBulk: hasBulk,
+            retailPrice: retailPrice,
+            bulkPrice: bulkPrice,
+            unitPrice: unitPrice,
+            minimumQty: bulkMinQty,
+            heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
+            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
+            bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
             staticDisplay: {
                 label: 'BULK PRICE',
-                price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
-                minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+                price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
+                minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
             }
         };
         
@@ -102,6 +119,7 @@ export default class ProductRenderer {
                 ` : `
                     <span class="price">${this.currencySymbol}${this.formatPrice(product.price)}</span>
                 `}
+                ${hasBulk && savings > 0 ? `<span class="savings-badge">Save ${this.currencySymbol}${this.formatPrice(savings)}</span>` : ''}
             </div>
         `;
         
@@ -249,30 +267,44 @@ export default class ProductRenderer {
 
         // --- BULK PRICING: Grid Card ---
         const variant = this.adapter.getSelectedVariant(product);
-        const pricingResult = await this.adapter.resolvePricing({
+        const decision = await this.adapter.resolvePricing({
             sellable: product,
             variant: variant,
             quantity: 1,
             customer: this.customer,
             place: this.place
         });
-        const pricing = pricingResult.legacy || pricingResult;
+
+        // Extract data from CommercialDecision directly
+        const item = decision.items?.[0] || {};
+        const adjustments = decision.adjustments || [];
+        
+        const hasBulk = adjustments.some(a => 
+            a.type === 'bulk_discount' || 
+            a.label?.toLowerCase().includes('bulk')
+        );
+        const unitPrice = item.unitPrice?.amount || 0;
+        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
+        
+        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
+        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
+        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
 
         const bulkDisplay = {
-            hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
-            isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
-            retailPrice: pricing.retailPrice || variant?.price || 0,
-            bulkPrice: pricing.bulkPrice || null,
-            unitPrice: pricing.unitPrice || 0,
-            minimumQty: pricing.bulkMinimumQty || null,
-            heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
-            message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
-            displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
-            bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+            hasBulk: hasBulk,
+            isBulk: hasBulk,
+            retailPrice: retailPrice,
+            bulkPrice: bulkPrice,
+            unitPrice: unitPrice,
+            minimumQty: bulkMinQty,
+            heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
+            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
+            bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
             staticDisplay: {
                 label: 'BULK PRICE',
-                price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
-                minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+                price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
+                minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
             }
         };
 
@@ -329,30 +361,44 @@ export default class ProductRenderer {
 
         // --- BULK PRICING: List Card ---
         const variant = this.adapter.getSelectedVariant(product);
-        const pricingResult = await this.adapter.resolvePricing({
+        const decision = await this.adapter.resolvePricing({
             sellable: product,
             variant: variant,
             quantity: 1,
             customer: this.customer,
             place: this.place
         });
-        const pricing = pricingResult.legacy || pricingResult;
+
+        // Extract data from CommercialDecision directly
+        const item = decision.items?.[0] || {};
+        const adjustments = decision.adjustments || [];
+        
+        const hasBulk = adjustments.some(a => 
+            a.type === 'bulk_discount' || 
+            a.label?.toLowerCase().includes('bulk')
+        );
+        const unitPrice = item.unitPrice?.amount || 0;
+        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
+        
+        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
+        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
+        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
 
         const bulkDisplay = {
-            hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
-            isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
-            retailPrice: pricing.retailPrice || variant?.price || 0,
-            bulkPrice: pricing.bulkPrice || null,
-            unitPrice: pricing.unitPrice || 0,
-            minimumQty: pricing.bulkMinimumQty || null,
-            heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
-            message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
-            displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
-            bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+            hasBulk: hasBulk,
+            isBulk: hasBulk,
+            retailPrice: retailPrice,
+            bulkPrice: bulkPrice,
+            unitPrice: unitPrice,
+            minimumQty: bulkMinQty,
+            heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
+            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
+            bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
             staticDisplay: {
                 label: 'BULK PRICE',
-                price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
-                minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+                price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
+                minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
             }
         };
 
