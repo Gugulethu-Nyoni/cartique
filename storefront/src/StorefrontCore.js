@@ -82,6 +82,10 @@ export default class StorefrontCore {
     this.container = null;
     this.templateHolder = null;
     this.eventListeners = new Map();
+    
+    // Bind addEventListener to this instance
+    this.addEventListener = addEventListener.bind(this);
+    
     this.toastTimer1 = null;
     this.toastTimer2 = null;
     this.redirectTimer = null;
@@ -115,7 +119,8 @@ export default class StorefrontCore {
       cart: new CartService({
         products: this.products,
         features: this.features,
-        callbacks: this.callbacks
+        callbacks: this.callbacks,
+        showCart: this.showCart.bind(this)  // Pass showCart to CartService
       }),
       locale: new LocaleService({
         currencySymbol: this.currencySymbol,
@@ -127,11 +132,12 @@ export default class StorefrontCore {
     // 7. Initialize Notification Service
     this.notification = new NotificationService({
       container: this.container,
+      eventListeners: this.eventListeners,
       features: this.features,
       callbacks: this.callbacks
     });
 
-    // 8. Initialize Adapter
+    // 8. Initialize Adapter (ONLY ONCE)
     this.adapter = new CartiqueAdapter(this.kernel, {
       legacyMode: this.features.kernelMode !== true,
       debug: this.features.debug || false,
@@ -146,16 +152,17 @@ export default class StorefrontCore {
       this.services.cart.setAdapter(this.adapter);
     }
 
-    // 10. Create minimal renderer context (NO RENDER METHODS)
+    // 10. Create minimal renderer context (NO RENDER METHODS - only UI actions)
     this.rendererContext = {
       // Data
       products: this.products,
       features: this.features,
       callbacks: this.callbacks,
       container: this.container,
+      eventListeners: this.eventListeners,
       
       // Utilities (from imports)
-      addEventListener,
+      addEventListener: this.addEventListener,
       debounce,
       
       // Services
@@ -178,24 +185,12 @@ export default class StorefrontCore {
       itemsPerBatch: this.itemsPerBatch,
       loadedCount: this.loadedCount,
       
-      // UI Actions (bound methods)
+      // UI Actions (ONLY cart and layout actions)
       showCart: this.showCart.bind(this),
       closeCart: this.closeCart.bind(this),
       showCartPage: this.showCartPage.bind(this),
       closeCartPage: this.closeCartPage.bind(this),
       setLayout: this.setLayout.bind(this),
-      handleSearch: this.handleSearch.bind(this),
-      handleSort: this.handleSort.bind(this),
-      applyAllFilters: this.applyAllFilters.bind(this),
-      applyFilters: this.applyFilters.bind(this),
-      handleFilterChange: this.handleFilterChange.bind(this),
-      clearAllFilters: this.clearAllFilters.bind(this),
-      addToCart: this.services.cart.addToCart.bind(this.services.cart),
-      checkout: this.services.cart.checkout.bind(this.services.cart),
-      showSingleProductView: this.showSingleProductView.bind(this),
-      returnToListView: this.returnToListView.bind(this),
-      setupInfiniteScroll: this.setupInfiniteScroll.bind(this),
-      loadMoreProducts: this.loadMoreProducts.bind(this),
       
       // Formatting
       formatPrice: this.formatPrice.bind(this),
@@ -203,7 +198,15 @@ export default class StorefrontCore {
       
       // Customer and place
       customer: this.customer || null,
-      place: this.place || null
+      place: this.place || null,
+      
+      // Callbacks for UI interactions (set after renderer creation)
+      onSearch: null,
+      onSort: null,
+      onFilterChange: null,
+      onClearFilters: null,
+      onCategorySelect: null,
+      onProductClick: null
     };
 
     // 11. Initialize Renderers with minimal context
@@ -211,11 +214,42 @@ export default class StorefrontCore {
     this.collectionRenderer = new CollectionRenderer(this.rendererContext);
     this.cartRenderer = new CartRenderer(this.rendererContext);
 
-    // 12. Register URL state restorers
+    // 12. Wire up callbacks between renderers
+    // Search callback: ProductRenderer → CollectionRenderer
+    this.productRenderer.onSearch = (query) => {
+      this.collectionRenderer.handleSearch(query);
+    };
+    
+    // Sort callback: ProductRenderer → CollectionRenderer
+    this.productRenderer.onSort = (sortType) => {
+      this.collectionRenderer.handleSort(sortType);
+    };
+    
+    // Product click callback: ProductRenderer → ProductRenderer (self)
+    this.productRenderer.onProductClick = (product) => {
+      this.productRenderer.renderSingleProduct(product);
+    };
+    
+    // Back to list callback: ProductRenderer → CollectionRenderer
+    this.productRenderer.onBackToList = () => {
+      this.collectionRenderer.handleBackToList();
+    };
+    
+    // Filter callbacks: CollectionRenderer → ProductRenderer
+    this.collectionRenderer.onFilterApplied = (filteredProducts) => {
+      this.productRenderer.renderProductDisplays();
+    };
+    
+    // Category select callback: CollectionRenderer → ProductRenderer
+    this.collectionRenderer.onCategorySelect = () => {
+      this.productRenderer.renderProductDisplays();
+    };
+
+    // 13. Register URL state restorers
     this.registerUrlStateRestorer(this.restoreCartState);
     this.registerUrlStateRestorer(this.restoreSearchState);
 
-    // 13. Fire off the Engine
+    // 14. Fire off the Engine
     this.init();
   }
 
@@ -304,7 +338,9 @@ export default class StorefrontCore {
     const query = route.params.get('search');
 
     if (query !== null) {
-      await this.performSearch(query);
+      if (this.productRenderer && this.productRenderer.onSearch) {
+        this.productRenderer.onSearch(query);
+      }
     }
   }
 
@@ -328,14 +364,18 @@ export default class StorefrontCore {
    * Sets the current search query
    */
   async setSearchQuery(query = '') {
-    await this.performSearch(query);
+    if (this.productRenderer && this.productRenderer.onSearch) {
+      this.productRenderer.onSearch(query);
+    }
   }
 
   /**
    * Clears the current search query
    */
   async clearSearchQuery() {
-    await this.setSearchQuery('');
+    if (this.productRenderer && this.productRenderer.onSearch) {
+      this.productRenderer.onSearch('');
+    }
   }
 
   /**
@@ -345,161 +385,27 @@ export default class StorefrontCore {
     return this.currentSearchQuery;
   }
 
-  /**
-   * Executes the search operation
-   */
-  async performSearch(rawQuery = '') {
-    const normalisedQuery = String(rawQuery).trim();
-
-    if (normalisedQuery === this.currentSearchQuery) {
-      return;
-    }
-
-    this.currentSearchQuery = normalisedQuery;
-    await this.applyAllFilters();
-  }
-
   // ==========================================================
   // SINGLE PRODUCT VIEW
   // ==========================================================
 
   /**
    * Shows a single product view
-   * Delegates directly to ProductRenderer
    */
   async showSingleProductView(productId) {
-    await this.productRenderer.showSingleProductView(productId);
+    const product = this.products.find(p => p.id === productId);
+    if (product && this.productRenderer) {
+      await this.productRenderer.renderSingleProduct(product);
+    }
   }
 
   /**
    * Returns to the product list view
-   * Delegates directly to ProductRenderer
    */
   async returnToListView() {
-    await this.productRenderer.returnToListView();
-  }
-
-  // ==========================================================
-  // FILTER AND COLLECTION METHODS (Delegated to CollectionRenderer)
-  // ==========================================================
-
-  /**
-   * Applies all filters
-   * Delegates directly to CollectionRenderer
-   */
-  async applyAllFilters() {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for filters');
-      return;
+    if (this.productRenderer && this.productRenderer.onBackToList) {
+      this.productRenderer.onBackToList();
     }
-    try {
-      await this.collectionRenderer.applyAllFilters();
-    } catch (error) {
-      console.warn('applyAllFilters failed:', error.message);
-    }
-  }
-
-  /**
-   * Applies filters
-   * Delegates directly to CollectionRenderer
-   */
-  async applyFilters(activeFilters) {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for filters');
-      return;
-    }
-    try {
-      await this.collectionRenderer.applyFilters(activeFilters);
-    } catch (error) {
-      console.warn('applyFilters failed:', error.message);
-    }
-  }
-
-  /**
-   * Handles filter changes
-   * Delegates directly to CollectionRenderer
-   */
-  async handleFilterChange(element) {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for filter change');
-      return;
-    }
-    try {
-      await this.collectionRenderer.handleFilterChange(element);
-    } catch (error) {
-      console.warn('handleFilterChange failed:', error.message);
-    }
-  }
-
-  /**
-   * Clears all filters
-   * Delegates directly to CollectionRenderer
-   */
-  async clearAllFilters() {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for clear filters');
-      return;
-    }
-    try {
-      await this.collectionRenderer.clearAllFilters();
-    } catch (error) {
-      console.warn('clearAllFilters failed:', error.message);
-    }
-  }
-
-  /**
-   * Sets up infinite scroll
-   * Delegates directly to CollectionRenderer
-   */
-  setupInfiniteScroll() {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for infinite scroll');
-      return;
-    }
-    try {
-      this.collectionRenderer.setupInfiniteScroll();
-    } catch (error) {
-      console.warn('setupInfiniteScroll failed:', error.message);
-    }
-  }
-
-  /**
-   * Loads more products
-   * Delegates directly to CollectionRenderer
-   */
-  async loadMoreProducts() {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for load more');
-      return;
-    }
-    try {
-      await this.collectionRenderer.loadMoreProducts();
-    } catch (error) {
-      console.warn('loadMoreProducts failed:', error.message);
-    }
-  }
-
-  /**
-   * Handles sort
-   * Delegates directly to CollectionRenderer
-   */
-  handleSort(event) {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for sort');
-      return;
-    }
-    try {
-      this.collectionRenderer.handleSort(event);
-    } catch (error) {
-      console.warn('handleSort failed:', error.message);
-    }
-  }
-
-  /**
-   * Handles search input
-   */
-  handleSearch(event) {
-    this.performSearch(event?.target?.value);
   }
 
   // ==========================================================
@@ -508,7 +414,6 @@ export default class StorefrontCore {
 
   /**
    * Sets the layout
-   * Delegates directly to ProductRenderer
    */
   async setLayout(layout) {
     await this.productRenderer.setLayout(layout);
@@ -520,7 +425,6 @@ export default class StorefrontCore {
 
   /**
    * Shows the cart
-   * Delegates directly to CartRenderer
    */
   showCart() {
     if (!this.cartRenderer) {
@@ -536,7 +440,6 @@ export default class StorefrontCore {
 
   /**
    * Closes the cart
-   * Delegates directly to CartRenderer
    */
   closeCart() {
     if (!this.cartRenderer) {
@@ -552,7 +455,6 @@ export default class StorefrontCore {
 
   /**
    * Shows the cart page
-   * Delegates directly to CartRenderer
    */
   showCartPage() {
     if (!this.cartRenderer) {
@@ -568,7 +470,6 @@ export default class StorefrontCore {
 
   /**
    * Closes the cart page
-   * Delegates directly to CartRenderer
    */
   closeCartPage() {
     if (!this.cartRenderer) {
@@ -759,11 +660,11 @@ export default class StorefrontCore {
     const listButton = document.querySelector('.cartique-list-view');
 
     if (gridButton) {
-      addEventListener(gridButton, 'click', () => this.setLayout('grid'));
+      this.addEventListener(gridButton, 'click', () => this.setLayout('grid'));
     }
 
     if (listButton) {
-      addEventListener(listButton, 'click', () => this.setLayout('list'));
+      this.addEventListener(listButton, 'click', () => this.setLayout('list'));
     }
   }
 
