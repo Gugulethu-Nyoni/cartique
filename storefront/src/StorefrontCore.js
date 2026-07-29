@@ -14,6 +14,10 @@ import CartiqueAdapter from './adapters/CartiqueAdapter.js';
 import PricingService from './services/PricingService.js';
 import CartService from './services/CartService.js';
 import LocaleService from './services/LocaleService.js';
+// Import renderers
+import ProductRenderer from './renderers/ProductRenderer.js';
+import CollectionRenderer from './renderers/CollectionRenderer.js';
+import CartRenderer from './renderers/CartRenderer.js';
 
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
@@ -131,11 +135,51 @@ export default class StorefrontCore {
       this.services.cart.setAdapter(this.adapter);
     }
 
-    // 10. Register URL state restorers
+    // 10. Initialize Renderers with shared context
+    const rendererContext = {
+      ...this,
+      adapter: this.adapter,
+      theme: this.theme,
+      notification: this.notification,
+      services: this.services,
+      formatPrice: this.formatPrice.bind(this),
+      formatDate: this.formatDate.bind(this),
+      // Methods that need to be bound
+      addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      showCart: this.showCart.bind(this),
+      closeCart: this.closeCart.bind(this),
+      showCartPage: this.showCartPage.bind(this),
+      closeCartPage: this.closeCartPage.bind(this),
+      checkout: this.services.cart.checkout.bind(this.services.cart),
+      setLayout: this.setLayout.bind(this),
+      setupInfiniteScroll: this.setupInfiniteScroll.bind(this),
+      loadMoreProducts: this.loadMoreProducts.bind(this),
+      showSingleProductView: this.showSingleProductView.bind(this),
+      returnToListView: this.returnToListView.bind(this),
+      renderSingleProduct: this.renderSingleProduct.bind(this),
+      renderProductDetails: this.renderProductDetails.bind(this),
+      renderProductReviews: this.renderProductReviews.bind(this),
+      renderStars: this.renderStars.bind(this),
+      submitReview: this.submitReview.bind(this),
+      handleSearch: this.handleSearch.bind(this),
+      handleSort: this.handleSort.bind(this),
+      applyAllFilters: this.applyAllFilters.bind(this),
+      applyFilters: this.applyFilters.bind(this),
+      renderCatalogueMenu: this.renderCatalogueMenu.bind(this),
+      renderSidebarFilters: this.renderSidebarFilters.bind(this),
+      handleFilterChange: this.handleFilterChange.bind(this),
+      clearAllFilters: this.clearAllFilters.bind(this)
+    };
+
+    this.productRenderer = new ProductRenderer(rendererContext);
+    this.collectionRenderer = new CollectionRenderer(rendererContext);
+    this.cartRenderer = new CartRenderer(rendererContext);
+
+    // 11. Register URL state restorers
     this.registerUrlStateRestorer(this.restoreCartState);
     this.registerUrlStateRestorer(this.restoreSearchState);
 
-    // 11. Fire off the Engine
+    // 12. Fire off the Engine
     this.init();
   }
 
@@ -277,36 +321,237 @@ export default class StorefrontCore {
    * Returns to the product list view
    */
   async returnToListView() {
-    const singleProductView = document.getElementById('single-product-view-container');
-    const productDisplays = document.getElementById('cartique-product-displays');
-    const sidebar = document.getElementById('cartique-sidebar');
-    const controls = document.getElementById('cartique-controls');
-    const menuAnchor = document.getElementById('cartique-menu-anchor-top');
-    const footer = document.getElementById('cartique-product-footer');
+    await this.productRenderer.returnToListView();
+  }
 
-    if (singleProductView) singleProductView.style.display = 'none';
-    if (productDisplays) productDisplays.style.display = 'block';
-    if (sidebar) sidebar.style.display = this.features.sidebarDisplay;
-    if (controls) controls.style.display = '';
-    if (menuAnchor) menuAnchor.style.display = '';
-    if (footer) footer.style.display = this.features.footerDisplay;
+  // ==========================================================
+  // DELEGATED RENDERER METHODS
+  // ==========================================================
 
-    const mainContent = document.getElementById('cartique-main-content');
-    if (mainContent) {
-      if (this.features.sidebarDisplay === 'none') {
-        mainContent.classList.add('cartique-full-width');
-      } else {
-        mainContent.classList.remove('cartique-full-width');
-      }
+  /**
+   * Renders product displays
+   */
+  async renderProductDisplays() {
+    await this.productRenderer.renderProductDisplays();
+  }
+
+  /**
+   * Renders products in a layout
+   */
+  async renderProducts(layout, data) {
+    await this.productRenderer.renderProducts(layout, data);
+  }
+
+  /**
+   * Sets the layout
+   */
+  async setLayout(layout) {
+    await this.productRenderer.setLayout(layout);
+  }
+
+  /**
+   * Renders a single product view
+   */
+  async renderSingleProduct(product) {
+    await this.productRenderer.renderSingleProduct(product);
+  }
+
+  /**
+   * Shows a single product view
+   */
+  async showSingleProductView(productId) {
+    await this.productRenderer.showSingleProductView(productId);
+  }
+
+  /**
+   * Renders product details
+   */
+  renderProductDetails(product) {
+    return this.productRenderer.renderProductDetails(product);
+  }
+
+  /**
+   * Renders product reviews
+   */
+  renderProductReviews(product) {
+    return this.productRenderer.renderProductReviews(product);
+  }
+
+  /**
+   * Renders stars for ratings
+   */
+  renderStars(rating) {
+    return this.productRenderer.renderStars(rating);
+  }
+
+  /**
+   * Submits a review
+   */
+  async submitReview(form, product) {
+    await this.productRenderer.submitReview(form, product);
+  }
+
+  /**
+   * Renders the main frame
+   */
+  async renderMainFrame() {
+    await this.productRenderer.renderMainFrame();
+  }
+
+  /**
+   * Renders the sidebar
+   */
+  async renderSidebar() {
+    await this.productRenderer.renderSidebar();
+  }
+
+  /**
+   * Renders controls
+   */
+  async renderControls() {
+    await this.productRenderer.renderControls();
+  }
+
+  /**
+   * Renders the footer
+   */
+  async renderFooter() {
+    await this.productRenderer.renderFooter();
+  }
+
+  /**
+   * Renders the catalogue menu
+   */
+  async renderCatalogueMenu() {
+    await this.collectionRenderer.renderCatalogueMenu();
+  }
+
+  /**
+   * Applies all filters
+   */
+  async applyAllFilters() {
+    await this.collectionRenderer.applyAllFilters();
+  }
+
+  /**
+   * Applies filters
+   */
+  async applyFilters(activeFilters) {
+    await this.collectionRenderer.applyFilters(activeFilters);
+  }
+
+  /**
+   * Handles filter changes
+   */
+  async handleFilterChange(element) {
+    await this.collectionRenderer.handleFilterChange(element);
+  }
+
+  /**
+   * Clears all filters
+   */
+  async clearAllFilters() {
+    await this.collectionRenderer.clearAllFilters();
+  }
+
+  /**
+   * Renders sidebar filters
+   */
+  renderSidebarFilters() {
+    this.collectionRenderer.renderSidebarFilters();
+  }
+
+  /**
+   * Sets up infinite scroll
+   */
+  setupInfiniteScroll() {
+    this.collectionRenderer.setupInfiniteScroll();
+  }
+
+  /**
+   * Loads more products
+   */
+  async loadMoreProducts() {
+    await this.collectionRenderer.loadMoreProducts();
+  }
+
+  /**
+   * Renders the cart slider
+   */
+  async renderCartSlider() {
+    await this.cartRenderer.renderCartSlider();
+  }
+
+  /**
+   * Renders the cart item template
+   */
+  async renderCartItemTemplate() {
+    await this.cartRenderer.renderCartItemTemplate();
+  }
+
+  /**
+   * Shows the cart
+   */
+  showCart() {
+    this.cartRenderer.showCart();
+  }
+
+  /**
+   * Closes the cart
+   */
+  closeCart() {
+    this.cartRenderer.closeCart();
+  }
+
+  /**
+   * Shows the cart page
+   */
+  showCartPage() {
+    this.cartRenderer.showCartPage();
+  }
+
+  /**
+   * Closes the cart page
+   */
+  closeCartPage() {
+    this.cartRenderer.closeCartPage();
+  }
+
+  /**
+   * Handles search input
+   */
+  handleSearch(event) {
+    this.performSearch(event?.target?.value);
+  }
+
+  /**
+   * Handles sort
+   */
+  handleSort(event) {
+    this.collectionRenderer.handleSort(event);
+  }
+
+  // ==========================================================
+  // FORMATTING UTILITIES
+  // ==========================================================
+
+  /**
+   * Formats a price
+   */
+  formatPrice(price) {
+    if (price === undefined || price === null || isNaN(price)) {
+      return '0.00';
     }
+    return Number(price).toFixed(2);
+  }
 
-    this.singleProductViewActive = false;
-
-    if (this.previousViewState?.scrollPosition) {
-      window.scrollTo(0, this.previousViewState.scrollPosition);
-    }
-
-    await this.renderProductDisplays();
+  /**
+   * Formats a date
+   */
+  formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   }
 
   // ==========================================================
@@ -333,6 +578,9 @@ export default class StorefrontCore {
       if (!this.container) {
         throw new Error(`Container with ID "${this.features.containerId}" not found`);
       }
+
+      // Update notification container
+      this.notification.container = this.container;
 
       // 3. Component Loading
       await this.fetchAndExtractComponents();
@@ -365,19 +613,7 @@ export default class StorefrontCore {
    * Initializes product display containers
    */
   initializeContainers() {
-    const gridWrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
-    const gridContainer = document.getElementById('cartique-product-grid');
-    if (gridWrapper && gridContainer) {
-      gridContainer.innerHTML = '';
-      gridContainer.appendChild(gridWrapper.cloneNode(true));
-    }
-
-    const listWrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
-    const listContainer = document.getElementById('cartique-product-list');
-    if (listWrapper && listContainer) {
-      listContainer.innerHTML = '';
-      listContainer.appendChild(listWrapper.cloneNode(true));
-    }
+    this.productRenderer.initializeContainers();
   }
 
   /**
@@ -396,6 +632,11 @@ export default class StorefrontCore {
     if (!this.templateHolder.content) {
       throw new Error('Failed to create template holder for components');
     }
+
+    // Pass templateHolder to renderers
+    this.productRenderer.templateHolder = this.templateHolder;
+    this.collectionRenderer.templateHolder = this.templateHolder;
+    this.cartRenderer.templateHolder = this.templateHolder;
   }
 
   /**
@@ -407,7 +648,6 @@ export default class StorefrontCore {
       this.renderSidebar.bind(this),
       this.renderCatalogueMenu.bind(this),
       this.renderControls.bind(this),
-      this.renderProductDisplays.bind(this),
       this.renderFooter.bind(this),
       this.renderCartSlider.bind(this),
       this.renderCartItemTemplate.bind(this)
