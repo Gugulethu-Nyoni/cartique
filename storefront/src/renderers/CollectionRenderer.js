@@ -7,6 +7,7 @@
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks and recursion prevention.
  * Phase 3.6.3: Callback-based UI interactions.
+ * Phase 3.7.1: Shared state integration.
  *
  * Single ownership: Search, Sort, Filters, Categories
  */
@@ -14,6 +15,11 @@
 export default class CollectionRenderer {
     constructor(context = {}) {
         Object.assign(this, context);
+        
+        // Validate shared state
+        if (!this.state) {
+            throw new Error('CollectionRenderer requires shared state object');
+        }
         
         // Ensure eventListeners exists
         if (!this.eventListeners) {
@@ -36,7 +42,7 @@ export default class CollectionRenderer {
         this._isRenderingMenu = false;
         this._isRenderingFilters = false;
         
-        // Callback properties (set by StorefrontCore)
+        // CALLBACK CONTRACT
         this.onFilterApplied = null;
         this.onCategorySelect = null;
     }
@@ -46,8 +52,8 @@ export default class CollectionRenderer {
      * @param {string} query - The search query
      */
     handleSearch(query) {
-        this.currentSearchQuery = query || '';
-        this.rendererContext.currentSearchQuery = this.currentSearchQuery;
+        this.state.currentSearchQuery = query || '';
+        this.currentSearchQuery = this.state.currentSearchQuery; // Legacy alias
         this.applyAllFilters();
     }
 
@@ -57,8 +63,8 @@ export default class CollectionRenderer {
      */
     handleSort(sortType) {
         if (!sortType) return;
-        this.currentSortType = sortType;
-        this.rendererContext.currentSortType = sortType;
+        this.state.currentSortType = sortType;
+        this.currentSortType = this.state.currentSortType; // Legacy alias
         this.applyAllFilters();
     }
 
@@ -66,8 +72,8 @@ export default class CollectionRenderer {
      * Returns to product list view (called from ProductRenderer)
      */
     handleBackToList() {
-        this.singleProductViewActive = false;
-        this.rendererContext.singleProductViewActive = false;
+        this.state.singleProductViewActive = false;
+        this.singleProductViewActive = false; // Legacy alias
         this.applyAllFilters();
     }
 
@@ -111,7 +117,7 @@ export default class CollectionRenderer {
 
             // Get categories
             const categories = this.categories || this._extractCategories?.() || [];
-            const activeId = String(this.activeCategoryId || 'all');
+            const activeId = String(this.state.activeCategoryId || 'all');
 
             // Build simple menu HTML
             let html = `
@@ -138,8 +144,8 @@ export default class CollectionRenderer {
                     this.addEventListener(item, 'click', async (e) => {
                         e.preventDefault();
                         const catId = item.getAttribute('data-cat-id');
-                        this.activeCategoryId = (catId === 'all') ? null : catId;
-                        this.rendererContext.activeCategoryId = this.activeCategoryId;
+                        this.state.activeCategoryId = (catId === 'all') ? null : catId;
+                        this.activeCategoryId = this.state.activeCategoryId; // Legacy alias
                         
                         // Re-render menu WITHOUT recursion
                         await this._renderMenuInternal();
@@ -149,7 +155,7 @@ export default class CollectionRenderer {
                         
                         // Trigger callback if set
                         if (typeof this.onCategorySelect === 'function') {
-                            this.onCategorySelect(this.activeCategoryId);
+                            this.onCategorySelect(this.state.activeCategoryId);
                         }
                     });
                 }
@@ -173,7 +179,7 @@ export default class CollectionRenderer {
         if (!anchor) return;
 
         const categories = this.categories || this._extractCategories?.() || [];
-        const activeId = String(this.activeCategoryId || 'all');
+        const activeId = String(this.state.activeCategoryId || 'all');
 
         let html = `
             <div class="cartique-menu-container">
@@ -202,14 +208,16 @@ export default class CollectionRenderer {
         const hasActiveFilters = Object.keys(activeFilters || {}).length > 0;
 
         if (!hasActiveFilters) {
-            this.filteredProducts = [...(this.products || [])];
+            this.state.filteredProducts = [...(this.products || [])];
+            this.filteredProducts = this.state.filteredProducts; // Legacy alias
         } else {
-            this.filteredProducts = (this.products || []).filter(product => {
+            this.state.filteredProducts = (this.products || []).filter(product => {
                 return Object.entries(activeFilters).every(([group, selectedValues]) => {
                     const productValue = product[group]; 
                     return selectedValues.includes(productValue);
                 });
             });
+            this.filteredProducts = this.state.filteredProducts; // Legacy alias
         }
 
         await this._notifyFilterApplied();
@@ -222,96 +230,93 @@ export default class CollectionRenderer {
     async applyAllFilters() {
         if (!this.products || !Array.isArray(this.products)) {
             console.warn('Products not available for filtering');
-            this.filteredProducts = [];
+            this.state.filteredProducts = [];
+            this.filteredProducts = this.state.filteredProducts; // Legacy alias
             await this._notifyFilterApplied();
             return;
         }
 
-        this.filteredProducts = this.products.filter(product => {
-            // 1. Category Filter
-            let matchesCategory = true;
-            
-            if (this.activeCategoryId) {
-                matchesCategory = product.categories?.some(
-                    c => String(c.id) === String(this.activeCategoryId)
-                ) || false;
-            }
-            
-            if (matchesCategory && this.activeFilters?.['category']?.length > 0) {
-                const productCategoryNames = product.categories?.map(c => c.name) || [];
-                matchesCategory = this.activeFilters['category'].some(
-                    catName => productCategoryNames.includes(catName)
-                );
-            }
+        // Start with all products
+        let result = [...this.products];
 
-            if (!matchesCategory) return false;
+        // 1. Category Filter
+        if (this.state.activeCategoryId) {
+            result = result.filter(product => 
+                product.categories?.some(c => String(c.id) === String(this.state.activeCategoryId)) || false
+            );
+        }
 
-            // 2. Search Query Filter
-            const query = this.currentSearchQuery || '';
-            const matchesSearch = !query || 
-                (product.title?.toLowerCase().includes(query.toLowerCase()) || 
-                 product.description?.toLowerCase().includes(query.toLowerCase()));
+        // 2. Search Query Filter
+        if (this.state.currentSearchQuery) {
+            const query = this.state.currentSearchQuery.toLowerCase().trim();
+            result = result.filter(product => {
+                const searchableText = [
+                    product.name,
+                    product.title,
+                    product.description,
+                    product.sku
+                ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+                return searchableText.includes(query);
+            });
+        }
 
-            if (!matchesSearch) return false;
-
-            // 3. Sidebar Attribute Filters
-            const attributeFilters = Object.entries(this.activeFilters || {}).filter(
+        // 3. Sidebar Attribute Filters
+        if (this.state.activeFilters && Object.keys(this.state.activeFilters).length > 0) {
+            const attributeFilters = Object.entries(this.state.activeFilters).filter(
                 ([key]) => key !== 'category'
             );
             
-            const matchesAttributes = attributeFilters.every(([key, selectedValues]) => {
-                if (!selectedValues || !selectedValues.length) return true;
-                
-                if (key === 'priceRange') {
-                    const effectivePrice = product.sale_price || product.price || 
-                        Math.min(...(product.variants?.map(v => v.sale_price || v.price) || [product.price]));
-                    return selectedValues.some(rangeLabel => this._checkPriceMatch(effectivePrice, rangeLabel));
-                }
+            result = result.filter(product => {
+                return attributeFilters.every(([key, selectedValues]) => {
+                    if (!selectedValues || !selectedValues.length) return true;
+                    
+                    if (key === 'priceRange') {
+                        const effectivePrice = product.sale_price || product.price || 
+                            Math.min(...(product.variants?.map(v => v.sale_price || v.price) || [product.price]));
+                        return selectedValues.some(rangeLabel => this._checkPriceMatch(effectivePrice, rangeLabel));
+                    }
 
-                return product.variants?.some(variant => 
-                    variant.attributes?.some(attr => 
-                        String(attr.key).toLowerCase() === String(key).toLowerCase() && 
-                        selectedValues.includes(attr.value)
-                    )
-                ) || false;
+                    return product.variants?.some(variant => 
+                        variant.attributes?.some(attr => 
+                            String(attr.key).toLowerCase() === String(key).toLowerCase() && 
+                            selectedValues.includes(attr.value)
+                        )
+                    ) || false;
+                });
             });
-
-            return matchesAttributes;
-        });
-
-        // Apply sort if active
-        if (this.currentSortType) {
-            this._applySort();
         }
 
-        this.loadedCount = 0;
-        this.rendererContext.filteredProducts = this.filteredProducts;
+        // 4. Apply sort if active
+        if (this.state.currentSortType) {
+            switch (this.state.currentSortType) {
+                case 'price-asc':
+                    result.sort((a, b) => (a.price || 0) - (b.price || 0));
+                    break;
+                case 'price-desc':
+                    result.sort((a, b) => (b.price || 0) - (a.price || 0));
+                    break;
+                case 'title-asc':
+                    result.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                    break;
+                case 'title-desc':
+                    result.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // 5. Update state
+        this.state.filteredProducts = result;
+        this.filteredProducts = result; // Legacy alias
+        this.state.loadedCount = 0;
+        this.loadedCount = 0; // Legacy alias
+
+        // 6. Notify
         await this._notifyFilterApplied();
-    }
-
-    /**
-     * Apply sort to filtered products
-     */
-    _applySort() {
-        const sortType = this.currentSortType;
-        if (!sortType || !this.filteredProducts) return;
-
-        switch (sortType) {
-            case 'price-asc':
-                this.filteredProducts.sort((a, b) => (a.price || 0) - (b.price || 0));
-                break;
-            case 'price-desc':
-                this.filteredProducts.sort((a, b) => (b.price || 0) - (a.price || 0));
-                break;
-            case 'title-asc':
-                this.filteredProducts.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                break;
-            case 'title-desc':
-                this.filteredProducts.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
-                break;
-            default:
-                break;
-        }
     }
 
     /**
@@ -319,11 +324,9 @@ export default class CollectionRenderer {
      * Calls onFilterApplied callback if set
      */
     async _notifyFilterApplied() {
-        // Update the product renderer with filtered products
         if (typeof this.onFilterApplied === 'function') {
-            await this.onFilterApplied(this.filteredProducts);
+            await this.onFilterApplied(this.state.filteredProducts);
         } else if (typeof this.renderProductDisplays === 'function') {
-            // Fallback: call renderProductDisplays directly
             await this.renderProductDisplays();
         }
     }
@@ -546,8 +549,8 @@ export default class CollectionRenderer {
             activeFilters[type].push(cb.value);
         });
 
-        this.activeFilters = activeFilters;
-        this.rendererContext.activeFilters = activeFilters;
+        this.state.activeFilters = activeFilters;
+        this.activeFilters = activeFilters; // Legacy alias
         await this.applyAllFilters();
     }
 
@@ -649,17 +652,21 @@ export default class CollectionRenderer {
             cb.checked = false;
         });
 
+        // Reset state
+        this.state.activeFilters = {};
+        this.state.filteredProducts = null;
+        this.state.loadedCount = 0;
+        this.state.currentSearchQuery = '';
+        this.state.currentSortType = '';
+        this.state.activeCategoryId = null;
+        
+        // Legacy aliases
         this.activeFilters = {};
         this.filteredProducts = null;
         this.loadedCount = 0;
         this.currentSearchQuery = '';
         this.currentSortType = '';
         this.activeCategoryId = null;
-        this.rendererContext.activeFilters = {};
-        this.rendererContext.filteredProducts = null;
-        this.rendererContext.currentSearchQuery = '';
-        this.rendererContext.currentSortType = '';
-        this.rendererContext.activeCategoryId = null;
 
         // Re-render
         await this.applyAllFilters();
@@ -711,7 +718,7 @@ export default class CollectionRenderer {
     setupInfiniteScroll() {
         if (this.observer) this.observer.disconnect();
 
-        const layout = this.currentLayout || 'grid';
+        const layout = this.state.currentLayout || 'grid';
         const gridContainer = document.getElementById('cartique-product-grid');
         const listContainer = document.getElementById('cartique-product-list');
         const activeContainer = layout === 'grid' ? gridContainer : listContainer;
@@ -746,10 +753,10 @@ export default class CollectionRenderer {
     async loadMoreProducts() {
         console.group('🚀 Infinite Scroll: Loading Batch');
         
-        const productsSource = this.filteredProducts || this.products || [];
+        const productsSource = this.state.filteredProducts || this.products || [];
         const sentinel = document.getElementById('cartique-scroll-sentinel');
 
-        if (this.loadedCount >= productsSource.length) {
+        if (this.state.loadedCount >= productsSource.length) {
             if (this.observer) this.observer.disconnect();
             if (sentinel) {
                 sentinel.classList.remove('is-loading');
@@ -759,7 +766,7 @@ export default class CollectionRenderer {
             return;
         }
 
-        const layout = this.currentLayout || 'grid';
+        const layout = this.state.currentLayout || 'grid';
         const container = layout === 'grid' 
             ? document.getElementById('cartique-product-grid')
             : document.getElementById('cartique-product-list');
@@ -770,9 +777,10 @@ export default class CollectionRenderer {
             return;
         }
 
+        const itemsPerBatch = this.state.itemsPerBatch || this.features?.itemsPerPage || 12;
         const nextBatch = productsSource.slice(
-            this.loadedCount, 
-            this.loadedCount + this.itemsPerBatch
+            this.state.loadedCount, 
+            this.state.loadedCount + itemsPerBatch
         );
 
         if (sentinel) {
@@ -802,20 +810,21 @@ export default class CollectionRenderer {
 
             container.insertBefore(fragment, sentinel);
             
-            this.loadedCount += nextBatch.length;
+            this.state.loadedCount += nextBatch.length;
+            this.loadedCount = this.state.loadedCount; // Legacy alias
             
             if (sentinel) {
                 sentinel.classList.remove('is-loading');
                 sentinel.innerHTML = '';
             }
 
-            if (this.loadedCount >= productsSource.length) {
+            if (this.state.loadedCount >= productsSource.length) {
                 console.log('End of catalog reached. Disconnecting observer.');
                 if (this.observer) this.observer.disconnect();
                 if (sentinel) sentinel.style.display = 'none';
             }
             
-            console.log(`Success: Added ${nextBatch.length} items. Total: ${this.loadedCount}`);
+            console.log(`Success: Added ${nextBatch.length} items. Total: ${this.state.loadedCount}`);
             console.groupEnd();
         }, 400);
     }
