@@ -5,6 +5,7 @@
  *
  * Migrated from: cartique/storefront/src/Storefront.js
  * Phase 1: Pure extraction. No refactoring.
+ * Phase 3.7.1: Browser environment guard for Node/SSR.
  *
  * TODO: Phase 2 — Move navigation to Router.
  */
@@ -20,8 +21,14 @@ export default class DefaultTheme {
 
     /**
      * Injects CSS styles into the document head
+     * Browser guard for Node/SSR environments
      */
     injectCSS() {
+        // ✅ Browser guard for Node/SSR environments
+        if (typeof document === 'undefined') {
+            return;
+        }
+        
         // Prevent duplicate injection
         if (document.getElementById('cartique-styles')) return;
         
@@ -47,8 +54,14 @@ export default class DefaultTheme {
 
     /**
      * Applies theme color and mode to the document
+     * Browser guard for Node/SSR environments
      */
     applyTheme() {
+        // ✅ Browser guard for Node/SSR environments
+        if (typeof document === 'undefined') {
+            return;
+        }
+        
         // Set accent color
         const accentColor = this.features.themeColor || '#2a2a2a';
         document.documentElement.style.setProperty('--cartique-accent', accentColor);
@@ -65,8 +78,14 @@ export default class DefaultTheme {
     /**
      * Applies minimal theme styling
      * @deprecated Use applyTheme() instead
+     * Browser guard for Node/SSR environments
      */
     applyMinimalTheme() {
+        // ✅ Browser guard for Node/SSR environments
+        if (typeof document === 'undefined') {
+            return;
+        }
+        
         const accentColor = this.features.themeColor || this.features.theme || '#2a2a2a';
         document.documentElement.style.setProperty('--cartique-accent', accentColor);
         document.documentElement.style.setProperty('--theme-accent', accentColor);
