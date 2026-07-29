@@ -4,9 +4,7 @@
  * ProductRenderer — Product presentation logic
  *
  * Migrated from: cartique/storefront/src/Storefront.js
- * Phase 1: Pure extraction. No refactoring.
- *
- * TODO: Phase 2 — Replace direct DOM access with theme slots.
+ * Phase 2: Replaced legacy commerce methods with adapter calls.
  */
 
 export default class ProductRenderer {
@@ -14,196 +12,212 @@ export default class ProductRenderer {
         Object.assign(this, context);
     }
 
-    renderSingleProduct(product) {
-    if (!product) {
-        console.error('Product not found');
-        return;
-    }
+    async renderSingleProduct(product) {
+        if (!product) {
+            console.error('Product not found');
+            return;
+        }
 
-    // Save current state
-    this.previousViewState = {
-        layout: this.currentLayout,
-        searchQuery: this.currentSearchQuery,
-        sortType: this.currentSortType,
-        scrollPosition: window.scrollY
-    };
+        // Save current state
+        this.previousViewState = {
+            layout: this.currentLayout,
+            searchQuery: this.currentSearchQuery,
+            sortType: this.currentSortType,
+            scrollPosition: window.scrollY
+        };
 
-    // Hide main views and controls
-    const productDisplays = document.getElementById('cartique-product-displays');
-    const sidebar = document.getElementById('cartique-sidebar');
-    const controls = document.getElementById('cartique-controls');
-    const menuAnchor = document.getElementById('cartique-menu-anchor-top');
-    const footer = document.getElementById('cartique-product-footer');
+        // Hide main views and controls
+        const productDisplays = document.getElementById('cartique-product-displays');
+        const sidebar = document.getElementById('cartique-sidebar');
+        const controls = document.getElementById('cartique-controls');
+        const menuAnchor = document.getElementById('cartique-menu-anchor-top');
+        const footer = document.getElementById('cartique-product-footer');
 
-    if (productDisplays) productDisplays.style.display = 'none';
-    if (sidebar) sidebar.style.display = 'none';
-    if (controls) controls.style.display = 'none';
-    if (menuAnchor) menuAnchor.style.display = 'none';
-    if (footer) footer.style.display = 'none';
-    
-    // Make main content full width
-    const mainContent = document.getElementById('cartique-main-content');
-    if (mainContent) {
-        mainContent.classList.add('cartique-full-width');
-    }
-    
-    this.singleProductViewActive = true;
-    
-    // Render the single product view (this is the actual rendering part)
-    let container = document.getElementById('single-product-view-container');
-    
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'single-product-view-container';
-        document.getElementById('cartique-main-content').appendChild(container);
-    }
+        if (productDisplays) productDisplays.style.display = 'none';
+        if (sidebar) sidebar.style.display = 'none';
+        if (controls) controls.style.display = 'none';
+        if (menuAnchor) menuAnchor.style.display = 'none';
+        if (footer) footer.style.display = 'none';
+        
+        // Make main content full width
+        const mainContent = document.getElementById('cartique-main-content');
+        if (mainContent) {
+            mainContent.classList.add('cartique-full-width');
+        }
+        
+        this.singleProductViewActive = true;
+        
+        // Render the single product view (this is the actual rendering part)
+        let container = document.getElementById('single-product-view-container');
+        
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'single-product-view-container';
+            document.getElementById('cartique-main-content').appendChild(container);
+        }
 
-    container.innerHTML = '';
-    
-    const productView = document.createElement('div');
-    productView.className = 'single-product-view';
-    
-    // --- BULK PRICING: Single Product View ---
-    const variant = this.getSelectedVariant(product);
-    const decision = await this.adapter.resolvePricing({
-    sellable: product,
-    variant: variant,
-    quantity: quantity,
-    customer: this.customer,
-    place: this.place
-});
-// Use decision.adjustments for bulk display
-
-    
-    
-    // Build price HTML with bulk section
-    let priceHTML = `
-        <div class="price-container">
-            ${product.sale_price && product.original_price ? `
-                <span class="original-price">${this.currencySymbol}${this.formatPrice(product.original_price)}</span>
-                <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
-            ` : product.sale_price ? `
-                <span class="original-price">${this.currencySymbol}${this.formatPrice(product.price)}</span>
-                <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
-            ` : `
-                <span class="price">${this.currencySymbol}${this.formatPrice(product.price)}</span>
-            `}
-        </div>
-    `;
-    
-    // Add bulk pricing section if available
-    if (bulkDisplay && bulkDisplay.hasBulk && bulkDisplay.staticDisplay) {
-        priceHTML += `
-            <div class="cartique-bulk-pricing single-product">
-                <div class="bulk-header">${bulkDisplay.heading || 'BULK PRICE'}</div>
-                <div class="bulk-price-row">
-                    <span class="bulk-price">${bulkDisplay.bulkDisplayPrice || ''}</span>
+        container.innerHTML = '';
+        
+        const productView = document.createElement('div');
+        productView.className = 'single-product-view';
+        
+        // --- BULK PRICING: Single Product View ---
+        const variant = this.adapter.getSelectedVariant(product);
+        const pricingResult = await this.adapter.resolvePricing({
+            sellable: product,
+            variant: variant,
+            quantity: 1,
+            customer: this.customer,
+            place: this.place
+        });
+        const pricing = pricingResult.legacy || pricingResult;
+        
+        const bulkDisplay = {
+            hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            retailPrice: pricing.retailPrice || variant?.price || 0,
+            bulkPrice: pricing.bulkPrice || null,
+            unitPrice: pricing.unitPrice || 0,
+            minimumQty: pricing.bulkMinimumQty || null,
+            heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
+            displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
+            bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+            staticDisplay: {
+                label: 'BULK PRICE',
+                price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+                minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+            }
+        };
+        
+        // Build price HTML with bulk section
+        let priceHTML = `
+            <div class="price-container">
+                ${product.sale_price && product.original_price ? `
+                    <span class="original-price">${this.currencySymbol}${this.formatPrice(product.original_price)}</span>
+                    <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
+                ` : product.sale_price ? `
+                    <span class="original-price">${this.currencySymbol}${this.formatPrice(product.price)}</span>
+                    <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
+                ` : `
+                    <span class="price">${this.currencySymbol}${this.formatPrice(product.price)}</span>
+                `}
+            </div>
+        `;
+        
+        // Add bulk pricing section if available
+        if (bulkDisplay && bulkDisplay.hasBulk && bulkDisplay.staticDisplay) {
+            priceHTML += `
+                <div class="cartique-bulk-pricing single-product">
+                    <div class="bulk-header">${bulkDisplay.heading || 'BULK PRICE'}</div>
+                    <div class="bulk-price-row">
+                        <span class="bulk-price">${bulkDisplay.bulkDisplayPrice || ''}</span>
+                    </div>
+                    <div class="bulk-min-row">
+                        <span class="bulk-min-qty">${bulkDisplay.message || ''}</span>
+                    </div>
                 </div>
-                <div class="bulk-min-row">
-                    <span class="bulk-min-qty">${bulkDisplay.message || ''}</span>
+            `;
+        }
+        // --- END BULK PRICING ---
+        
+        productView.innerHTML = `
+            <button class="back-to-products">← Back to Products</button>
+            <div class="product-content-wrapper">
+                <div class="product-image-column">
+                    <div class="product-image-container">
+                        <img src="${product.image}" alt="${product.title}" loading="lazy">
+                    </div>
+                </div>
+                <div class="product-info-column">
+                    <div class="product-meta">
+                        <h2>${product.title}</h2>
+                        ${priceHTML}
+                        <p class="product-description">${product.description}</p>
+                    </div>
+                    <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
+                </div>
+            </div>
+            <div class="product-tabs-container">
+                <div class="product-tabs-header">
+                    <button class="tab-button" data-tab="details">Product Details</button>
+                    <button class="tab-button active" data-tab="reviews">Reviews</button>
+                </div>
+                <div class="tab-content" data-tab-content="details">
+                    ${this.renderProductDetails(product)}
+                </div>
+                <div class="tab-content active" data-tab-content="reviews">
+                    ${this.renderProductReviews(product)}
                 </div>
             </div>
         `;
-    }
-    // --- END BULK PRICING ---
-    
-    productView.innerHTML = `
-        <button class="back-to-products">← Back to Products</button>
-        <div class="product-content-wrapper">
-            <div class="product-image-column">
-                <div class="product-image-container">
-                    <img src="${product.image}" alt="${product.title}" loading="lazy">
-                </div>
-            </div>
-            <div class="product-info-column">
-                <div class="product-meta">
-                    <h2>${product.title}</h2>
-                    ${priceHTML}
-                    <p class="product-description">${product.description}</p>
-                </div>
-                <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
-            </div>
-        </div>
-        <div class="product-tabs-container">
-            <div class="product-tabs-header">
-                <button class="tab-button" data-tab="details">Product Details</button>
-                <button class="tab-button active" data-tab="reviews">Reviews</button>
-            </div>
-            <div class="tab-content" data-tab-content="details">
-                ${this.renderProductDetails(product)}
-            </div>
-            <div class="tab-content active" data-tab-content="reviews">
-                ${this.renderProductReviews(product)}
-            </div>
-        </div>
-    `;
 
-    // Add event listeners
-    const backBtn = productView.querySelector('.back-to-products');
-    const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
-    const tabButtons = productView.querySelectorAll('.tab-button');
+        // Add event listeners
+        const backBtn = productView.querySelector('.back-to-products');
+        const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
+        const tabButtons = productView.querySelectorAll('.tab-button');
 
-    if (backBtn) {
-        this.addEventListener(backBtn, 'click', () => this.returnToListView());
-    }
-
-    if (addToCartBtn) {
-        this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
-    }
-
-    tabButtons.forEach(button => {
-        this.addEventListener(button, 'click', () => {
-            productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
-                el.classList.remove('active');
-            });
-            button.classList.add('active');
-            const tabName = button.dataset.tab;
-            const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
-            if (content) content.classList.add('active');
-        });
-    });
-
-    // Append to DOM first
-    container.appendChild(productView);
-    container.style.display = 'block';
-    
-    // Attach review form submit listener
-    const submitBtn = container.querySelector('#review-submit-btn');
-    if (submitBtn) {
-        submitBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const form = document.getElementById('review-form');
-            if (!form) return;
-            
-            const ratingInput = form.querySelector('input[name="rating"]:checked');
-            
-            if (!ratingInput) {
-                alert('Please select a rating');
-                return;
-            }
-            
-            const productId = parseInt(form.querySelector('#review-product-id').value);
-            const product = this.products.find(p => p.id === productId);
-            if (product) {
-                this.submitReview(form, product);
-            }
-        });
-    }
-    
-    // Scroll to single product view after DOM renders
-    requestAnimationFrame(() => {
-        const singleView = document.querySelector('.single-product-view');
-        if (singleView) {
-            singleView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (backBtn) {
+            this.addEventListener(backBtn, 'click', () => this.returnToListView());
         }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        document.documentElement.scrollTop = 0;
-        const mainContent = document.getElementById('cartique-main-content');
-        if (mainContent) mainContent.scrollTop = 0;
-    });
-}
 
+        if (addToCartBtn) {
+            this.addEventListener(addToCartBtn, 'click', async (e) => {
+                await this.addToCart(e);
+            });
+        }
 
+        tabButtons.forEach(button => {
+            this.addEventListener(button, 'click', () => {
+                productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
+                    el.classList.remove('active');
+                });
+                button.classList.add('active');
+                const tabName = button.dataset.tab;
+                const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
+                if (content) content.classList.add('active');
+            });
+        });
+
+        // Append to DOM first
+        container.appendChild(productView);
+        container.style.display = 'block';
+        
+        // Attach review form submit listener
+        const submitBtn = container.querySelector('#review-submit-btn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const form = document.getElementById('review-form');
+                if (!form) return;
+                
+                const ratingInput = form.querySelector('input[name="rating"]:checked');
+                
+                if (!ratingInput) {
+                    alert('Please select a rating');
+                    return;
+                }
+                
+                const productId = parseInt(form.querySelector('#review-product-id').value);
+                const product = this.products.find(p => p.id === productId);
+                if (product) {
+                    this.submitReview(form, product);
+                }
+            });
+        }
+        
+        // Scroll to single product view after DOM renders
+        requestAnimationFrame(() => {
+            const singleView = document.querySelector('.single-product-view');
+            if (singleView) {
+                singleView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.documentElement.scrollTop = 0;
+            const mainContent = document.getElementById('cartique-main-content');
+            if (mainContent) mainContent.scrollTop = 0;
+        });
+    }
 
     renderProductDetails(product) {
         const attributes = product.variants?.[0]?.attributes || [];
@@ -224,18 +238,43 @@ export default class ProductRenderer {
         `;
     }
 
-    createProductCard(product) {
+    async createProductCard(product) {
         const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
         if (!wrapper) return null;
 
         const productCardTemplate = wrapper.firstElementChild?.cloneNode(true);
         if (!productCardTemplate) return null;
 
-        this.updateProductElement(productCardTemplate, product);
+        await this.updateProductElement(productCardTemplate, product);
 
         // --- BULK PRICING: Grid Card ---
-        const variant = this.getSelectedVariant(product);
-        const bulkDisplay = this.getBulkPricingDisplay(variant);
+        const variant = this.adapter.getSelectedVariant(product);
+        const pricingResult = await this.adapter.resolvePricing({
+            sellable: product,
+            variant: variant,
+            quantity: 1,
+            customer: this.customer,
+            place: this.place
+        });
+        const pricing = pricingResult.legacy || pricingResult;
+
+        const bulkDisplay = {
+            hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            retailPrice: pricing.retailPrice || variant?.price || 0,
+            bulkPrice: pricing.bulkPrice || null,
+            unitPrice: pricing.unitPrice || 0,
+            minimumQty: pricing.bulkMinimumQty || null,
+            heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
+            displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
+            bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+            staticDisplay: {
+                label: 'BULK PRICE',
+                price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+                minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+            }
+        };
 
         if (bulkDisplay.hasBulk) {
             // Find the currency-price-display container
@@ -278,7 +317,7 @@ export default class ProductRenderer {
         return productCardTemplate;
     }
 
-    createProductListing(product) {
+    async createProductListing(product) {
         const wrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
         if (!wrapper) return null;
 
@@ -286,11 +325,36 @@ export default class ProductRenderer {
         if (!productListingTemplate) return null;
 
         productListingTemplate.classList.add('cartique-product-listing');
-        this.updateProductElement(productListingTemplate, product);
+        await this.updateProductElement(productListingTemplate, product);
 
         // --- BULK PRICING: List Card ---
-        const variant = this.getSelectedVariant(product);
-        const bulkDisplay = this.getBulkPricingDisplay(variant);
+        const variant = this.adapter.getSelectedVariant(product);
+        const pricingResult = await this.adapter.resolvePricing({
+            sellable: product,
+            variant: variant,
+            quantity: 1,
+            customer: this.customer,
+            place: this.place
+        });
+        const pricing = pricingResult.legacy || pricingResult;
+
+        const bulkDisplay = {
+            hasBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            isBulk: pricingResult.decision?.adjustments?.some(a => a.type === 'bulk_discount') || false,
+            retailPrice: pricing.retailPrice || variant?.price || 0,
+            bulkPrice: pricing.bulkPrice || null,
+            unitPrice: pricing.unitPrice || 0,
+            minimumQty: pricing.bulkMinimumQty || null,
+            heading: pricing.isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null,
+            displayPrice: `${this.currencySymbol}${pricing.unitPrice} each`,
+            bulkDisplayPrice: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+            staticDisplay: {
+                label: 'BULK PRICE',
+                price: pricing.bulkPrice ? `${this.currencySymbol}${pricing.bulkPrice} each` : null,
+                minQty: pricing.bulkMinimumQty ? `Minimum ${pricing.bulkMinimumQty} items` : null
+            }
+        };
 
         if (bulkDisplay.hasBulk) {
             // Find the currency-price-display container
@@ -340,7 +404,7 @@ export default class ProductRenderer {
         return productListingTemplate;
     }
 
-    updateProductElement(element, product) {
+    async updateProductElement(element, product) {
         // Update all product fields EXCEPT currency
         for (const [key, value] of Object.entries(product)) {
             if (key === 'currency') continue; // Skip - handled below
@@ -441,7 +505,12 @@ export default class ProductRenderer {
         }
 
         // STOCK MANAGEMENT: Handle Add to Cart button state and stock display
-        const stockCount = this.getProductStock(product);
+        const variant = this.adapter.getSelectedVariant(product);
+        const inventory = await this.adapter.resolveInventory({
+            sellable: product,
+            variant: variant
+        });
+        const stockCount = inventory.quantity || 0;
         const addToCartBtn = element.querySelector('.cartique_add_to_cart');
         
         if (addToCartBtn) {
@@ -530,7 +599,7 @@ export default class ProductRenderer {
         }
     }
 
-    renderProductDisplays() {
+    async renderProductDisplays() {
         // 1. Determine Source Data
         // Use filtered products if available, otherwise fall back to the master list
         const displayData = this.filteredProducts || this.products;
@@ -550,20 +619,20 @@ export default class ProductRenderer {
             if (listContainer) listContainer.style.display = 'none';
             if (gridContainer) {
                 gridContainer.style.display = 'grid';
-                this.renderProducts('grid', displayData);
+                await this.renderProducts('grid', displayData);
             }
         } else {
             if (gridContainer) gridContainer.style.display = 'none';
             if (listContainer) {
                 listContainer.style.display = 'block';
-                this.renderProducts('list', displayData);
+                await this.renderProducts('list', displayData);
             }
         }
 
         console.log(`[UI] Rendered ${displayData.length} products in ${layout} view.`);
     }
 
-    renderProducts(layout, data) {
+    async renderProducts(layout, data) {
         const container = layout === 'grid' 
             ? document.getElementById('cartique-product-grid')
             : document.getElementById('cartique-product-list');
@@ -594,13 +663,13 @@ export default class ProductRenderer {
 
         // 4. BATCH RENDER (Fragment)
         const fragment = document.createDocumentFragment();
-        initialSlice.forEach(product => {
+        for (const product of initialSlice) {
             const productElement = layout === 'grid'
-                ? this.createProductCard(product)
-                : this.createProductListing(product);
+                ? await this.createProductCard(product)
+                : await this.createProductListing(product);
             
             if (productElement) fragment.appendChild(productElement);
-        });
+        }
 
         container.appendChild(fragment);
 
@@ -742,7 +811,7 @@ export default class ProductRenderer {
         }
     }
 
-    setLayout(layout) {
+    async setLayout(layout) {
         const gridContainer = document.getElementById('cartique-product-grid');
         const listContainer = document.getElementById('cartique-product-list');
 
@@ -750,7 +819,7 @@ export default class ProductRenderer {
             gridContainer.style.display = layout === 'grid' ? 'grid' : 'none';
             listContainer.style.display = layout === 'list' ? 'block' : 'none';
             this.currentLayout = layout;
-            this.renderProducts(layout);
+            await this.renderProducts(layout);
         }
     }
 }
