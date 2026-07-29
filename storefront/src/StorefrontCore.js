@@ -8,6 +8,8 @@
  */
 
 import { deepMerge } from './utils/object.js';
+import { addEventListener, cleanupEventListeners } from './utils/dom.js';
+import { debounce } from './utils/performance.js';
 import DefaultTheme from './theme/DefaultTheme.js';
 import NotificationService from './services/NotificationService.js';
 import CartiqueAdapter from './adapters/CartiqueAdapter.js';
@@ -19,7 +21,6 @@ import ProductRenderer from './renderers/ProductRenderer.js';
 import CollectionRenderer from './renderers/CollectionRenderer.js';
 import CartRenderer from './renderers/CartRenderer.js';
 import CartiqueInspector from './debug/CartiqueInspector.js';
-
 
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
@@ -91,9 +92,9 @@ export default class StorefrontCore {
 
     // 4.5 Initialize Inspector (debug mode)
     this.inspector = new CartiqueInspector({
-        enabled: this.features.debug || false,
-        maxHistory: 50,
-        version: '2.0.0'
+      enabled: this.features.debug || false,
+      maxHistory: 50,
+      version: '2.0.0'
     });
 
     // 5. Initialize Theme
@@ -130,11 +131,11 @@ export default class StorefrontCore {
       callbacks: this.callbacks
     });
 
-        // 8. Initialize Adapter
+    // 8. Initialize Adapter
     this.adapter = new CartiqueAdapter(this.kernel, {
-        legacyMode: this.features.kernelMode !== true,
-        debug: this.features.debug || false,
-        onDecision: (decision) => this.recordDecision(decision)
+      legacyMode: this.features.kernelMode !== true,
+      debug: this.features.debug || false,
+      onDecision: (decision) => this.recordDecision(decision)
     });
 
     // 9. Pass adapter to services
@@ -145,65 +146,106 @@ export default class StorefrontCore {
       this.services.cart.setAdapter(this.adapter);
     }
 
-    // 10. Initialize Renderers with shared context
-    const rendererContext = {
-      ...this,
-      adapter: this.adapter,
-      theme: this.theme,
-      notification: this.notification,
+    // 10. Create minimal renderer context
+    this.rendererContext = {
+      // Data
+      products: this.products,
+      features: this.features,
+      callbacks: this.callbacks,
+      container: this.container,
+      
+      // Utilities (from imports)
+      addEventListener,
+      debounce,
+      cleanupEventListeners: cleanupEventListeners.bind(this),
+      
+      // Services
       services: this.services,
-      formatPrice: this.formatPrice.bind(this),
-      formatDate: this.formatDate.bind(this),
-      // Methods that need to be bound
-      addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      theme: this.theme,
+      adapter: this.adapter,
+      kernel: this.kernel,
+      notification: this.notification,
+      
+      // Core state
+      currencySymbol: this.currencySymbol,
+      filteredProducts: this.filteredProducts,
+      currentLayout: this.currentLayout,
+      currentSearchQuery: this.currentSearchQuery,
+      activeCategoryId: this.activeCategoryId,
+      activeFilters: this.activeFilters,
+      singleProductViewActive: this.singleProductViewActive,
+      previousViewState: this.previousViewState,
+      templateHolder: this.templateHolder,
+      itemsPerBatch: this.itemsPerBatch,
+      loadedCount: this.loadedCount,
+      
+      // UI Actions (bound methods)
       showCart: this.showCart.bind(this),
       closeCart: this.closeCart.bind(this),
       showCartPage: this.showCartPage.bind(this),
       closeCartPage: this.closeCartPage.bind(this),
-      checkout: this.services.cart.checkout.bind(this.services.cart),
       setLayout: this.setLayout.bind(this),
-      setupInfiniteScroll: this.setupInfiniteScroll.bind(this),
-      loadMoreProducts: this.loadMoreProducts.bind(this),
+      handleSearch: this.handleSearch.bind(this),
+      handleSort: this.handleSort.bind(this),
+      applyAllFilters: this.applyAllFilters.bind(this),
+      applyFilters: this.applyFilters.bind(this),
+      handleFilterChange: this.handleFilterChange.bind(this),
+      clearAllFilters: this.clearAllFilters.bind(this),
+      addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      checkout: this.services.cart.checkout.bind(this.services.cart),
       showSingleProductView: this.showSingleProductView.bind(this),
       returnToListView: this.returnToListView.bind(this),
+      setupInfiniteScroll: this.setupInfiniteScroll.bind(this),
+      loadMoreProducts: this.loadMoreProducts.bind(this),
+      renderCatalogueMenu: this.renderCatalogueMenu.bind(this),
+      renderSidebarFilters: this.renderSidebarFilters.bind(this),
+      renderProductDisplays: this.renderProductDisplays.bind(this),
+      renderProducts: this.renderProducts.bind(this),
+      
+      // Formatting
+      formatPrice: this.formatPrice.bind(this),
+      formatDate: this.formatDate.bind(this),
+      
+      // Render methods (delegated)
+      renderMainFrame: this.renderMainFrame.bind(this),
+      renderSidebar: this.renderSidebar.bind(this),
+      renderControls: this.renderControls.bind(this),
+      renderFooter: this.renderFooter.bind(this),
+      renderCartSlider: this.renderCartSlider.bind(this),
+      renderCartItemTemplate: this.renderCartItemTemplate.bind(this),
       renderSingleProduct: this.renderSingleProduct.bind(this),
       renderProductDetails: this.renderProductDetails.bind(this),
       renderProductReviews: this.renderProductReviews.bind(this),
       renderStars: this.renderStars.bind(this),
       submitReview: this.submitReview.bind(this),
-      handleSearch: this.handleSearch.bind(this),
-      handleSort: this.handleSort.bind(this),
-      applyAllFilters: this.applyAllFilters.bind(this),
-      applyFilters: this.applyFilters.bind(this),
-      renderCatalogueMenu: this.renderCatalogueMenu.bind(this),
-      renderSidebarFilters: this.renderSidebarFilters.bind(this),
-      handleFilterChange: this.handleFilterChange.bind(this),
-      clearAllFilters: this.clearAllFilters.bind(this)
+      
+      // Customer and place
+      customer: this.customer || null,
+      place: this.place || null
     };
 
-    this.productRenderer = new ProductRenderer(rendererContext);
-    this.collectionRenderer = new CollectionRenderer(rendererContext);
-    this.cartRenderer = new CartRenderer(rendererContext);
+    // 11. Initialize Renderers with minimal context
+    this.productRenderer = new ProductRenderer(this.rendererContext);
+    this.collectionRenderer = new CollectionRenderer(this.rendererContext);
+    this.cartRenderer = new CartRenderer(this.rendererContext);
 
-    // 11. Register URL state restorers
+    // 12. Register URL state restorers
     this.registerUrlStateRestorer(this.restoreCartState);
     this.registerUrlStateRestorer(this.restoreSearchState);
 
-    // 12. Fire off the Engine
+    // 13. Fire off the Engine
     this.init();
   }
 
-
-
-/**
- * Record a CommercialDecision for debugging
- * @param {CommercialDecision} decision
- */
-recordDecision(decision) {
+  /**
+   * Record a CommercialDecision for debugging
+   * @param {CommercialDecision} decision
+   */
+  recordDecision(decision) {
     if (this.inspector && this.inspector.enabled) {
-        this.inspector.record(decision);
+      this.inspector.record(decision);
     }
-}
+  }
 
   /**
    * Extracts unique categories from products
@@ -445,98 +487,210 @@ recordDecision(decision) {
    * Renders the catalogue menu
    */
   async renderCatalogueMenu() {
-    await this.collectionRenderer.renderCatalogueMenu();
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for menu');
+      return;
+    }
+    try {
+      await this.collectionRenderer.renderCatalogueMenu();
+    } catch (error) {
+      console.warn('renderCatalogueMenu failed:', error.message);
+    }
   }
 
   /**
    * Applies all filters
    */
   async applyAllFilters() {
-    await this.collectionRenderer.applyAllFilters();
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for filters');
+      return;
+    }
+    try {
+      await this.collectionRenderer.applyAllFilters();
+    } catch (error) {
+      console.warn('applyAllFilters failed:', error.message);
+    }
   }
 
   /**
    * Applies filters
    */
   async applyFilters(activeFilters) {
-    await this.collectionRenderer.applyFilters(activeFilters);
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for filters');
+      return;
+    }
+    try {
+      await this.collectionRenderer.applyFilters(activeFilters);
+    } catch (error) {
+      console.warn('applyFilters failed:', error.message);
+    }
   }
 
   /**
    * Handles filter changes
    */
   async handleFilterChange(element) {
-    await this.collectionRenderer.handleFilterChange(element);
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for filter change');
+      return;
+    }
+    try {
+      await this.collectionRenderer.handleFilterChange(element);
+    } catch (error) {
+      console.warn('handleFilterChange failed:', error.message);
+    }
   }
 
   /**
    * Clears all filters
    */
   async clearAllFilters() {
-    await this.collectionRenderer.clearAllFilters();
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for clear filters');
+      return;
+    }
+    try {
+      await this.collectionRenderer.clearAllFilters();
+    } catch (error) {
+      console.warn('clearAllFilters failed:', error.message);
+    }
   }
 
   /**
    * Renders sidebar filters
    */
   renderSidebarFilters() {
-    this.collectionRenderer.renderSidebarFilters();
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for sidebar filters');
+      return;
+    }
+    try {
+      this.collectionRenderer.renderSidebarFilters();
+    } catch (error) {
+      console.warn('renderSidebarFilters failed:', error.message);
+    }
   }
 
   /**
    * Sets up infinite scroll
    */
   setupInfiniteScroll() {
-    this.collectionRenderer.setupInfiniteScroll();
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for infinite scroll');
+      return;
+    }
+    try {
+      this.collectionRenderer.setupInfiniteScroll();
+    } catch (error) {
+      console.warn('setupInfiniteScroll failed:', error.message);
+    }
   }
 
   /**
    * Loads more products
    */
   async loadMoreProducts() {
-    await this.collectionRenderer.loadMoreProducts();
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for load more');
+      return;
+    }
+    try {
+      await this.collectionRenderer.loadMoreProducts();
+    } catch (error) {
+      console.warn('loadMoreProducts failed:', error.message);
+    }
   }
 
   /**
    * Renders the cart slider
    */
   async renderCartSlider() {
-    await this.cartRenderer.renderCartSlider();
+    if (!this.cartRenderer) {
+      console.warn('CartRenderer not available');
+      return;
+    }
+    try {
+      await this.cartRenderer.renderCartSlider();
+    } catch (error) {
+      console.warn('renderCartSlider failed:', error.message);
+    }
   }
 
   /**
    * Renders the cart item template
    */
   async renderCartItemTemplate() {
-    await this.cartRenderer.renderCartItemTemplate();
+    if (!this.cartRenderer) {
+      console.warn('CartRenderer not available');
+      return;
+    }
+    try {
+      await this.cartRenderer.renderCartItemTemplate();
+    } catch (error) {
+      console.warn('renderCartItemTemplate failed:', error.message);
+    }
   }
 
   /**
    * Shows the cart
    */
   showCart() {
-    this.cartRenderer.showCart();
+    if (!this.cartRenderer) {
+      console.warn('CartRenderer not available');
+      return;
+    }
+    try {
+      this.cartRenderer.showCart();
+    } catch (error) {
+      console.warn('showCart failed:', error.message);
+    }
   }
 
   /**
    * Closes the cart
    */
   closeCart() {
-    this.cartRenderer.closeCart();
+    if (!this.cartRenderer) {
+      console.warn('CartRenderer not available');
+      return;
+    }
+    try {
+      this.cartRenderer.closeCart();
+    } catch (error) {
+      console.warn('closeCart failed:', error.message);
+    }
   }
 
   /**
    * Shows the cart page
    */
   showCartPage() {
-    this.cartRenderer.showCartPage();
+    if (!this.cartRenderer) {
+      console.warn('CartRenderer not available');
+      return;
+    }
+    try {
+      this.cartRenderer.showCartPage();
+    } catch (error) {
+      console.warn('showCartPage failed:', error.message);
+    }
   }
 
   /**
    * Closes the cart page
    */
   closeCartPage() {
-    this.cartRenderer.closeCartPage();
+    if (!this.cartRenderer) {
+      console.warn('CartRenderer not available');
+      return;
+    }
+    try {
+      this.cartRenderer.closeCartPage();
+    } catch (error) {
+      console.warn('closeCartPage failed:', error.message);
+    }
   }
 
   /**
@@ -550,7 +704,15 @@ recordDecision(decision) {
    * Handles sort
    */
   handleSort(event) {
-    this.collectionRenderer.handleSort(event);
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for sort');
+      return;
+    }
+    try {
+      this.collectionRenderer.handleSort(event);
+    } catch (error) {
+      console.warn('handleSort failed:', error.message);
+    }
   }
 
   // ==========================================================
@@ -603,6 +765,9 @@ recordDecision(decision) {
 
       // Update notification container
       this.notification.container = this.container;
+
+      // Update renderer context container
+      this.rendererContext.container = this.container;
 
       // 3. Component Loading
       await this.fetchAndExtractComponents();
@@ -659,30 +824,70 @@ recordDecision(decision) {
     this.productRenderer.templateHolder = this.templateHolder;
     this.collectionRenderer.templateHolder = this.templateHolder;
     this.cartRenderer.templateHolder = this.templateHolder;
+    
+    // Update renderer context
+    this.rendererContext.templateHolder = this.templateHolder;
   }
 
   /**
    * Renders all main components
    */
   async renderAllComponents() {
-    const renderMethods = [
-      this.renderMainFrame.bind(this),
-      this.renderSidebar.bind(this),
-      this.renderCatalogueMenu.bind(this),
-      this.renderControls.bind(this),
-      this.renderFooter.bind(this),
-      this.renderCartSlider.bind(this),
-      this.renderCartItemTemplate.bind(this)
-    ];
-
-    for (const method of renderMethods) {
-      try {
-        await method();
-      } catch (error) {
-        console.error(`Render failed for method: ${method.name}`, error);
-      }
+    // Check if container exists
+    if (!this.container) {
+      console.warn('Container not found, skipping renderAllComponents');
+      return;
     }
 
+    // Use the product renderer for main frame
+    try {
+      await this.productRenderer.renderMainFrame();
+    } catch (e) {
+      console.warn('renderMainFrame failed:', e.message);
+    }
+
+    // Use the product renderer for sidebar
+    try {
+      await this.productRenderer.renderSidebar();
+    } catch (e) {
+      console.warn('renderSidebar failed:', e.message);
+    }
+
+    // Use the collection renderer for menu
+    try {
+      await this.collectionRenderer.renderCatalogueMenu();
+    } catch (e) {
+      console.warn('renderCatalogueMenu failed:', e.message);
+    }
+
+    // Use the product renderer for controls
+    try {
+      await this.productRenderer.renderControls();
+    } catch (e) {
+      console.warn('renderControls failed:', e.message);
+    }
+
+    // Use the product renderer for footer
+    try {
+      await this.productRenderer.renderFooter();
+    } catch (e) {
+      console.warn('renderFooter failed:', e.message);
+    }
+
+    // Use the cart renderer
+    try {
+      await this.cartRenderer.renderCartSlider();
+    } catch (e) {
+      console.warn('renderCartSlider failed:', e.message);
+    }
+
+    try {
+      await this.cartRenderer.renderCartItemTemplate();
+    } catch (e) {
+      console.warn('renderCartItemTemplate failed:', e.message);
+    }
+
+    // Apply sidebar visibility
     const sidebar = document.getElementById('cartique-sidebar');
     if (sidebar) {
       sidebar.style.display = this.features.sidebarDisplay;
@@ -711,11 +916,11 @@ recordDecision(decision) {
     const listButton = document.querySelector('.cartique-list-view');
 
     if (gridButton) {
-      this.addEventListener(gridButton, 'click', () => this.setLayout('grid'));
+      addEventListener(gridButton, 'click', () => this.setLayout('grid'));
     }
 
     if (listButton) {
-      this.addEventListener(listButton, 'click', () => this.setLayout('list'));
+      addEventListener(listButton, 'click', () => this.setLayout('list'));
     }
   }
 
@@ -736,8 +941,12 @@ recordDecision(decision) {
    * Cleans up the component on destruction
    */
   destroy() {
-    this.cleanupEventListeners();
-    this.clearToastTimeouts();
+    cleanupEventListeners.call(this);
+
+    // Clear toast timeouts
+    if (this.toastTimer1) clearTimeout(this.toastTimer1);
+    if (this.toastTimer2) clearTimeout(this.toastTimer2);
+    if (this.redirectTimer) clearTimeout(this.redirectTimer);
 
     const singleProductView = document.getElementById('single-product-view-container');
     if (singleProductView) singleProductView.remove();
