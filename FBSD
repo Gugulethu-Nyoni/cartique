@@ -1,0 +1,131 @@
+cartique/
+│
+├── src/
+│   ├── core/                         ← Pure Value Objects
+│   │   ├── Money.js
+│   │   ├── Identifier.js
+│   │   ├── Quantity.js
+│   │   ├── Diagnostics.js
+│   │   ├── Adjustment.js
+│   │   ├── ResolutionItem.js
+│   │   ├── ResolutionPatch.js
+│   │   ├── ResolutionJournal.js
+│   │   ├── ResolutionState.js
+│   │   ├── CapabilityRegistry.js
+│   │   └── CommercialDecision.js
+│   │
+│   ├── commerce/                     ← Commerce Model
+│   │   ├── Sellable.js
+│   │   ├── Variant.js
+│   │   ├── Customer.js
+│   │   ├── Context.js
+│   │   ├── Place.js
+│   │   ├── Promotion.js
+│   │   ├── Coupon.js
+│   │   └── Cart.js
+│   │
+│   ├── catalog/                      ← Catalog Domain
+│   │   ├── Product.js
+│   │   ├── Category.js
+│   │   ├── Brand.js
+│   │   ├── Media.js
+│   │   └── Attribute.js
+│   │
+│   ├── engine/                       ← Resolution Engine
+│   │   ├── ResolutionEngine.js
+│   │   ├── resolvers/
+│   │   │   ├── VariantResolver.js
+│   │   │   ├── CompositionResolver.js
+│   │   │   ├── CustomerResolver.js
+│   │   │   ├── ContextResolver.js
+│   │   │   ├── EligibilityResolver.js
+│   │   │   ├── PricingResolver.js
+│   │   │   ├── PromotionResolver.js
+│   │   │   ├── InventoryResolver.js
+│   │   │   ├── ShippingResolver.js
+│   │   │   ├── TaxResolver.js
+│   │   │   ├── PaymentOptionsResolver.js
+│   │   │   └── FulfillmentResolver.js
+│   │   ├── strategies/
+│   │   │   ├── BundleStrategy.js
+│   │   │   ├── PackageStrategy.js
+│   │   │   ├── KitStrategy.js
+│   │   │   ├── CollectionStrategy.js
+│   │   │   └── SubscriptionStrategy.js
+│   │   └── rules/
+│   │       ├── BasePriceRule.js
+│   │       ├── QuantityPricingRule.js
+│   │       ├── CustomerPricingRule.js
+│   │       ├── ContextPricingRule.js
+│   │       └── ContractPricingRule.js
+│   │
+│   ├── persistence/                  ← Data Layer
+│   │   ├── reference/                ← Reference Dataset (Source of Truth)
+│   │   │   ├── tables/
+│   │   │   │   ├── products.js
+│   │   │   │   ├── variants.js
+│   │   │   │   ├── pricingRules.js
+│   │   │   │   ├── inventory.js
+│   │   │   │   ├── customers.js
+│   │   │   │   ├── promotions.js
+│   │   │   │   ├── coupons.js
+│   │   │   │   ├── categories.js
+│   │   │   │   ├── productCategories.js
+│   │   │   │   ├── reviews.js
+│   │   │   │   ├── media.js
+│   │   │   │   └── contracts.js
+│   │   │   └── fixtures/
+│   │   │       ├── botaniq/
+│   │   │       ├── fashion/
+│   │   │       ├── electronics/
+│   │   │       ├── automotive/
+│   │   │       ├── publishing/
+│   │   │       └── b2b/
+│   │   ├── repositories/
+│   │   │   ├── ProductRepository.js
+│   │   │   ├── CustomerRepository.js
+│   │   │   └── index.js
+│   │   ├── aggregates/
+│   │   │   ├── LoadedProduct.js
+│   │   │   └── index.js
+│   │   ├── mappers/
+│   │   │   ├── SellableMapper.js
+│   │   │   └── index.js
+│   │   └── index.js
+│   │
+│   ├── rules/                        ← Rule System
+│   │   ├── pricing/
+│   │   ├── promotion/
+│   │   ├── eligibility/
+│   │   ├── tax/
+│   │   ├── shipping/
+│   │   └── inventory/
+│   │
+│   ├── query/                        ← Query Layer
+│   │   ├── search/
+│   │   ├── filters/
+│   │   ├── facets/
+│   │   └── collections/
+│   │
+│   ├── ui/                           ← UI Rendering
+│   │   ├── components/
+│   │   ├── renderers/
+│   │   └── state/
+│   │
+│   └── index.js                      ← Main entry point
+│
+├── test/
+│   ├── core/
+│   ├── commerce/
+│   ├── engine/
+│   ├── persistence/
+│   └── acceptance/
+│       ├── golden/
+│       └── fixtures/
+│
+├── examples/
+│   └── acceptance/
+│
+├── package.json
+├── README.md
+└── .gitignore

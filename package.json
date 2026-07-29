@@ -1,5 +1,46 @@
 {
+  "name": "@semantq/cartique",
+  "version": "1.1.0",
+  "description": "Cartique is a framework-agnostic commerce storefront engine with product rendering, collections, cart management, pricing services, reviews, themes, and extensible commerce adapters. Built for the Semantq ecosystem.",
   "type": "module",
-  "name": "cartique",
-  "version": "1.0.1"
+  "main": "./storefront/src/index.js",
+  "exports": {
+    ".": "./storefront/src/index.js"
+  },
+  "scripts": {
+    "test": "echo \"No tests configured\""
+  },
+  "keywords": [
+    "semantq",
+    "cartique",
+    "commerce",
+    "ecommerce",
+    "storefront",
+    "product-gallery",
+    "shopping-cart",
+    "product-filter",
+    "reviews",
+    "pricing",
+    "inventory",
+    "framework-agnostic",
+    "vanilla-js",
+    "javascript",
+    "ui-library",
+    "commerce-engine"
+  ],
+  "author": "Gugulethu Nyoni <dev@semantq.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gugulethu-Nyoni/cartique"
+  },
+  "homepage": "https://github.com/Gugulethu-Nyoni/cartique#readme",
+  "bugs": {
+    "url": "https://github.com/Gugulethu-Nyoni/cartique/issues"
+  },
+  "files": [
+    "storefront/",
+    "README.md",
+    "LICENSE"
+  ]
 }

@@ -1,0 +1,44 @@
+
+
+BulkPrice Options 
+
+1. default bulk price and MoQ option
+
+bulkPrice and MOQ - this can be applied on the base product and or its qty variants
+
+2. Qty variants option 
+
+
+EXAMPLE 
+
+100g chia seeds for R100 (this is the base product)
+
+there is an option to:
+
+1. set bulkprice and MOQ 
+
+e.g. at 10 MOQ price goes to R50 for the 100g
+
+
+Example 2 
+100g chia seeds for R100 (this is the base product)
+
+options to add custom bulk price packages
+
+e.g.
+
+200g R150
+400g R400
+500g R550
+
+::and still be able to apply bulkPrice MoQ on the qty variants 
+
+
+Lets pressure test this against different product types, cars, clothing, perfumes, ebooks  etc - how do we keep this robust and optional 
+
+
+
+
+
+
+

@@ -1,0 +1,385 @@
+ 🏛️ Cartique Philosophy
+
+ The Commerce Decision Kernel
+
+
+
+Introduction
+
+Cartique is not an e-commerce platform.
+
+It is not a shopping cart.
+
+It is not a pricing engine.
+
+It is not a product catalog.
+
+It is not an order management system.
+
+It is not a warehouse management system.
+
+It is not a payment gateway.
+
+It is not a tax calculator.
+
+It is not a shipping calculator.
+
+Cartique is a **commerce decision kernel**.
+
+It receives commercial intent and produces commercial truth.
+
+Everything else is an implementation detail.
+
+
+
+The Problem We Solve
+
+Traditional commerce platforms try to solve every problem.
+
+
+Products
+Variants
+Pricing
+Tax
+Shipping
+Inventory
+Promotions
+Coupons
+Customers
+Orders
+Payments
+Fulfillment
+Analytics
+
+
+They become complex.
+
+They become fragile.
+
+They become impossible to change.
+
+Cartique takes a different approach.
+
+Instead of solving every problem, Cartique solves exactly one problem:
+
+> Given what exists and what the customer wants, what is commercially true?
+
+
+
+ The Insight
+
+Commerce is not a collection of mutable database records.
+
+Commerce is a compilation process.
+
+The customer expresses intent.
+
+
+"I want this."
+
+
+The platform evaluates that intent against business rules and commercial context.
+
+
+Intent + Context → Truth
+
+
+The result is not a modified configuration.
+
+The result is a new object describing commercial truth.
+
+
+Truth
+
+
+Nothing inside the original intent changes.
+
+Intent remains immutable.
+
+Truth is computed.
+
+
+
+ The Architecture
+
+Cartique has four layers.
+
+
+Persistence
+        │
+        ▼
+Commerce Model
+        │
+        ▼
+Resolution Engine
+        │
+        ▼
+Commercial Decision
+
+
+ Persistence
+
+Persistence is the source of truth.
+
+It contains products, customers, promotions, coupons, prices, inventory, and shipping rules.
+
+Cartique never owns this data.
+
+It only receives it.
+
+ Commerce Model
+
+The commerce model is a set of immutable objects.
+
+
+Sellable
+Variant
+Customer
+Place
+Context
+Promotion
+Coupon
+
+
+These objects are pure data.
+
+They contain no behavior.
+
+They contain no logic.
+
+They are simply facts.
+
+ Resolution Engine
+
+The resolution engine is a deterministic compiler.
+
+It receives commercial facts and produces commercial truth.
+
+
+Input:  Sellable, Customer, Configuration, Place, Contexts
+Process: Variant → Pricing → Promotion → Tax → Shipping
+Output: CommercialDecision
+
+
+ Commercial Decision
+
+The commercial decision is an immutable object.
+
+
+items
+adjustments
+totals
+journal
+diagnostics
+
+
+It is the commercial truth.
+
+It is explainable.
+
+It is auditable.
+
+It is repeatable.
+
+
+
+ The Principles
+
+ Principle 1: Database is the Source of Truth
+
+Cartique never owns commerce data.
+
+It computes commerce decisions.
+
+The kernel never creates, persists, or queries data.
+
+ Principle 2: Commerce Objects are Immutable
+
+Everything entering the kernel becomes immutable.
+
+No resolver mutates anything.
+
+Every resolver returns a new state.
+
+ Principle 3: Kernel Never Talks To Database
+
+No Prisma.
+
+No SQL.
+
+No fetch().
+
+No HTTP.
+
+No Redis.
+
+Pure computation only.
+
+ Principle 4: Resolvers are Deterministic
+
+Given the same inputs, every resolver produces the same output.
+
+No randomness.
+
+No clocks.
+
+No network calls.
+
+No hidden state.
+
+ Principle 5: If It's Stored → Persistence. If It's Derived → Kernel.
+
+This single rule keeps responsibilities clear and prevents business logic from leaking.
+
+
+
+ The Resolvers
+
+Each resolver answers exactly one question.
+
+
+VariantResolver    → Which variant?
+PricingResolver    → What price?
+PromotionResolver  → What adjustments apply?
+TaxResolver        → What tax applies?
+ShippingResolver   → What shipping applies?
+
+
+No resolver thinks.
+
+No resolver knows about other resolvers.
+
+No resolver mutates state.
+
+No resolver is special.
+
+They are all just functions.
+
+They receive state.
+
+They return patches.
+
+The engine composes them.
+
+
+
+ The Output
+
+The output is a CommercialDecision.
+
+
+CommercialDecision
+├── items (what was purchased)
+├── adjustments (what changed the price)
+├── totals (subtotal, tax, shipping, total)
+├── journal (why every decision was made)
+└── diagnostics (errors, warnings, notices)
+
+
+It is immutable.
+
+It is explainable.
+
+It is auditable.
+
+It is repeatable.
+
+
+
+ The Extension Model
+
+New resolvers can be added without changing the kernel.
+
+
+InventoryResolver    → Is stock available?
+EligibilityResolver  → Is customer eligible?
+CompositionResolver  → What is included?
+FulfillmentResolver  → How is it fulfilled?
+
+
+New capabilities can be added to Sellable without changing the kernel.
+
+
+requiresInventory
+requiresShipping
+requiresFulfillment
+
+
+New adapters can be added without changing the kernel.
+
+
+REST API
+Prisma
+Shopify
+Commerce Layer
+Medusa
+
+
+The kernel stays small.
+
+The capabilities grow.
+
+
+
+ The Future
+
+Cartique is not finished.
+
+It will never be finished.
+
+Commerce evolves.
+
+Cartique evolves with it.
+
+But the core remains stable.
+
+
+Core
+├── Value Objects
+├── Commerce Model
+├── Resolution Engine
+├── Commercial Decision
+└── Resolver Contract
+
+
+These never change.
+
+Everything else is an enhancement.
+
+
+
+ The Belief
+
+Cartique is a belief.
+
+A belief that commerce can be modeled through a small set of timeless primitives.
+
+A belief that complexity should be achieved through composition, not accumulation.
+
+A belief that truth should be computed, not stored.
+
+A belief that intent should be portable.
+
+A belief that history should be permanent.
+
+A belief that the kernel should be stable while the ecosystem evolves.
+
+
+
+ The One Sentence
+
+> Cartique is a deterministic commerce decision engine that transforms a sellable, customer, configuration, place, and context into an immutable commercial decision.
+
+
+
+ Version
+
+
+v1.0
+Core Complete
+Architecture Frozen
+
+
+
+
+ 🚀 The Journey Continues

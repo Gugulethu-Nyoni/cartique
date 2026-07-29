@@ -8,3 +8,6 @@ Semantq Native Ecommerce Front End UI
 - More configs
 - Add templates
 - SEO categories URLs
+- Bulk pricicng capabilities added
+- Cartique ecommerce graph
+- Add collections

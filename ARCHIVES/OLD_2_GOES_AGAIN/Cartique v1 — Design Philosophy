@@ -1,0 +1,526 @@
+ Cartique v1 — Design Philosophy
+
+ Introduction
+
+Cartique was not designed to be another e-commerce platform.
+
+It was designed as a Transactional Commerce Kernel—a small, deterministic core capable of expressing almost any commercial transaction through a consistent set of primitives.
+
+The objective is not to build software for selling products. The objective is to build software that understands commercial intent, evaluates that intent deterministically, and produces immutable commercial truth.
+
+Everything else is an implementation detail.
+
+
+
+ The Fundamental Shift
+
+Traditional commerce platforms model features.
+
+Cartique models concepts.
+
+Instead of introducing dedicated systems for subscriptions, configurable products, bundles, rentals, bookings, financing, or wholesale pricing, Cartique asks a different question:
+
+> What are the smallest concepts that every commercial transaction has in common?
+
+Those concepts became the foundation of the system.
+
+```
+Catalog Item
+
+↓
+
+Offer Template
+
+↓
+
+Configuration
+
+↓
+
+Offer Resolution
+
+↓
+
+Order Snapshot
+```
+
+Every commerce experience is simply a different composition of these primitives.
+
+
+
+ Commerce as Compilation
+
+One of the core ideas behind Cartique is that commerce is not a collection of mutable database records.
+
+Commerce is a compilation process.
+
+The customer expresses intent.
+
+```
+"I want this."
+
+↓
+
+Configuration
+```
+
+The platform evaluates that intent against business rules and commercial context.
+
+```
+Configuration
+        +
+Commercial Context
+
+↓
+
+Resolution Engine
+```
+
+The result is not a modified configuration.
+
+The result is a new object describing commercial truth.
+
+```
+Offer Resolution
+```
+
+Nothing inside the original intent changes.
+
+Intent remains immutable.
+
+Truth is computed.
+
+
+
+ Intent Before Context
+
+A customer's configuration represents only what they want.
+
+It deliberately contains no pricing, taxation, inventory, customer information, shipping calculations, or operational state.
+
+A configuration should be portable.
+
+It should be possible to:
+
+ save it
+ share it
+ bookmark it
+ email it
+ cache it
+ restore it years later
+
+without carrying any commercial assumptions.
+
+Context is introduced only during resolution.
+
+```
+Configuration
+        +
+Context
+
+↓
+
+Offer Resolution
+```
+
+Intent is timeless.
+
+Commercial truth is contextual.
+
+
+
+ Resolution Is Pure
+
+The Resolution Engine is not an operational workflow.
+
+It performs no mutations.
+
+It allocates nothing.
+
+It reserves nothing.
+
+It charges nothing.
+
+It simply answers the question:
+
+> "Given this configuration and this context, what is commercially true?"
+
+For identical inputs, the output must always be identical.
+
+```
+(Configuration, Context)
+
+↓
+
+Offer Resolution
+```
+
+No hidden state.
+
+No side effects.
+
+No randomness.
+
+No environmental dependencies.
+
+Pure computation.
+
+
+
+ Business Rules Are Not Business Objects
+
+Traditional systems embed pricing, discounts, tax, inventory, and shipping logic directly into products or orders.
+
+Cartique deliberately separates them.
+
+Business rules belong to specialized providers.
+
+```
+Configuration
+
+↓
+
+Pricing Provider
+
+↓
+
+Pricing Delta
+```
+
+```
+Configuration
+
+↓
+
+Inventory Provider
+
+↓
+
+Inventory Delta
+```
+
+Each provider solves one problem.
+
+The compiler assembles the complete picture.
+
+
+
+ Composition Over Specialization
+
+Cartique does not have product types.
+
+It has compositions.
+
+A configurable laptop.
+
+A rental vehicle.
+
+A hotel booking.
+
+A financing agreement.
+
+A subscription.
+
+All emerge from combining the same primitives.
+
+Complexity is achieved through composition rather than inheritance.
+
+
+
+ Templates Define Possibility
+
+Offer Templates describe what may be configured.
+
+They define:
+
+ selections
+ constraints
+ supported capabilities
+
+A template is a contract between the business and the user interface.
+
+The frontend does not invent configuration screens.
+
+It renders the template.
+
+```
+Offer Template
+
+↓
+
+Selection Model
+
+↓
+
+Generated UI
+```
+
+The same template can power:
+
+ Web
+ Mobile
+ POS
+ API
+ CLI
+ AI assistants
+
+without modification.
+
+
+
+ Separation of Knowledge
+
+Every object knows only what it must know.
+
+Catalog Items know how products are described.
+
+Offer Templates know how products may be configured.
+
+Selection Models know what choices are valid.
+
+Configurations know customer intent.
+
+Resolution Providers know how to calculate commercial truth.
+
+Workflows know how to execute operations.
+
+Order Snapshots know historical truth.
+
+No layer reaches across its boundary.
+
+Knowledge is intentionally limited.
+
+
+
+ Replaceable Runtime
+
+The runtime exists to execute the domain.
+
+It is not the domain itself.
+
+The execution engine may evolve.
+
+Today's runtime may execute locally.
+
+Tomorrow's runtime may execute on distributed workers.
+
+Next year's runtime may execute inside a serverless workflow engine.
+
+The domain remains unchanged.
+
+```
+Domain
+
+↓
+
+Compiler
+
+↓
+
+Runtime
+```
+
+The runtime is replaceable.
+
+The domain is sacred.
+
+
+
+ Commercial Truth Is Temporary
+
+An Offer Resolution represents the commercial truth of a configuration at a specific moment.
+
+Inventory changes.
+
+Tax laws change.
+
+Discounts expire.
+
+Exchange rates fluctuate.
+
+Because of this, resolutions are disposable.
+
+They are recomputed whenever context changes.
+
+```
+Configuration
+
+↓
+
+Resolve
+
+↓
+
+Offer Resolution
+```
+
+The configuration survives.
+
+The resolution evolves.
+
+
+
+ Historical Truth Is Permanent
+
+An Order Snapshot is fundamentally different.
+
+Once payment has been accepted, the transaction becomes history.
+
+History must never be recalculated.
+
+```
+Offer Resolution
+
+↓
+
+Checkout
+
+↓
+
+Order Snapshot
+```
+
+Order Snapshots are immutable legal records.
+
+Future rule changes must never affect historical transactions.
+
+
+
+ Deterministic by Design
+
+Determinism is one of Cartique's strongest guarantees.
+
+Every calculation is explainable.
+
+Every result is reproducible.
+
+Every output has a lineage.
+
+Instead of asking:
+
+> "Why did the system charge R1,275?"
+
+The platform should be able to answer:
+
+```
+Base Price
+
+↓
+
+Bulk Discount
+
+↓
+
+VIP Discount
+
+↓
+
+Regional Tax
+
+↓
+
+Final Price
+```
+
+Commercial truth must always be explainable.
+
+
+
+ Extensible Without Modification
+
+New commerce paradigms should not require changes to the kernel.
+
+Instead they extend it.
+
+Examples include:
+
+ Rentals
+ Financing
+ Loyalty
+ Reservations
+ Auctions
+ Gift Cards
+ Digital Licensing
+ Marketplace Integrations
+
+These are providers.
+
+Not architectural changes.
+
+The kernel remains stable while capabilities evolve around it.
+
+
+
+ Operations Follow Truth
+
+The compiler computes.
+
+The workflow acts.
+
+These responsibilities never overlap.
+
+```
+Configuration
+
+↓
+
+Resolution
+
+↓
+
+Commerce Event
+
+↓
+
+Workflow
+
+↓
+
+Side Effects
+```
+
+Only workflows may:
+
+ reserve inventory
+ capture payments
+ print shipping labels
+ notify customers
+ update accounting systems
+
+The compiler remains mathematically pure.
+
+
+
+ The Long-Term Vision
+
+Cartique is intentionally small.
+
+Its goal is not to contain every commerce feature.
+
+Its goal is to provide a stable commercial foundation upon which any commerce model can be built.
+
+Every design decision follows one simple principle:
+
+> Prefer timeless concepts over temporary features.
+
+Features evolve.
+
+Markets change.
+
+Technology changes.
+
+Commerce changes.
+
+Well-defined concepts endure.
+
+That belief forms the philosophical foundation of Cartique.
+
+
+
+ Guiding Principle
+
+Cartique does not attempt to model every business.
+
+It models the universal language of commerce.
+
+Everything else is simply composition.
