@@ -4,7 +4,7 @@
  * CartService — Cart operations
  *
  * Migrated from: cartique/storefront/src/Storefront.js
- * Phase 1: Pure extraction. No refactoring.
+ * Phase 2: Integrated adapter for inventory resolution.
  */
 
 export default class CartService {
@@ -16,7 +16,7 @@ export default class CartService {
      * Adds a product to the cart
      * @param {Event} event - The click event
      */
-    addToCart(event) {
+    async addToCart(event) {
         const productId = parseInt(event.target.id);
         const product = this.products.find(p => p.id === productId);
 
@@ -26,12 +26,16 @@ export default class CartService {
         }
 
         // STOCK CHECK
+        const variant = this.adapter.resolveVariant(product, product.variantId);
         const inventory = await this.adapter.resolveInventory({
             sellable: product,
             variant: variant
         });
-        const availableStock = inventory.quantity;
-
+        const availableStock = inventory.quantity || 0;
+        if (availableStock === 0) {
+            this.showStockAlert('This product is SOLD OUT');
+            return;
+        }
 
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const existingIndex = cart.findIndex(item => item.id === product.id);
@@ -100,6 +104,10 @@ export default class CartService {
         this.showCheckoutAlert();
     }
 
+    /**
+     * Sets the adapter instance
+     * @param {Object} adapter - The adapter instance
+     */
     setAdapter(adapter) {
         this.adapter = adapter;
     }
