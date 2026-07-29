@@ -131,7 +131,7 @@ export default class StorefrontCore {
       callbacks: this.callbacks
     });
 
-    // 8. Initialize Adapter (SINGLE initialization - removed duplicates)
+    // 8. Initialize Adapter
     this.adapter = new CartiqueAdapter(this.kernel, {
       legacyMode: this.features.kernelMode !== true,
       debug: this.features.debug || false,
@@ -196,10 +196,6 @@ export default class StorefrontCore {
       returnToListView: this.returnToListView.bind(this),
       setupInfiniteScroll: this.setupInfiniteScroll.bind(this),
       loadMoreProducts: this.loadMoreProducts.bind(this),
-      renderCatalogueMenu: this.renderCatalogueMenu.bind(this),
-      renderSidebarFilters: this.renderSidebarFilters.bind(this),
-      renderProductDisplays: this.renderProductDisplays.bind(this),
-      renderProducts: this.renderProducts.bind(this),
       
       // Formatting
       formatPrice: this.formatPrice.bind(this),
@@ -368,96 +364,28 @@ export default class StorefrontCore {
   // ==========================================================
 
   /**
-   * Returns to the product list view
-   */
-  async returnToListView() {
-    await this.productRenderer.returnToListView();
-  }
-
-  // ==========================================================
-  // DELEGATED RENDERER METHODS (KEEP THESE)
-  // ==========================================================
-
-  /**
-   * Renders product displays
-   */
-  async renderProductDisplays() {
-    await this.productRenderer.renderProductDisplays();
-  }
-
-  /**
-   * Renders products in a layout
-   */
-  async renderProducts(layout, data) {
-    await this.productRenderer.renderProducts(layout, data);
-  }
-
-  /**
-   * Sets the layout
-   */
-  async setLayout(layout) {
-    await this.productRenderer.setLayout(layout);
-  }
-
-  /**
-   * Renders a single product view
-   */
-  async renderSingleProduct(product) {
-    await this.productRenderer.renderSingleProduct(product);
-  }
-
-  /**
    * Shows a single product view
+   * Delegates directly to ProductRenderer
    */
   async showSingleProductView(productId) {
     await this.productRenderer.showSingleProductView(productId);
   }
 
   /**
-   * Renders product details
+   * Returns to the product list view
+   * Delegates directly to ProductRenderer
    */
-  renderProductDetails(product) {
-    return this.productRenderer.renderProductDetails(product);
+  async returnToListView() {
+    await this.productRenderer.returnToListView();
   }
 
-  /**
-   * Renders product reviews
-   */
-  renderProductReviews(product) {
-    return this.productRenderer.renderProductReviews(product);
-  }
-
-  /**
-   * Renders stars for ratings
-   */
-  renderStars(rating) {
-    return this.productRenderer.renderStars(rating);
-  }
-
-  /**
-   * Submits a review
-   */
-  async submitReview(form, product) {
-    await this.productRenderer.submitReview(form, product);
-  }
-
-  /**
-   * Renders the catalogue menu
-   */
-  async renderCatalogueMenu() {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for menu');
-      return;
-    }
-    try {
-      await this.collectionRenderer.renderCatalogueMenu();
-    } catch (error) {
-      console.warn('renderCatalogueMenu failed:', error.message);
-    }
-  }
+  // ==========================================================
+  // FILTER AND COLLECTION METHODS (Delegated to CollectionRenderer)
+  // ==========================================================
 
   /**
    * Applies all filters
+   * Delegates directly to CollectionRenderer
    */
   async applyAllFilters() {
     if (!this.collectionRenderer) {
@@ -473,6 +401,7 @@ export default class StorefrontCore {
 
   /**
    * Applies filters
+   * Delegates directly to CollectionRenderer
    */
   async applyFilters(activeFilters) {
     if (!this.collectionRenderer) {
@@ -488,6 +417,7 @@ export default class StorefrontCore {
 
   /**
    * Handles filter changes
+   * Delegates directly to CollectionRenderer
    */
   async handleFilterChange(element) {
     if (!this.collectionRenderer) {
@@ -503,6 +433,7 @@ export default class StorefrontCore {
 
   /**
    * Clears all filters
+   * Delegates directly to CollectionRenderer
    */
   async clearAllFilters() {
     if (!this.collectionRenderer) {
@@ -517,22 +448,8 @@ export default class StorefrontCore {
   }
 
   /**
-   * Renders sidebar filters
-   */
-  renderSidebarFilters() {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for sidebar filters');
-      return;
-    }
-    try {
-      this.collectionRenderer.renderSidebarFilters();
-    } catch (error) {
-      console.warn('renderSidebarFilters failed:', error.message);
-    }
-  }
-
-  /**
    * Sets up infinite scroll
+   * Delegates directly to CollectionRenderer
    */
   setupInfiniteScroll() {
     if (!this.collectionRenderer) {
@@ -548,6 +465,7 @@ export default class StorefrontCore {
 
   /**
    * Loads more products
+   * Delegates directly to CollectionRenderer
    */
   async loadMoreProducts() {
     if (!this.collectionRenderer) {
@@ -562,7 +480,47 @@ export default class StorefrontCore {
   }
 
   /**
+   * Handles sort
+   * Delegates directly to CollectionRenderer
+   */
+  handleSort(event) {
+    if (!this.collectionRenderer) {
+      console.warn('CollectionRenderer not available for sort');
+      return;
+    }
+    try {
+      this.collectionRenderer.handleSort(event);
+    } catch (error) {
+      console.warn('handleSort failed:', error.message);
+    }
+  }
+
+  /**
+   * Handles search input
+   */
+  handleSearch(event) {
+    this.performSearch(event?.target?.value);
+  }
+
+  // ==========================================================
+  // LAYOUT AND RENDERING (Delegated to ProductRenderer)
+  // ==========================================================
+
+  /**
+   * Sets the layout
+   * Delegates directly to ProductRenderer
+   */
+  async setLayout(layout) {
+    await this.productRenderer.setLayout(layout);
+  }
+
+  // ==========================================================
+  // CART METHODS (Delegated to CartRenderer)
+  // ==========================================================
+
+  /**
    * Shows the cart
+   * Delegates directly to CartRenderer
    */
   showCart() {
     if (!this.cartRenderer) {
@@ -578,6 +536,7 @@ export default class StorefrontCore {
 
   /**
    * Closes the cart
+   * Delegates directly to CartRenderer
    */
   closeCart() {
     if (!this.cartRenderer) {
@@ -593,6 +552,7 @@ export default class StorefrontCore {
 
   /**
    * Shows the cart page
+   * Delegates directly to CartRenderer
    */
   showCartPage() {
     if (!this.cartRenderer) {
@@ -608,6 +568,7 @@ export default class StorefrontCore {
 
   /**
    * Closes the cart page
+   * Delegates directly to CartRenderer
    */
   closeCartPage() {
     if (!this.cartRenderer) {
@@ -618,28 +579,6 @@ export default class StorefrontCore {
       this.cartRenderer.closeCartPage();
     } catch (error) {
       console.warn('closeCartPage failed:', error.message);
-    }
-  }
-
-  /**
-   * Handles search input
-   */
-  handleSearch(event) {
-    this.performSearch(event?.target?.value);
-  }
-
-  /**
-   * Handles sort
-   */
-  handleSort(event) {
-    if (!this.collectionRenderer) {
-      console.warn('CollectionRenderer not available for sort');
-      return;
-    }
-    try {
-      this.collectionRenderer.handleSort(event);
-    } catch (error) {
-      console.warn('handleSort failed:', error.message);
     }
   }
 
@@ -702,7 +641,7 @@ export default class StorefrontCore {
       await this.renderAllComponents();
 
       // 5. Initial Product Render
-      await this.renderProductDisplays();
+      await this.productRenderer.renderProductDisplays();
 
       // 6. Interactivity & Completion
       this.setupEventListeners();
@@ -820,11 +759,11 @@ export default class StorefrontCore {
     const listButton = document.querySelector('.cartique-list-view');
 
     if (gridButton) {
-      this.addEventListener(gridButton, 'click', () => this.setLayout('grid'));
+      addEventListener(gridButton, 'click', () => this.setLayout('grid'));
     }
 
     if (listButton) {
-      this.addEventListener(listButton, 'click', () => this.setLayout('list'));
+      addEventListener(listButton, 'click', () => this.setLayout('list'));
     }
   }
 
