@@ -4,7 +4,7 @@
  * PricingService — Pricing and bulk calculations
  *
  * Migrated from: cartique/storefront/src/Storefront.js
- * Phase 1: Pure extraction. No refactoring.
+ * Phase 2: Added deprecation warnings. All methods now warn about adapter usage.
  */
 
 export default class PricingService {
@@ -16,8 +16,10 @@ export default class PricingService {
      * Checks if a variant has bulk pricing available
      * @param {Object} variant - The product variant
      * @returns {boolean}
+     * @deprecated Use adapter.resolvePricing() instead
      */
     hasBulkPricing(variant) {
+        console.warn('[PricingService] hasBulkPricing() is deprecated. Use adapter.resolvePricing().');
         return variant?.bulkPrice != null && variant?.bulkMinimumQty != null;
     }
 
@@ -27,8 +29,11 @@ export default class PricingService {
      * @param {Object} variant - The product variant
      * @param {number} quantity - Current quantity
      * @returns {Object} Bulk pricing display data
+     * @deprecated Use adapter.resolvePricing() instead
      */
     getBulkPricingDisplay(variant, quantity = 0) {
+        console.warn('[PricingService] getBulkPricingDisplay() is deprecated. Use adapter.resolvePricing().');
+        
         const defaultDisplay = {
             hasBulk: false,
             isBulk: false,
@@ -80,8 +85,11 @@ export default class PricingService {
      * Gets the selected variant from a product
      * @param {Object} product - The product
      * @returns {Object} The selected variant
+     * @deprecated Use adapter.getSelectedVariant() instead
      */
     getSelectedVariant(product) {
+        console.warn('[PricingService] getSelectedVariant() is deprecated. Use adapter.getSelectedVariant().');
+        
         if (product.variants && product.variants.length > 0) {
             return product.variants[0];
         }
@@ -98,8 +106,11 @@ export default class PricingService {
      * Finds a variant by ID across all products
      * @param {string|number} variantId - The variant ID
      * @returns {Object|null} The found variant or null
+     * @deprecated Use adapter.resolveVariant() instead
      */
     findVariant(variantId) {
+        console.warn('[PricingService] findVariant() is deprecated. Use adapter.resolveVariant().');
+        
         if (!variantId) return null;
         
         for (const product of this.products) {
@@ -127,43 +138,53 @@ export default class PricingService {
      * @param {Object} variant - The product variant
      * @param {number} quantity - The quantity
      * @returns {Object} Pricing information
+     * @deprecated Use adapter.resolvePricing() instead
      */
     getUnitPrice(variant, quantity = 1) {
-    console.warn('[PricingService] getUnitPrice() is deprecated. Use adapter.resolvePricing().');
-    
-    // Delegate to adapter if available
-    if (this.adapter) {
-        const result = this.adapter._resolveLegacy({
-            sellable: { variants: [variant] },
-            variant: variant,
-            quantity: quantity
-        });
-        return result;
-    }
-    
-    // Fallback to legacy calculation
-    const retailPrice = variant?.price || 0;
-    const bulkPrice = variant?.bulkPrice;
-    const bulkMinQty = variant?.bulkMinimumQty;
-    const isBulk = bulkPrice && bulkMinQty && quantity >= bulkMinQty;
-    const unitPrice = isBulk ? bulkPrice : retailPrice;
+        console.warn('[PricingService] getUnitPrice() is deprecated. Use adapter.resolvePricing().');
+        
+        // Delegate to adapter if available
+        if (this.adapter) {
+            try {
+                const result = this.adapter._resolveLegacy({
+                    sellable: { variants: [variant] },
+                    variant: variant,
+                    quantity: quantity
+                });
+                return result;
+            } catch (e) {
+                // Fall through to legacy
+            }
+        }
+        
+        // Fallback to legacy calculation
+        const retailPrice = variant?.price || 0;
+        const bulkPrice = variant?.bulkPrice;
+        const bulkMinQty = variant?.bulkMinimumQty;
 
-    return {
-        unitPrice: unitPrice,
-        isBulk: isBulk,
-        retailPrice: retailPrice,
-        bulkPrice: bulkPrice,
-        bulkMinimumQty: bulkMinQty,
-        quantity: quantity,
-        totalPrice: unitPrice * quantity
-    };
-}
+        const isBulk = bulkPrice && bulkMinQty && quantity >= bulkMinQty;
+        const unitPrice = isBulk ? bulkPrice : retailPrice;
+
+        return {
+            unitPrice: unitPrice,
+            isBulk: isBulk,
+            retailPrice: retailPrice,
+            bulkPrice: bulkPrice,
+            bulkMinimumQty: bulkMinQty,
+            quantity: quantity,
+            totalPrice: unitPrice * quantity
+        };
+    }
+
     /**
      * Gets product stock count
      * @param {Object} product - The product
      * @returns {number} Stock count
+     * @deprecated Use adapter.resolveInventory() instead
      */
     getProductStock(product) {
+        console.warn('[PricingService] getProductStock() is deprecated. Use adapter.resolveInventory().');
+        
         // Check for inventory directly on product
         if (typeof product.inventory === 'number') {
             return product.inventory;
@@ -185,6 +206,10 @@ export default class PricingService {
         return 10;
     }
 
+    /**
+     * Sets the adapter instance
+     * @param {Object} adapter - The adapter instance
+     */
     setAdapter(adapter) {
         this.adapter = adapter;
     }
