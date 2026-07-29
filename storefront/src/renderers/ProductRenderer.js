@@ -65,7 +65,16 @@ export default class ProductRenderer {
     
     // --- BULK PRICING: Single Product View ---
     const variant = this.getSelectedVariant(product);
-    const bulkDisplay = this.getBulkPricingDisplay(variant);
+    const decision = await this.adapter.resolvePricing({
+    sellable: product,
+    variant: variant,
+    quantity: quantity,
+    customer: this.customer,
+    place: this.place
+});
+// Use decision.adjustments for bulk display
+
+    
     
     // Build price HTML with bulk section
     let priceHTML = `
