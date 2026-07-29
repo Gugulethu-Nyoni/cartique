@@ -129,24 +129,35 @@ export default class PricingService {
      * @returns {Object} Pricing information
      */
     getUnitPrice(variant, quantity = 1) {
-        const retailPrice = variant?.price || 0;
-        const bulkPrice = variant?.bulkPrice;
-        const bulkMinQty = variant?.bulkMinimumQty;
-
-        const isBulk = bulkPrice && bulkMinQty && quantity >= bulkMinQty;
-        const unitPrice = isBulk ? bulkPrice : retailPrice;
-
-        return {
-            unitPrice: unitPrice,
-            isBulk: isBulk,
-            retailPrice: retailPrice,
-            bulkPrice: bulkPrice,
-            bulkMinimumQty: bulkMinQty,
-            quantity: quantity,
-            totalPrice: unitPrice * quantity
-        };
+    console.warn('[PricingService] getUnitPrice() is deprecated. Use adapter.resolvePricing().');
+    
+    // Delegate to adapter if available
+    if (this.adapter) {
+        const result = this.adapter._resolveLegacy({
+            sellable: { variants: [variant] },
+            variant: variant,
+            quantity: quantity
+        });
+        return result;
     }
+    
+    // Fallback to legacy calculation
+    const retailPrice = variant?.price || 0;
+    const bulkPrice = variant?.bulkPrice;
+    const bulkMinQty = variant?.bulkMinimumQty;
+    const isBulk = bulkPrice && bulkMinQty && quantity >= bulkMinQty;
+    const unitPrice = isBulk ? bulkPrice : retailPrice;
 
+    return {
+        unitPrice: unitPrice,
+        isBulk: isBulk,
+        retailPrice: retailPrice,
+        bulkPrice: bulkPrice,
+        bulkMinimumQty: bulkMinQty,
+        quantity: quantity,
+        totalPrice: unitPrice * quantity
+    };
+}
     /**
      * Gets product stock count
      * @param {Object} product - The product
@@ -172,5 +183,9 @@ export default class PricingService {
         
         // Default: assume in stock if no inventory data
         return 10;
+    }
+
+    setAdapter(adapter) {
+        this.adapter = adapter;
     }
 }
