@@ -6,6 +6,7 @@
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks.
+ * Phase 3.6.3: Callback-based UI interactions.
  */
 
 export default class ProductRenderer {
@@ -46,6 +47,12 @@ export default class ProductRenderer {
                 };
             };
         }
+        
+        // Callback properties (set by StorefrontCore)
+        this.onSearch = null;
+        this.onSort = null;
+        this.onProductClick = null;
+        this.onBackToList = null;
     }
 
     async renderSingleProduct(product) {
@@ -193,10 +200,6 @@ export default class ProductRenderer {
         }
         // --- END BULK PRICING ---
         
-        // Safely get render methods
-        const renderProductDetails = this.renderProductDetails || (() => '');
-        const renderProductReviews = this.renderProductReviews || (() => '');
-        
         productView.innerHTML = `
             <button class="back-to-products">← Back to Products</button>
             <div class="product-content-wrapper">
@@ -220,22 +223,25 @@ export default class ProductRenderer {
                     <button class="tab-button active" data-tab="reviews">Reviews</button>
                 </div>
                 <div class="tab-content" data-tab-content="details">
-                    ${renderProductDetails(product)}
+                    ${this.renderProductDetails(product)}
                 </div>
                 <div class="tab-content active" data-tab-content="reviews">
-                    ${renderProductReviews(product)}
+                    ${this.renderProductReviews(product)}
                 </div>
             </div>
         `;
 
-        // Add event listeners with safe checks
+        // Add event listeners
         const backBtn = productView.querySelector('.back-to-products');
         const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
         const tabButtons = productView.querySelectorAll('.tab-button');
 
         if (backBtn && this.addEventListener) {
             this.addEventListener(backBtn, 'click', () => {
-                if (typeof this.returnToListView === 'function') {
+                // Use callback if available, otherwise fallback
+                if (typeof this.onBackToList === 'function') {
+                    this.onBackToList();
+                } else if (typeof this.returnToListView === 'function') {
                     this.returnToListView();
                 }
             });
@@ -501,14 +507,17 @@ export default class ProductRenderer {
         }
         // --- END BULK PRICING ---
 
-        // Add image click handler
+        // Add image click handler - use callback if available
         const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
         if (imgContainer && this.addEventListener) {
             imgContainer.dataset.productId = product.id;
             imgContainer.style.cursor = 'pointer';
             this.addEventListener(imgContainer, 'click', (e) => {
                 e.preventDefault();
-                if (typeof this.showSingleProductView === 'function') {
+                // Use callback if available
+                if (typeof this.onProductClick === 'function') {
+                    this.onProductClick(product);
+                } else if (typeof this.showSingleProductView === 'function') {
                     this.showSingleProductView(product.id);
                 }
             });
@@ -615,13 +624,16 @@ export default class ProductRenderer {
         }
         // --- END BULK PRICING ---
 
+        // Image click handler - use callback if available
         const imgContainer = productListingTemplate.querySelector('.cartique_product_image_container');
         if (imgContainer && this.addEventListener) {
             imgContainer.dataset.productId = product.id;
             imgContainer.style.cursor = 'pointer';
             this.addEventListener(imgContainer, 'click', (e) => {
                 e.preventDefault();
-                if (typeof this.showSingleProductView === 'function') {
+                if (typeof this.onProductClick === 'function') {
+                    this.onProductClick(product);
+                } else if (typeof this.showSingleProductView === 'function') {
                     this.showSingleProductView(product.id);
                 }
             });
@@ -1030,6 +1042,7 @@ export default class ProductRenderer {
             return el;
         };
 
+        // Search - use onSearch callback
         const searchWrapper = this.templateHolder?.content?.getElementById('cartique-search-container-component');
         if (searchWrapper) {
             const searchContainer = ensureContainer('cartique-search-container');
@@ -1040,19 +1053,20 @@ export default class ProductRenderer {
             if (searchInput && this.addEventListener) {
                 const debouncedHandler = this.debounce ? 
                     this.debounce(() => {
-                        if (typeof this.handleSearch === 'function') {
-                            this.handleSearch({ target: searchInput });
+                        if (typeof this.onSearch === 'function') {
+                            this.onSearch(searchInput.value);
                         }
                     }, 300) : 
                     () => {
-                        if (typeof this.handleSearch === 'function') {
-                            this.handleSearch({ target: searchInput });
+                        if (typeof this.onSearch === 'function') {
+                            this.onSearch(searchInput.value);
                         }
                     };
                 this.addEventListener(searchInput, 'input', debouncedHandler);
             }
         }
 
+        // Sort - use onSort callback
         const sortWrapper = this.templateHolder?.content?.getElementById('cartique-sort-container-component');
         if (sortWrapper) {
             const sortContainer = ensureContainer('cartique-sort-container');
@@ -1062,13 +1076,14 @@ export default class ProductRenderer {
             const sortDropdown = sortContainer.querySelector('.cartique-sort');
             if (sortDropdown && this.addEventListener) {
                 this.addEventListener(sortDropdown, 'change', () => {
-                    if (typeof this.handleSort === 'function') {
-                        this.handleSort({ target: sortDropdown });
+                    if (typeof this.onSort === 'function') {
+                        this.onSort(sortDropdown.value);
                     }
                 });
             }
         }
 
+        // View toggles
         const togglesWrapper = this.templateHolder?.content?.getElementById('cartique-view-toggles-container-component');
         if (togglesWrapper) {
             const togglesContainer = ensureContainer('cartique-view-toggles-container');
@@ -1076,6 +1091,7 @@ export default class ProductRenderer {
             togglesContainer.appendChild(togglesWrapper.cloneNode(true));
         }
 
+        // Cart icon
         const cartIconWrapper = this.templateHolder?.content?.getElementById('shopping-cart-icon-container-component');
         if (cartIconWrapper) {
             const cartIconContainer = ensureContainer('shopping-cart-icon-container');
