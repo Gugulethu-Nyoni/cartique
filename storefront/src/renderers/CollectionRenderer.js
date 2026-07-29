@@ -5,46 +5,135 @@
  *
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
+ * Phase 3.6.2: Safe context method checks and recursion prevention.
  */
 
 export default class CollectionRenderer {
     constructor(context = {}) {
         Object.assign(this, context);
+        
+        // Ensure eventListeners exists
+        if (!this.eventListeners) {
+            this.eventListeners = new Map();
+        }
+        
+        // Ensure addEventListener is bound
+        if (!this.addEventListener) {
+            this.addEventListener = (el, event, handler) => {
+                el.addEventListener(event, handler);
+                const key = `${el.id || el.className}-${event}`;
+                if (!this.eventListeners.has(key)) {
+                    this.eventListeners.set(key, []);
+                }
+                this.eventListeners.get(key).push({ element: el, event, handler });
+            };
+        }
+        
+        // Prevent recursion flag
+        this._isRenderingMenu = false;
+        this._isRenderingFilters = false;
     }
 
     /**
      * Renders the catalogue menu (mega, inline, or stacked)
+     * Safe version — no recursion
      */
     async renderCatalogueMenu() {
-        // Check if menu is enabled
-        const cfg = this.features?.menu;
-        if (!cfg || !cfg.enabled) {
+        // Prevent recursion
+        if (this._isRenderingMenu) {
+            console.warn('CollectionRenderer: renderCatalogueMenu already in progress, skipping');
             return;
         }
+        
+        this._isRenderingMenu = true;
+        
+        try {
+            // Check if menu is enabled
+            const cfg = this.features?.menu;
+            if (!cfg || !cfg.enabled) {
+                return;
+            }
 
-        // Find container
+            // Find container
+            let anchor = document.getElementById('cartique-menu-anchor-top');
+            if (!anchor) {
+                anchor = document.getElementById('cartique-menu-anchor-sidebar');
+            }
+            if (!anchor) {
+                // Create anchor if missing
+                const mainContent = document.getElementById('cartique-main-content');
+                if (mainContent) {
+                    anchor = document.createElement('div');
+                    anchor.id = 'cartique-menu-anchor-top';
+                    mainContent.prepend(anchor);
+                } else {
+                    console.warn('Menu anchor not found, skipping menu render');
+                    return;
+                }
+            }
+
+            // Get categories
+            const categories = this.categories || this._extractCategories?.() || [];
+            const activeId = String(this.activeCategoryId || 'all');
+
+            // Build simple menu HTML
+            let html = `
+                <div class="cartique-menu-container">
+                    <ul class="cartique-menu-list">
+                        <li class="cartique-menu-item ${activeId === 'all' ? 'active' : ''}" data-cat-id="all">
+                            All Products
+                        </li>
+                        ${categories.map(cat => `
+                            <li class="cartique-menu-item ${activeId === String(cat.id) ? 'active' : ''}" data-cat-id="${cat.id}">
+                                <span class="cat-name">${cat.name}</span>
+                                ${cfg.showCounts ? `<span class="cat-count">(${cat.count})</span>` : ''}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+
+            anchor.innerHTML = html;
+
+            // Attach click events
+            anchor.querySelectorAll('.cartique-menu-item').forEach(item => {
+                if (this.addEventListener) {
+                    this.addEventListener(item, 'click', async (e) => {
+                        e.preventDefault();
+                        const catId = item.getAttribute('data-cat-id');
+                        this.activeCategoryId = (catId === 'all') ? null : catId;
+                        
+                        // Re-render menu WITHOUT recursion
+                        await this._renderMenuInternal();
+                        
+                        // Apply filters via callback
+                        if (typeof this.applyAllFilters === 'function') {
+                            await this.applyAllFilters();
+                        }
+                    });
+                }
+            });
+        } finally {
+            this._isRenderingMenu = false;
+        }
+    }
+
+    /**
+     * Internal menu render — no recursion
+     */
+    async _renderMenuInternal() {
+        const cfg = this.features?.menu;
+        if (!cfg || !cfg.enabled) return;
+
         let anchor = document.getElementById('cartique-menu-anchor-top');
         if (!anchor) {
             anchor = document.getElementById('cartique-menu-anchor-sidebar');
         }
-        if (!anchor) {
-            // Create anchor if missing
-            const mainContent = document.getElementById('cartique-main-content');
-            if (mainContent) {
-                anchor = document.createElement('div');
-                anchor.id = 'cartique-menu-anchor-top';
-                mainContent.prepend(anchor);
-            } else {
-                console.warn('Menu anchor not found, skipping menu render');
-                return;
-            }
-        }
+        if (!anchor) return;
 
-        // Get categories
         const categories = this.categories || this._extractCategories?.() || [];
         const activeId = String(this.activeCategoryId || 'all');
 
-        // Build simple menu HTML
         let html = `
             <div class="cartique-menu-container">
                 <ul class="cartique-menu-list">
@@ -62,19 +151,6 @@ export default class CollectionRenderer {
         `;
 
         anchor.innerHTML = html;
-
-        // Attach click events
-        anchor.querySelectorAll('.cartique-menu-item').forEach(item => {
-            this.addEventListener(item, 'click', async (e) => {
-                e.preventDefault();
-                const catId = item.getAttribute('data-cat-id');
-                this.activeCategoryId = (catId === 'all') ? null : catId;
-                await this.renderCatalogueMenu();
-                if (typeof this.applyAllFilters === 'function') {
-                    await this.applyAllFilters();
-                }
-            });
-        });
     }
 
     /**
@@ -85,7 +161,7 @@ export default class CollectionRenderer {
         const hasActiveFilters = Object.keys(activeFilters || {}).length > 0;
 
         if (!hasActiveFilters) {
-            this.filteredProducts = [...this.products || []];
+            this.filteredProducts = [...(this.products || [])];
         } else {
             this.filteredProducts = (this.products || []).filter(product => {
                 return Object.entries(activeFilters).every(([group, selectedValues]) => {
@@ -289,42 +365,57 @@ export default class CollectionRenderer {
 
     /**
      * Renders sidebar filter sections from features configuration
+     * Safe version — no recursion
      */
     renderSidebarFilters() {
-        const container = document.getElementById('cartique-filter-sidebar');
-        if (!container) {
-            console.warn('Filter sidebar container not found');
+        // Prevent recursion
+        if (this._isRenderingFilters) {
+            console.warn('CollectionRenderer: renderSidebarFilters already in progress, skipping');
             return;
         }
-
-        const filters = { ...this.features?.sidebarFeatures?.filters || {} };
-        let finalHTML = '';
-
-        // Add categories as the first filter group if sidebar is enabled
-        if (this.categories && this.categories.length > 0) {
-            const categoryNames = this.categories.map(cat => cat.name).sort();
-            finalHTML += this.generateFilterHTML('category', categoryNames);
-        }
-
-        // Handle Price Range
-        if (filters.priceRange) {
-            finalHTML += this.generateFilterHTML('priceRange', filters.priceRange);
-            delete filters.priceRange;
-        }
-
-        // Handle everything else dynamically
-        finalHTML += Object.entries(filters).map(([group, options]) => {
-            return this.generateFilterHTML(group, options);
-        }).join('');
-
-        container.innerHTML = finalHTML;
-
-        // Attach event listener
-        this.addEventListener(container, 'change', (e) => {
-            if (e.target.matches('input[type="checkbox"]')) {
-                this.handleFilterChange(e.target);
+        
+        this._isRenderingFilters = true;
+        
+        try {
+            const container = document.getElementById('cartique-filter-sidebar');
+            if (!container) {
+                console.warn('Filter sidebar container not found');
+                return;
             }
-        });
+
+            const filters = { ...this.features?.sidebarFeatures?.filters || {} };
+            let finalHTML = '';
+
+            // Add categories as the first filter group if sidebar is enabled
+            if (this.categories && this.categories.length > 0) {
+                const categoryNames = this.categories.map(cat => cat.name).sort();
+                finalHTML += this.generateFilterHTML('category', categoryNames);
+            }
+
+            // Handle Price Range
+            if (filters.priceRange) {
+                finalHTML += this.generateFilterHTML('priceRange', filters.priceRange);
+                delete filters.priceRange;
+            }
+
+            // Handle everything else dynamically
+            finalHTML += Object.entries(filters).map(([group, options]) => {
+                return this.generateFilterHTML(group, options);
+            }).join('');
+
+            container.innerHTML = finalHTML;
+
+            // Attach event listener
+            if (this.addEventListener) {
+                this.addEventListener(container, 'change', (e) => {
+                    if (e.target.matches('input[type="checkbox"]')) {
+                        this.handleFilterChange(e.target);
+                    }
+                });
+            }
+        } finally {
+            this._isRenderingFilters = false;
+        }
     }
 
     /**
@@ -453,16 +544,18 @@ export default class CollectionRenderer {
         const sidebar = document.getElementById('cartique-sidebar');
         if (!sidebar) return;
 
-        this.addEventListener(sidebar, 'change', (e) => {
-            if (e.target.type === 'checkbox') {
-                this.handleFilterChange(e);
-                if (window.innerWidth <= 767) {
-                    setTimeout(() => {
-                        this.toggleMobileSidebar(false);
-                    }, 400);
+        if (this.addEventListener) {
+            this.addEventListener(sidebar, 'change', (e) => {
+                if (e.target.type === 'checkbox') {
+                    this.handleFilterChange(e);
+                    if (window.innerWidth <= 767) {
+                        setTimeout(() => {
+                            this.toggleMobileSidebar(false);
+                        }, 400);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     /**
