@@ -4,7 +4,7 @@
  * CollectionRenderer — Catalog, filters, menu, infinite scroll
  *
  * Migrated from: cartique/storefront/src/Storefront.js
- * Phase 1: Pure extraction. No refactoring.
+ * Phase 2: Updated to call async methods from ProductRenderer.
  */
 
 export default class CollectionRenderer {
@@ -110,7 +110,7 @@ export default class CollectionRenderer {
      * Applies category and attribute filters to products
      * @deprecated Use applyAllFilters() instead
      */
-    applyFilters(activeFilters) {
+    async applyFilters(activeFilters) {
         const hasActiveFilters = Object.keys(activeFilters).length > 0;
 
         if (!hasActiveFilters) {
@@ -127,14 +127,14 @@ export default class CollectionRenderer {
         }
 
         // 3. Re-render the Catalogue
-        this.renderProductDisplays(); 
+        await this.renderProductDisplays(); 
     }
 
     /**
      * Applies all active filters (category, search, attributes) to products
      * Updates filteredProducts and triggers re-render
      */
-    applyAllFilters() {
+    async applyAllFilters() {
         this.filteredProducts = this.products.filter(product => {
             // 1. Category Filter (from mega menu ID OR sidebar name)
             let matchesCategory = true;
@@ -190,7 +190,7 @@ export default class CollectionRenderer {
         });
 
         this.loadedCount = 0;
-        this.renderProductDisplays();
+        await this.renderProductDisplays();
     }
 
     /**
@@ -219,7 +219,7 @@ export default class CollectionRenderer {
         const selectors = '.cartique-menu-item, .mega-item';
         
         container.querySelectorAll(selectors).forEach(item => {
-            item.addEventListener('click', (e) => {
+            item.addEventListener('click', async (e) => {
                 e.preventDefault();
                 
                 const catId = item.getAttribute('data-cat-id');
@@ -241,8 +241,8 @@ export default class CollectionRenderer {
                     delete this.activeFilters['category'];
                 }
 
-                this.renderCatalogueMenu();
-                this.applyAllFilters();
+                await this.renderCatalogueMenu();
+                await this.applyAllFilters();
             });
         });
 
@@ -412,7 +412,7 @@ export default class CollectionRenderer {
      * Handles filter checkbox change events
      * @param {HTMLElement} element - The changed checkbox
      */
-    handleFilterChange(element) {
+    async handleFilterChange(element) {
         const activeFilters = {};
         const checkedBoxes = document.querySelectorAll('.option-item input:checked');
 
@@ -425,7 +425,7 @@ export default class CollectionRenderer {
 
         // Store active filters and apply all filters together
         this.activeFilters = activeFilters;
-        this.applyAllFilters();
+        await this.applyAllFilters();
     }
 
     /**
@@ -525,7 +525,7 @@ export default class CollectionRenderer {
     /**
      * Clears all active filters
      */
-    clearAllFilters() {
+    async clearAllFilters() {
         // Uncheck all checkboxes
         const checkboxes = document.querySelectorAll('#cartique-filter-sidebar input[type="checkbox"]');
         checkboxes.forEach(cb => {
@@ -539,7 +539,7 @@ export default class CollectionRenderer {
 
         // Re-render
         const layout = this.currentLayout || 'grid';
-        this.renderProducts(layout, this.products);
+        await this.renderProducts(layout, this.products);
 
         // If on mobile, stay open so user can see it cleared, or close manually
         console.log("Filters cleared, state reset.");
@@ -626,7 +626,7 @@ export default class CollectionRenderer {
     /**
      * Loads the next batch of products
      */
-    loadMoreProducts() {
+    async loadMoreProducts() {
         console.group("🚀 Infinite Scroll: Loading Batch");
         
         const productsSource = this.filteredProducts || this.products;
@@ -664,19 +664,19 @@ export default class CollectionRenderer {
             sentinel.innerHTML = '<div class="cartique-loader"></div>';
         }
 
-        setTimeout(() => {
+        setTimeout(async () => {
             const fragment = document.createDocumentFragment();
 
-            nextBatch.forEach(product => {
+            for (const product of nextBatch) {
                 const el = (layout === 'grid') 
-                    ? this.createProductCard(product) 
-                    : this.createProductListing(product);
+                    ? await this.createProductCard(product) 
+                    : await this.createProductListing(product);
                 
                 if (el) {
                     el.classList.add('cartique-fade-in');
                     fragment.appendChild(el);
                 }
-            });
+            }
 
             // Insert BEFORE the sentinel so it stays at the bottom
             container.insertBefore(fragment, sentinel);
