@@ -16,6 +16,7 @@
  *   - getSelectedVariant(sellable)         // UI helper
  * 
  * Phase 2D: Returns CommercialDecision directly, no legacy wrapper.
+ * Phase 3: Records decisions for debugging.
  */
 
 export default class CartiqueAdapter {
@@ -24,6 +25,7 @@ export default class CartiqueAdapter {
         this.legacyMode = options.legacyMode ?? true;
         this.debug = options.debug ?? false;
         this.currencySymbol = options.currencySymbol || 'USD';
+        this.onDecision = options.onDecision || null;  // Phase 3: Decision recording callback
     }
 
     /**
@@ -138,6 +140,11 @@ export default class CartiqueAdapter {
                 contexts: contexts
             });
 
+            // Phase 3: Record decision for debugging
+            if (this.onDecision) {
+                this.onDecision(decision);
+            }
+
             // Phase 2D: Return CommercialDecision directly
             return decision;
         } catch (error) {
@@ -217,7 +224,12 @@ export default class CartiqueAdapter {
 
         // Handle case where variant is null
         if (!variant) {
-            return this._createEmptyDecision(request);
+            const emptyDecision = this._createEmptyDecision(request);
+            // Phase 3: Record empty decision for debugging
+            if (this.onDecision) {
+                this.onDecision(emptyDecision);
+            }
+            return emptyDecision;
         }
 
         const retailPrice = variant.price || 0;
@@ -270,7 +282,7 @@ export default class CartiqueAdapter {
         }];
 
         // Build CommercialDecision
-        return {
+        const decision = {
             type: 'commercial_decision',
             version: '1.0',
             timestamp: new Date().toISOString(),
@@ -291,6 +303,13 @@ export default class CartiqueAdapter {
                 legacyMode: true
             }
         };
+
+        // Phase 3: Record decision for debugging
+        if (this.onDecision) {
+            this.onDecision(decision);
+        }
+
+        return decision;
     }
 
     /**
