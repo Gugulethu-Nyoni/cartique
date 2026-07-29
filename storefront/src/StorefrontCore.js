@@ -18,6 +18,8 @@ import LocaleService from './services/LocaleService.js';
 import ProductRenderer from './renderers/ProductRenderer.js';
 import CollectionRenderer from './renderers/CollectionRenderer.js';
 import CartRenderer from './renderers/CartRenderer.js';
+import CartiqueInspector from './debug/CartiqueInspector.js';
+
 
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
@@ -87,6 +89,13 @@ export default class StorefrontCore {
     this.callbacks = callbacks || {};
     this.kernel = kernel;
 
+    // 4.5 Initialize Inspector (debug mode)
+    this.inspector = new CartiqueInspector({
+        enabled: this.features.debug || false,
+        maxHistory: 50,
+        version: '2.0.0'
+    });
+
     // 5. Initialize Theme
     this.theme = new DefaultTheme({
       features: this.features,
@@ -121,10 +130,11 @@ export default class StorefrontCore {
       callbacks: this.callbacks
     });
 
-    // 8. Initialize Adapter
+        // 8. Initialize Adapter
     this.adapter = new CartiqueAdapter(this.kernel, {
-      legacyMode: this.features.kernelMode !== true,
-      debug: this.features.debug || false
+        legacyMode: this.features.kernelMode !== true,
+        debug: this.features.debug || false,
+        onDecision: (decision) => this.recordDecision(decision)
     });
 
     // 9. Pass adapter to services
@@ -182,6 +192,18 @@ export default class StorefrontCore {
     // 12. Fire off the Engine
     this.init();
   }
+
+
+
+/**
+ * Record a CommercialDecision for debugging
+ * @param {CommercialDecision} decision
+ */
+recordDecision(decision) {
+    if (this.inspector && this.inspector.enabled) {
+        this.inspector.record(decision);
+    }
+}
 
   /**
    * Extracts unique categories from products
