@@ -1,0 +1,24 @@
+# Development backups
+**/*.backup.js
+**/*.bak
+**/*.old.js
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Tests
+test/
+**/test/
+
+# Archives
+ARCHIVES/
+
+# Temporary package files
+*.tgz
+
+# Development artifacts
+node_modules/
+coverage/
+.vscode/
+.idea/

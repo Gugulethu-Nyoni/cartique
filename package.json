@@ -1,11 +1,16 @@
 {
   "name": "@semantq/cartique",
-  "version": "1.1.0",
-  "description": "Cartique is a framework-agnostic commerce storefront engine with product rendering, collections, cart management, pricing services, reviews, themes, and extensible commerce adapters. Built for the Semantq ecosystem.",
+  "version": "2.0.0-alpha.1",
+  "description": "Cartique is a framework-agnostic commerce engine and storefront system. It provides commerce primitives, pricing resolution, product modelling, persistence adapters, storefront rendering, carts, reviews, themes, and extensible commerce capabilities for the Semantq ecosystem.",
   "type": "module",
-  "main": "./storefront/src/index.js",
+  "main": "./src/index.js",
   "exports": {
-    ".": "./storefront/src/index.js"
+    ".": "./src/index.js",
+    "./storefront": "./storefront/src/index.js",
+    "./core": "./src/core/index.js",
+    "./commerce": "./src/commerce/index.js",
+    "./engine": "./src/engine/index.js",
+    "./persistence": "./src/persistence/index.js"
   },
   "scripts": {
     "test": "echo \"No tests configured\""
@@ -13,20 +18,17 @@
   "keywords": [
     "semantq",
     "cartique",
-    "commerce",
+    "commerce-engine",
     "ecommerce",
     "storefront",
-    "product-gallery",
     "shopping-cart",
-    "product-filter",
-    "reviews",
-    "pricing",
+    "pricing-engine",
+    "product-catalog",
     "inventory",
     "framework-agnostic",
-    "vanilla-js",
     "javascript",
-    "ui-library",
-    "commerce-engine"
+    "typescript",
+    "headless-commerce"
   ],
   "author": "Gugulethu Nyoni <dev@semantq.com>",
   "license": "MIT",
@@ -38,8 +40,13 @@
   "bugs": {
     "url": "https://github.com/Gugulethu-Nyoni/cartique/issues"
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
   "files": [
-    "storefront/",
+    "src/",
+    "storefront/src/",
     "README.md",
     "LICENSE"
   ]
