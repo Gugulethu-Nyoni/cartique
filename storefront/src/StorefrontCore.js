@@ -1,3 +1,9 @@
+import { deepMerge } from './utils/object.js';
+import DefaultTheme  from './theme/DefaultTheme.js';
+import NotificationService  from './services/NotificationService.js';
+import CartiqueAdapter from './adapters/CartiqueAdapter.js';
+
+
 // storefront/src/StorefrontCore.js
 
 /**
@@ -8,7 +14,7 @@
  */
 
 export default class StorefrontCore {
-  constructor(products, features = {}, callbacks = {}) {
+  constructor(products, features = {}, callbacks = {}, kernel = null) {
     // 1. Validation
     if (!products || !Array.isArray(products)) {
         throw new Error('Cartique requires an array of products');
@@ -48,7 +54,7 @@ export default class StorefrontCore {
     };
 
     // Deep merge to ensure nested objects like sidebarFeatures aren't overwritten
-    this.features = this.deepMerge(this.defaultFeatures, features);
+    this.features = deepMerge(this.defaultFeatures, features);
     this.currencySymbol = this.features.currencySymbol || '$';
 
     // 3. Data State Management
@@ -86,10 +92,57 @@ export default class StorefrontCore {
     this.loadedCount = this.itemsPerBatch;
 
     this.callbacks = callbacks || {};
+    this.kernel = kernel;
 
-    // 5. Fire off the Engine
+    // 5. Initialize Theme
+    this.theme = new DefaultTheme({
+        features: this.features,
+        containerId: this.features.containerId
+    });
+
+        // 6. Initialize Notification Service
+    this.notification = new NotificationService({
+        container: this.container,
+        features: this.features,
+        callbacks: this.callbacks
+    });
+
+    // 7. Initialize Adapter (Phase 2A: legacy mode)
+    this.adapter = new CartiqueAdapter(this.kernel, {
+        legacyMode: false,
+        debug: this.features.debug || false
+    });
+
+    // 8. Pass adapter to services
+    if (this.services?.pricing?.setAdapter) {
+        this.services.pricing.setAdapter(this.adapter);
+    }
+    if (this.services?.cart?.setAdapter) {
+        this.services.cart.setAdapter(this.adapter);
+    }
+
+    // 9. Fire off the Engine
     this.init();
   }
+
+
+
+      /**
+     * Extracts unique categories from products
+     * @returns {Array} Array of category objects { id, name, count }
+     */
+    _extractCategories() {
+        const catMap = new Map();
+        this.products.forEach(product => {
+            product.categories?.forEach(cat => {
+                if (!catMap.has(cat.id)) {
+                    catMap.set(cat.id, { id: cat.id, name: cat.name, count: 0 });
+                }
+                catMap.get(cat.id).count++;
+            });
+        });
+        return Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }
 
   // ==========================================================
   // PUBLIC API
@@ -280,10 +333,9 @@ export default class StorefrontCore {
   async init() {
     try {
       // Inject CSS (must be first)
-      this.injectCSS();
-      
-      // Apply theme color
-      this.applyTheme();
+      this.theme.injectCSS();
+      this.theme.applyTheme();
+
 
       // 1. Sync display states from features
       const sidebarEnabled = this.features.sidebar && 
@@ -320,7 +372,7 @@ export default class StorefrontCore {
       
     } catch (error) {
       console.error('Failed to initialize Cartique:', error);
-      this.showErrorMessage('Failed to load product catalog');
+      this.notification.showErrorMessage('Failed to load product catalog');
     }
   }
 
