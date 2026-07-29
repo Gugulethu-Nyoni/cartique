@@ -1,5 +1,5 @@
 /**
- * @semantq/storefront
+ * @semantq/storefront/services
  *
  * LocaleService — Formatting utilities
  *
@@ -12,11 +12,26 @@ export default class LocaleService {
         Object.assign(this, context);
     }
 
+    /**
+     * Format price with 2 decimal places
+     * @param {number|string} price - The price to format
+     * @returns {string} Formatted price with 2 decimal places
+     */
     formatPrice(price) {
-        // PASTE ORIGINAL CODE
+        if (price === undefined || price === null || isNaN(price)) {
+            return '0.00';
+        }
+        return Number(price).toFixed(2);
     }
 
+    /**
+     * Formats a date string
+     * @param {string} dateString - The date string
+     * @returns {string} Formatted date
+     */
     formatDate(dateString) {
-        // PASTE ORIGINAL CODE
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     }
 }
