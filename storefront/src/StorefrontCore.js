@@ -5,6 +5,15 @@
  * 
  * This class handles the main lifecycle, state management,
  * and core functionality of the storefront.
+ *
+ * Architecture:
+ *   StorefrontCore (Orchestrator)
+ *       ├── ProductRenderer (owns: layout, product rendering, single product)
+ *       ├── CollectionRenderer (owns: search, sort, filters, categories)
+ *       ├── CartRenderer (owns: cart UI)
+ *       └── CartService (owns: cart data, localStorage, stock)
+ * 
+ * Communication: Callback-based (no direct method calls between renderers)
  */
 
 import { deepMerge } from './utils/object.js';
@@ -16,7 +25,6 @@ import CartiqueAdapter from './adapters/CartiqueAdapter.js';
 import PricingService from './services/PricingService.js';
 import CartService from './services/CartService.js';
 import LocaleService from './services/LocaleService.js';
-// Import renderers
 import ProductRenderer from './renderers/ProductRenderer.js';
 import CollectionRenderer from './renderers/CollectionRenderer.js';
 import CartRenderer from './renderers/CartRenderer.js';
@@ -24,12 +32,16 @@ import CartiqueInspector from './debug/CartiqueInspector.js';
 
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
-    // 1. Validation
+    // ==========================================================
+    // 1. VALIDATION
+    // ==========================================================
     if (!products || !Array.isArray(products)) {
       throw new Error('Cartique requires an array of products');
     }
 
-    // 2. Default Configuration & Feature Merging
+    // ==========================================================
+    // 2. DEFAULT CONFIGURATION
+    // ==========================================================
     this.defaultFeatures = {
       grid: true,
       pagination: true,
@@ -65,7 +77,9 @@ export default class StorefrontCore {
     this.features = deepMerge(this.defaultFeatures, features);
     this.currencySymbol = this.features.currencySymbol || '$';
 
-    // 3. Data State Management
+    // ==========================================================
+    // 3. DATA STATE MANAGEMENT
+    // ==========================================================
     this.products = products;
     this.filteredProducts = [...products];
     this.categories = this._extractCategories();
@@ -78,14 +92,63 @@ export default class StorefrontCore {
     this.singleProductViewActive = false;
     this.previousViewState = null;
 
-    // 4. Component Lifecycle References
+    // ==========================================================
+    // 3.5 SHARED STATE OBJECT (SINGLE SOURCE OF TRUTH)
+    // ==========================================================
+    this.state = {
+      // Product display
+      currentLayout: 'grid',
+      
+      // Search
+      currentSearchQuery: '',
+      
+      // Sorting
+      currentSortType: '',
+      
+      // Products
+      products: this.products || [],
+      filteredProducts: this.filteredProducts || [],
+      
+      // Filters
+      activeCategoryId: null,
+      activeFilters: {},
+      
+      // Views
+      singleProductViewActive: false,
+      previousViewState: null,
+      
+      // Pagination
+      itemsPerBatch: this.features.itemsPerPage || 12,
+      loadedCount: 0
+    };
+
+    // ==========================================================
+    // 3.6 STATE UPDATE METHOD (WITH DEBUG LOGGING)
+    // ==========================================================
+    this.updateState = (key, value) => {
+      this.state[key] = value;
+      // Also update legacy properties for backward compatibility
+      if (key === 'currentLayout') this.currentLayout = value;
+      if (key === 'currentSearchQuery') this.currentSearchQuery = value;
+      if (key === 'currentSortType') this.currentSortType = value;
+      if (key === 'filteredProducts') this.filteredProducts = value;
+      if (key === 'activeCategoryId') this.activeCategoryId = value;
+      if (key === 'activeFilters') this.activeFilters = value;
+      if (key === 'singleProductViewActive') this.singleProductViewActive = value;
+      if (key === 'previousViewState') this.previousViewState = value;
+      if (key === 'loadedCount') this.loadedCount = value;
+      
+      if (this.features.debug) {
+        console.log('[STATE UPDATE]', key, '→', value);
+      }
+    };
+
+    // ==========================================================
+    // 4. COMPONENT LIFECYCLE REFERENCES
+    // ==========================================================
     this.container = null;
     this.templateHolder = null;
     this.eventListeners = new Map();
-    
-    // Bind addEventListener to this instance
-    this.addEventListener = addEventListener.bind(this);
-    
     this.toastTimer1 = null;
     this.toastTimer2 = null;
     this.redirectTimer = null;
@@ -94,20 +157,29 @@ export default class StorefrontCore {
     this.callbacks = callbacks || {};
     this.kernel = kernel;
 
-    // 4.5 Initialize Inspector (debug mode)
+    // Bind addEventListener to this instance
+    this.addEventListener = addEventListener.bind(this);
+
+    // ==========================================================
+    // 5. INSPECTOR (Debug Mode)
+    // ==========================================================
     this.inspector = new CartiqueInspector({
       enabled: this.features.debug || false,
       maxHistory: 50,
       version: '2.0.0'
     });
 
-    // 5. Initialize Theme
+    // ==========================================================
+    // 6. THEME
+    // ==========================================================
     this.theme = new DefaultTheme({
       features: this.features,
       containerId: this.features.containerId
     });
 
-    // 6. Initialize Services
+    // ==========================================================
+    // 7. SERVICES
+    // ==========================================================
     this.services = {
       pricing: new PricingService({
         currencySymbol: this.currencySymbol,
@@ -120,7 +192,7 @@ export default class StorefrontCore {
         products: this.products,
         features: this.features,
         callbacks: this.callbacks,
-        showCart: this.showCart.bind(this)  // Pass showCart to CartService
+        showCart: this.showCart.bind(this)
       }),
       locale: new LocaleService({
         currencySymbol: this.currencySymbol,
@@ -129,7 +201,9 @@ export default class StorefrontCore {
       })
     };
 
-    // 7. Initialize Notification Service
+    // ==========================================================
+    // 8. NOTIFICATION SERVICE
+    // ==========================================================
     this.notification = new NotificationService({
       container: this.container,
       eventListeners: this.eventListeners,
@@ -137,14 +211,16 @@ export default class StorefrontCore {
       callbacks: this.callbacks
     });
 
-    // 8. Initialize Adapter (ONLY ONCE)
+    // ==========================================================
+    // 9. ADAPTER
+    // ==========================================================
     this.adapter = new CartiqueAdapter(this.kernel, {
       legacyMode: this.features.kernelMode !== true,
       debug: this.features.debug || false,
       onDecision: (decision) => this.recordDecision(decision)
     });
 
-    // 9. Pass adapter to services
+    // Pass adapter to services
     if (this.services?.pricing?.setAdapter) {
       this.services.pricing.setAdapter(this.adapter);
     }
@@ -152,7 +228,9 @@ export default class StorefrontCore {
       this.services.cart.setAdapter(this.adapter);
     }
 
-    // 10. Create minimal renderer context (NO RENDER METHODS - only UI actions)
+    // ==========================================================
+    // 10. RENDERER CONTEXT (WITH SHARED STATE + LEGACY ALIASES)
+    // ==========================================================
     this.rendererContext = {
       // Data
       products: this.products,
@@ -161,9 +239,24 @@ export default class StorefrontCore {
       container: this.container,
       eventListeners: this.eventListeners,
       
-      // Utilities (from imports)
+      // SHARED STATE (SINGLE SOURCE OF TRUTH)
+      state: this.state,
+      
+      // LEGACY ALIASES (for backward compatibility, gradually remove)
+      filteredProducts: this.state.filteredProducts,
+      currentLayout: this.state.currentLayout,
+      currentSearchQuery: this.state.currentSearchQuery,
+      activeCategoryId: this.state.activeCategoryId,
+      activeFilters: this.state.activeFilters,
+      singleProductViewActive: this.state.singleProductViewActive,
+      previousViewState: this.state.previousViewState,
+      loadedCount: this.state.loadedCount,
+      itemsPerBatch: this.state.itemsPerBatch,
+      
+      // Utilities
       addEventListener: this.addEventListener,
       debounce,
+      cleanupEventListeners: cleanupEventListeners.bind(this),
       
       // Services
       services: this.services,
@@ -172,25 +265,11 @@ export default class StorefrontCore {
       kernel: this.kernel,
       notification: this.notification,
       
-      // Core state
-      currencySymbol: this.currencySymbol,
-      filteredProducts: this.filteredProducts,
-      currentLayout: this.currentLayout,
-      currentSearchQuery: this.currentSearchQuery,
-      activeCategoryId: this.activeCategoryId,
-      activeFilters: this.activeFilters,
-      singleProductViewActive: this.singleProductViewActive,
-      previousViewState: this.previousViewState,
-      templateHolder: this.templateHolder,
-      itemsPerBatch: this.itemsPerBatch,
-      loadedCount: this.loadedCount,
-      
-      // UI Actions (ONLY cart and layout actions)
+      // Cart actions (temporary)
       showCart: this.showCart.bind(this),
       closeCart: this.closeCart.bind(this),
       showCartPage: this.showCartPage.bind(this),
       closeCartPage: this.closeCartPage.bind(this),
-      setLayout: this.setLayout.bind(this),
       
       // Formatting
       formatPrice: this.formatPrice.bind(this),
@@ -198,75 +277,85 @@ export default class StorefrontCore {
       
       // Customer and place
       customer: this.customer || null,
-      place: this.place || null,
-      
-      // Callbacks for UI interactions (set after renderer creation)
-      onSearch: null,
-      onSort: null,
-      onFilterChange: null,
-      onClearFilters: null,
-      onCategorySelect: null,
-      onProductClick: null
+      place: this.place || null
     };
 
-    // 11. Initialize Renderers with minimal context
+    // ==========================================================
+    // 11. CREATE RENDERERS
+    // ==========================================================
     this.productRenderer = new ProductRenderer(this.rendererContext);
     this.collectionRenderer = new CollectionRenderer(this.rendererContext);
     this.cartRenderer = new CartRenderer(this.rendererContext);
 
-    // 12. Wire up callbacks between renderers
-    // Search callback: ProductRenderer → CollectionRenderer
+    // ==========================================================
+    // 12. WIRE CALLBACKS (THIS IS THE CRITICAL PART)
+    // ==========================================================
+    
+    // ProductRenderer → CollectionRenderer (search, sort, back)
     this.productRenderer.onSearch = (query) => {
       this.collectionRenderer.handleSearch(query);
     };
     
-    // Sort callback: ProductRenderer → CollectionRenderer
     this.productRenderer.onSort = (sortType) => {
       this.collectionRenderer.handleSort(sortType);
     };
     
-    // Product click callback: ProductRenderer → ProductRenderer (self)
-    this.productRenderer.onProductClick = (product) => {
-      this.productRenderer.renderSingleProduct(product);
-    };
-    
-    // Back to list callback: ProductRenderer → CollectionRenderer
     this.productRenderer.onBackToList = () => {
       this.collectionRenderer.handleBackToList();
     };
     
-    // Filter callbacks: CollectionRenderer → ProductRenderer
-    this.collectionRenderer.onFilterApplied = (filteredProducts) => {
+    this.productRenderer.onFilterChange = (filters) => {
+      this.collectionRenderer.handleFilterChange(filters);
+    };
+    
+    this.productRenderer.onClearFilters = () => {
+      this.collectionRenderer.clearAllFilters();
+    };
+    
+    // ProductRenderer → StorefrontCore (layout change)
+    this.productRenderer.onLayoutChange = (layout) => {
+      this.updateState('currentLayout', layout);
       this.productRenderer.renderProductDisplays();
     };
     
-    // Category select callback: CollectionRenderer → ProductRenderer
+    // CollectionRenderer → StorefrontCore → ProductRenderer (filter results)
+    this.collectionRenderer.onFilterApplied = (filteredProducts) => {
+      this.updateState('filteredProducts', filteredProducts);
+      this.productRenderer.filteredProducts = filteredProducts;
+      this.productRenderer.renderProductDisplays();
+    };
+    
     this.collectionRenderer.onCategorySelect = () => {
       this.productRenderer.renderProductDisplays();
     };
+    
+    // CartService → CartRenderer (cart updated)
+    this.services.cart.onCartUpdated = () => {
+      this.cartRenderer.showCart();
+    };
 
-    // 13. Register URL state restorers
+    // ==========================================================
+    // 13. URL STATE RESTORERS
+    // ==========================================================
     this.registerUrlStateRestorer(this.restoreCartState);
     this.registerUrlStateRestorer(this.restoreSearchState);
 
-    // 14. Fire off the Engine
+    // ==========================================================
+    // 14. FIRE OFF THE ENGINE
+    // ==========================================================
     this.init();
   }
 
-  /**
-   * Record a CommercialDecision for debugging
-   * @param {CommercialDecision} decision
-   */
+  // ==========================================================
+  // HELPERS
+  // ==========================================================
+
   recordDecision(decision) {
     if (this.inspector && this.inspector.enabled) {
       this.inspector.record(decision);
     }
   }
 
-  /**
-   * Extracts unique categories from products
-   * @returns {Array} Array of category objects { id, name, count }
-   */
   _extractCategories() {
     const catMap = new Map();
     this.products.forEach(product => {
@@ -284,11 +373,8 @@ export default class StorefrontCore {
   // PUBLIC API
   // ==========================================================
 
-  /**
-   * Opens the cart page programmatically
-   */
   openCart() {
-    console.log('🔍 4. openCart() called');
+    console.log('🔍 openCart() called');
     this.showCartPage();
   }
 
@@ -296,9 +382,6 @@ export default class StorefrontCore {
   // URL STATE RESTORATION
   // ==========================================================
 
-  /**
-   * Returns the current browser URL state
-   */
   getCurrentRoute() {
     return {
       pathname: window.location.pathname,
@@ -307,36 +390,22 @@ export default class StorefrontCore {
     };
   }
 
-  /**
-   * Restores Cartique UI state from the current URL
-   */
   async restoreStateFromUrl() {
-    console.log('🔍 1. restoreStateFromUrl() called');
+    console.log('🔍 restoreStateFromUrl() called');
     await this.restoreCartState();
   }
 
-  /**
-   * Restores cart state from URL
-   */
   restoreCartState() {
-    console.log('🔍 2. restoreCartState() called');
+    console.log('🔍 restoreCartState() called');
     const route = this.getCurrentRoute();
-    console.log('🔍    route.hash:', route.hash);
-    console.log('🔍    route.params.get("ui"):', route.params.get('ui'));
-
     if (route.hash === '#cart' || route.params.get('ui') === 'cart') {
-      console.log('🔍 3. Cart route detected — calling openCart()');
       this.openCart();
     }
   }
 
-  /**
-   * Restores search state from URL
-   */
   async restoreSearchState() {
     const route = this.getCurrentRoute();
     const query = route.params.get('search');
-
     if (query !== null) {
       if (this.productRenderer && this.productRenderer.onSearch) {
         this.productRenderer.onSearch(query);
@@ -344,13 +413,8 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Registers a URL state restorer function
-   */
   registerUrlStateRestorer(restorer) {
-    if (typeof restorer !== 'function') {
-      return;
-    }
+    if (typeof restorer !== 'function') return;
     if (!this.urlStateRestorers.includes(restorer)) {
       this.urlStateRestorers.push(restorer);
     }
@@ -360,27 +424,18 @@ export default class StorefrontCore {
   // PUBLIC SEARCH API
   // ==========================================================
 
-  /**
-   * Sets the current search query
-   */
   async setSearchQuery(query = '') {
     if (this.productRenderer && this.productRenderer.onSearch) {
       this.productRenderer.onSearch(query);
     }
   }
 
-  /**
-   * Clears the current search query
-   */
   async clearSearchQuery() {
     if (this.productRenderer && this.productRenderer.onSearch) {
       this.productRenderer.onSearch('');
     }
   }
 
-  /**
-   * Returns the current search query
-   */
   getSearchQuery() {
     return this.currentSearchQuery;
   }
@@ -389,9 +444,6 @@ export default class StorefrontCore {
   // SINGLE PRODUCT VIEW
   // ==========================================================
 
-  /**
-   * Shows a single product view
-   */
   async showSingleProductView(productId) {
     const product = this.products.find(p => p.id === productId);
     if (product && this.productRenderer) {
@@ -399,9 +451,6 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Returns to the product list view
-   */
   async returnToListView() {
     if (this.productRenderer && this.productRenderer.onBackToList) {
       this.productRenderer.onBackToList();
@@ -409,28 +458,27 @@ export default class StorefrontCore {
   }
 
   // ==========================================================
-  // LAYOUT AND RENDERING (Delegated to ProductRenderer)
+  // LAYOUT
   // ==========================================================
 
-  /**
-   * Sets the layout
-   */
   async setLayout(layout) {
-    await this.productRenderer.setLayout(layout);
+    if (!this.productRenderer) {
+      console.warn('ProductRenderer not available for setLayout');
+      return;
+    }
+    try {
+      await this.productRenderer.setLayout(layout);
+    } catch (error) {
+      console.warn('setLayout failed:', error.message);
+    }
   }
 
   // ==========================================================
-  // CART METHODS (Delegated to CartRenderer)
+  // CART METHODS
   // ==========================================================
 
-  /**
-   * Shows the cart
-   */
   showCart() {
-    if (!this.cartRenderer) {
-      console.warn('CartRenderer not available');
-      return;
-    }
+    if (!this.cartRenderer) return;
     try {
       this.cartRenderer.showCart();
     } catch (error) {
@@ -438,14 +486,8 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Closes the cart
-   */
   closeCart() {
-    if (!this.cartRenderer) {
-      console.warn('CartRenderer not available');
-      return;
-    }
+    if (!this.cartRenderer) return;
     try {
       this.cartRenderer.closeCart();
     } catch (error) {
@@ -453,14 +495,8 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Shows the cart page
-   */
   showCartPage() {
-    if (!this.cartRenderer) {
-      console.warn('CartRenderer not available');
-      return;
-    }
+    if (!this.cartRenderer) return;
     try {
       this.cartRenderer.showCartPage();
     } catch (error) {
@@ -468,14 +504,8 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Closes the cart page
-   */
   closeCartPage() {
-    if (!this.cartRenderer) {
-      console.warn('CartRenderer not available');
-      return;
-    }
+    if (!this.cartRenderer) return;
     try {
       this.cartRenderer.closeCartPage();
     } catch (error) {
@@ -484,12 +514,9 @@ export default class StorefrontCore {
   }
 
   // ==========================================================
-  // FORMATTING UTILITIES
+  // FORMATTING
   // ==========================================================
 
-  /**
-   * Formats a price
-   */
   formatPrice(price) {
     if (price === undefined || price === null || isNaN(price)) {
       return '0.00';
@@ -497,9 +524,6 @@ export default class StorefrontCore {
     return Number(price).toFixed(2);
   }
 
-  /**
-   * Formats a date
-   */
   formatDate(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -510,41 +534,28 @@ export default class StorefrontCore {
   // INITIALIZATION
   // ==========================================================
 
-  /**
-   * Initializes the Cartique instance
-   */
   async init() {
     try {
-      // Inject CSS (must be first)
       this.theme.injectCSS();
       this.theme.applyTheme();
 
-      // 1. Sync display states from features
       const sidebarEnabled = this.features.sidebar &&
         (this.features.sidebarFeatures?.enabled !== false);
       this.features.sidebarDisplay = sidebarEnabled ? 'block' : 'none';
       this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
-      // 2. DOM setup
       this.container = document.querySelector(`#${this.features.containerId}`);
       if (!this.container) {
         throw new Error(`Container with ID "${this.features.containerId}" not found`);
       }
 
-      // Update notification container
       this.notification.container = this.container;
       this.rendererContext.container = this.container;
 
-      // 3. Component Loading
       await this.fetchAndExtractComponents();
-
-      // 4. Injects main structural components into the DOM
       await this.renderAllComponents();
-
-      // 5. Initial Product Render
       await this.productRenderer.renderProductDisplays();
 
-      // 6. Interactivity & Completion
       this.setupEventListeners();
       await this.completeInitialization();
 
@@ -554,12 +565,8 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Fetches and extracts component templates
-   */
   async fetchAndExtractComponents() {
     const cartiqueComponents = document.getElementById('cartique-components');
-
     if (!cartiqueComponents) {
       throw new Error('Could not find #cartique-components in the DOM');
     }
@@ -571,62 +578,21 @@ export default class StorefrontCore {
       throw new Error('Failed to create template holder for components');
     }
 
-    // Pass templateHolder to renderers
     this.productRenderer.templateHolder = this.templateHolder;
     this.collectionRenderer.templateHolder = this.templateHolder;
     this.cartRenderer.templateHolder = this.templateHolder;
-    
-    // Update renderer context
     this.rendererContext.templateHolder = this.templateHolder;
   }
 
-  /**
-   * Renders all main components — calls renderers directly
-   */
   async renderAllComponents() {
-    try {
-      await this.productRenderer.renderMainFrame();
-    } catch (e) {
-      console.warn('renderMainFrame failed:', e.message);
-    }
+    try { await this.productRenderer.renderMainFrame(); } catch (e) { console.warn('renderMainFrame failed:', e.message); }
+    try { await this.productRenderer.renderSidebar(); } catch (e) { console.warn('renderSidebar failed:', e.message); }
+    try { await this.collectionRenderer.renderCatalogueMenu(); } catch (e) { console.warn('renderCatalogueMenu failed:', e.message); }
+    try { await this.productRenderer.renderControls(); } catch (e) { console.warn('renderControls failed:', e.message); }
+    try { await this.productRenderer.renderFooter(); } catch (e) { console.warn('renderFooter failed:', e.message); }
+    try { await this.cartRenderer.renderCartSlider(); } catch (e) { console.warn('renderCartSlider failed:', e.message); }
+    try { await this.cartRenderer.renderCartItemTemplate(); } catch (e) { console.warn('renderCartItemTemplate failed:', e.message); }
 
-    try {
-      await this.productRenderer.renderSidebar();
-    } catch (e) {
-      console.warn('renderSidebar failed:', e.message);
-    }
-
-    try {
-      await this.collectionRenderer.renderCatalogueMenu();
-    } catch (e) {
-      console.warn('renderCatalogueMenu failed:', e.message);
-    }
-
-    try {
-      await this.productRenderer.renderControls();
-    } catch (e) {
-      console.warn('renderControls failed:', e.message);
-    }
-
-    try {
-      await this.productRenderer.renderFooter();
-    } catch (e) {
-      console.warn('renderFooter failed:', e.message);
-    }
-
-    try {
-      await this.cartRenderer.renderCartSlider();
-    } catch (e) {
-      console.warn('renderCartSlider failed:', e.message);
-    }
-
-    try {
-      await this.cartRenderer.renderCartItemTemplate();
-    } catch (e) {
-      console.warn('renderCartItemTemplate failed:', e.message);
-    }
-
-    // Apply sidebar visibility
     const sidebar = document.getElementById('cartique-sidebar');
     if (sidebar) {
       sidebar.style.display = this.features.sidebarDisplay;
@@ -640,7 +606,6 @@ export default class StorefrontCore {
       }
     }
 
-    // Render sidebar filters if enabled
     const sidebarEnabled = this.features.sidebar &&
       (this.features.sidebarFeatures?.enabled !== false);
     if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
@@ -652,9 +617,6 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Sets up event listeners
-   */
   setupEventListeners() {
     const gridButton = document.querySelector('.cartique-grid-view');
     const listButton = document.querySelector('.cartique-list-view');
@@ -668,26 +630,17 @@ export default class StorefrontCore {
     }
   }
 
-  /**
-   * Completes initialization and restores state
-   */
   async completeInitialization() {
     const container = document.getElementById(this.features.containerId);
     if (container) {
       container.style.visibility = 'visible';
       container.style.opacity = '1';
     }
-
     await this.restoreStateFromUrl();
   }
 
-  /**
-   * Cleans up the component on destruction
-   */
   destroy() {
     cleanupEventListeners.call(this);
-
-    // Clear toast timeouts
     if (this.toastTimer1) clearTimeout(this.toastTimer1);
     if (this.toastTimer2) clearTimeout(this.toastTimer2);
     if (this.redirectTimer) clearTimeout(this.redirectTimer);
