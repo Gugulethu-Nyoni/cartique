@@ -5,11 +5,47 @@
  *
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
+ * Phase 3.6.2: Safe context method checks.
  */
 
 export default class ProductRenderer {
     constructor(context) {
         Object.assign(this, context);
+        
+        // Ensure eventListeners exists
+        if (!this.eventListeners) {
+            this.eventListeners = new Map();
+        }
+        
+        // Ensure addEventListener is bound
+        if (!this.addEventListener) {
+            this.addEventListener = (el, event, handler) => {
+                el.addEventListener(event, handler);
+                const key = `${el.id || el.className}-${event}`;
+                if (!this.eventListeners.has(key)) {
+                    this.eventListeners.set(key, []);
+                }
+                this.eventListeners.get(key).push({ element: el, event, handler });
+            };
+        }
+        
+        // Ensure debounce exists
+        if (!this.debounce) {
+            this.debounce = (func, wait, immediate = false) => {
+                let timeout;
+                return function executedFunction(...args) {
+                    const context = this;
+                    const later = () => {
+                        timeout = null;
+                        if (!immediate) func.apply(context, args);
+                    };
+                    const callNow = immediate && !timeout;
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                    if (callNow) func.apply(context, args);
+                };
+            };
+        }
     }
 
     async renderSingleProduct(product) {
@@ -67,19 +103,32 @@ export default class ProductRenderer {
         productView.className = 'single-product-view';
         
         // --- BULK PRICING: Single Product View ---
-        const variant = this.adapter.getSelectedVariant(product);
-        const decision = await this.adapter.resolvePricing({
-            sellable: product,
-            variant: variant,
-            quantity: 1,
-            customer: this.customer,
-            place: this.place
-        });
+        let variant = null;
+        try {
+            variant = this.adapter?.getSelectedVariant(product);
+        } catch (e) {
+            console.warn('Failed to get variant:', e.message);
+            variant = { price: product.price || 0 };
+        }
+        
+        let decision;
+        try {
+            decision = await this.adapter?.resolvePricing({
+                sellable: product,
+                variant: variant,
+                quantity: 1,
+                customer: this.customer,
+                place: this.place
+            });
+        } catch (e) {
+            console.warn('Pricing resolution failed:', e.message);
+            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
+        }
 
         // Extract data from CommercialDecision directly
-        const item = decision.items?.[0] || {};
-        const adjustments = decision.adjustments || [];
-        const totals = decision.totals || {};
+        const item = decision?.items?.[0] || {};
+        const adjustments = decision?.adjustments || [];
+        const totals = decision?.totals || {};
         
         const hasBulk = adjustments.some(a => 
             a.type === 'bulk_discount' || 
@@ -144,19 +193,23 @@ export default class ProductRenderer {
         }
         // --- END BULK PRICING ---
         
+        // Safely get render methods
+        const renderProductDetails = this.renderProductDetails || (() => '');
+        const renderProductReviews = this.renderProductReviews || (() => '');
+        
         productView.innerHTML = `
             <button class="back-to-products">← Back to Products</button>
             <div class="product-content-wrapper">
                 <div class="product-image-column">
                     <div class="product-image-container">
-                        <img src="${product.image}" alt="${product.title}" loading="lazy">
+                        <img src="${product.image || ''}" alt="${product.title || ''}" loading="lazy">
                     </div>
                 </div>
                 <div class="product-info-column">
                     <div class="product-meta">
-                        <h2>${product.title}</h2>
+                        <h2>${product.title || ''}</h2>
                         ${priceHTML}
-                        <p class="product-description">${product.description}</p>
+                        <p class="product-description">${product.description || ''}</p>
                     </div>
                     <button class="spv-cartique_add_to_cart" id="${product.id}">ADD TO CART</button>
                 </div>
@@ -167,39 +220,47 @@ export default class ProductRenderer {
                     <button class="tab-button active" data-tab="reviews">Reviews</button>
                 </div>
                 <div class="tab-content" data-tab-content="details">
-                    ${this.renderProductDetails(product)}
+                    ${renderProductDetails(product)}
                 </div>
                 <div class="tab-content active" data-tab-content="reviews">
-                    ${this.renderProductReviews(product)}
+                    ${renderProductReviews(product)}
                 </div>
             </div>
         `;
 
-        // Add event listeners
+        // Add event listeners with safe checks
         const backBtn = productView.querySelector('.back-to-products');
         const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
         const tabButtons = productView.querySelectorAll('.tab-button');
 
-        if (backBtn) {
-            this.addEventListener(backBtn, 'click', () => this.returnToListView());
+        if (backBtn && this.addEventListener) {
+            this.addEventListener(backBtn, 'click', () => {
+                if (typeof this.returnToListView === 'function') {
+                    this.returnToListView();
+                }
+            });
         }
 
-        if (addToCartBtn) {
+        if (addToCartBtn && this.addEventListener) {
             this.addEventListener(addToCartBtn, 'click', async (e) => {
-                await this.addToCart(e);
+                if (typeof this.addToCart === 'function') {
+                    await this.addToCart(e);
+                }
             });
         }
 
         tabButtons.forEach(button => {
-            this.addEventListener(button, 'click', () => {
-                productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
-                    el.classList.remove('active');
+            if (this.addEventListener) {
+                this.addEventListener(button, 'click', () => {
+                    productView.querySelectorAll('.tab-button, .tab-content').forEach(el => {
+                        el.classList.remove('active');
+                    });
+                    button.classList.add('active');
+                    const tabName = button.dataset.tab;
+                    const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
+                    if (content) content.classList.add('active');
                 });
-                button.classList.add('active');
-                const tabName = button.dataset.tab;
-                const content = productView.querySelector(`[data-tab-content="${tabName}"]`);
-                if (content) content.classList.add('active');
-            });
+            }
         });
 
         // Append to DOM first
@@ -222,8 +283,8 @@ export default class ProductRenderer {
                 }
                 
                 const productId = parseInt(form.querySelector('#review-product-id').value);
-                const product = this.products.find(p => p.id === productId);
-                if (product) {
+                const product = this.products?.find(p => p.id === productId);
+                if (product && typeof this.submitReview === 'function') {
                     this.submitReview(form, product);
                 }
             });
@@ -243,7 +304,7 @@ export default class ProductRenderer {
     }
 
     renderProductDetails(product) {
-        const attributes = product.variants?.[0]?.attributes || [];
+        const attributes = product?.variants?.[0]?.attributes || [];
         
         if (attributes.length === 0) {
             return '<p>No additional details available.</p>';
@@ -253,7 +314,7 @@ export default class ProductRenderer {
             <div class="product-details-list">
                 ${attributes.map(attr => `
                     <div class="detail-row">
-                        <span class="detail-key">${attr.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                        <span class="detail-key">${String(attr.key).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
                         <span class="detail-value">${attr.value}</span>
                     </div>
                 `).join('')}
@@ -261,9 +322,105 @@ export default class ProductRenderer {
         `;
     }
 
+    renderProductReviews(product) {
+        const reviews = product?.reviews || [];
+        const avgRating = reviews.length > 0 
+            ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+            : 0;
+        
+        const distribution = [5, 4, 3, 2, 1].map(star => ({
+            star,
+            count: reviews.filter(r => r.rating === star).length,
+            percentage: reviews.length > 0 
+                ? Math.round((reviews.filter(r => r.rating === star).length / reviews.length) * 100)
+                : 0
+        }));
+        
+        return `
+            <div class="product-reviews">
+                <div class="reviews-summary">
+                    <div class="reviews-average">
+                        <span class="reviews-rating-number">${avgRating}</span>
+                        <div class="reviews-stars">
+                            ${this.renderStars ? this.renderStars(parseFloat(avgRating)) : ''}
+                        </div>
+                        <span class="reviews-count">${reviews.length} review${reviews.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    ${this.features?.reviews?.showRatingDistribution ? `
+                    <div class="reviews-distribution">
+                        ${distribution.map(d => `
+                            <div class="distribution-row">
+                                <span class="distribution-label">${d.star} ★</span>
+                                <div class="distribution-bar">
+                                    <div class="distribution-fill" style="width: ${d.percentage}%"></div>
+                                </div>
+                                <span class="distribution-count">${d.count}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="reviews-list">
+                    ${reviews.length === 0 ? `
+                        <p class="reviews-empty">No reviews yet. Be the first to review this product!</p>
+                    ` : reviews.map(review => `
+                        <div class="review-card">
+                            <div class="review-header">
+                                <div class="review-stars">
+                                    ${this.renderStars ? this.renderStars(review.rating) : ''}
+                                </div>
+                                <span class="review-date">${this.formatDate ? this.formatDate(review.createdAt) : ''}</span>
+                            </div>
+                            <p class="review-author">${review.customer?.name || 'Anonymous'}</p>
+                            ${review.comment ? `<p class="review-comment">${review.comment}</p>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="review-form-container">
+                    <h4>Write a Review</h4>
+                    <form id="review-form" class="review-form">
+                        <input type="hidden" id="review-product-id" value="${product.id}">
+                        <div class="review-rating-input">
+                            <label>Your Rating:</label>
+                            <div class="star-rating-input">
+                                ${[5,4,3,2,1].map(star => `
+                                    <input type="radio" id="star${star}" name="rating" value="${star}">
+                                    <label for="star${star}" title="${star} star${star > 1 ? 's' : ''}">★</label>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="review-comment-input">
+                            <label for="review-comment">Your Review:</label>
+                            <textarea id="review-comment" name="comment" rows="4" placeholder="Share your experience with this product..."></textarea>
+                        </div>
+                        <button type="button" class="review-submit-btn" id="review-submit-btn">Submit Review</button>
+                    </form>
+                </div>
+            </div>
+        `;
+    }
+
+    renderStars(rating) {
+        const numRating = parseFloat(rating) || 0;
+        const fullStars = Math.floor(numRating);
+        const hasHalf = (numRating % 1) >= 0.5;
+        const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
+        
+        return `
+            ${'<span class="star filled">★</span>'.repeat(Math.max(0, fullStars))}
+            ${hasHalf ? '<span class="star half">★</span>' : ''}
+            ${'<span class="star empty">★</span>'.repeat(Math.max(0, emptyStars))}
+        `;
+    }
+
     async createProductCard(product) {
-        const wrapper = this.templateHolder.content.getElementById('cartique-product-grid-component');
-        if (!wrapper) return null;
+        const wrapper = this.templateHolder?.content?.getElementById('cartique-product-grid-component');
+        if (!wrapper) {
+            console.warn('Grid component template not found');
+            return null;
+        }
 
         const productCardTemplate = wrapper.firstElementChild?.cloneNode(true);
         if (!productCardTemplate) return null;
@@ -271,18 +428,31 @@ export default class ProductRenderer {
         await this.updateProductElement(productCardTemplate, product);
 
         // --- BULK PRICING: Grid Card ---
-        const variant = this.adapter.getSelectedVariant(product);
-        const decision = await this.adapter.resolvePricing({
-            sellable: product,
-            variant: variant,
-            quantity: 1,
-            customer: this.customer,
-            place: this.place
-        });
+        let variant = null;
+        try {
+            variant = this.adapter?.getSelectedVariant(product);
+        } catch (e) {
+            console.warn('Failed to get variant:', e.message);
+            variant = { price: product.price || 0 };
+        }
+        
+        let decision;
+        try {
+            decision = await this.adapter?.resolvePricing({
+                sellable: product,
+                variant: variant,
+                quantity: 1,
+                customer: this.customer,
+                place: this.place
+            });
+        } catch (e) {
+            console.warn('Pricing resolution failed:', e.message);
+            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
+        }
 
         // Extract data from CommercialDecision directly
-        const item = decision.items?.[0] || {};
-        const adjustments = decision.adjustments || [];
+        const item = decision?.items?.[0] || {};
+        const adjustments = decision?.adjustments || [];
         
         const hasBulk = adjustments.some(a => 
             a.type === 'bulk_discount' || 
@@ -314,10 +484,8 @@ export default class ProductRenderer {
         };
 
         if (bulkDisplay.hasBulk) {
-            // Find the currency-price-display container
             const priceContainer = productCardTemplate.querySelector('.currency-price-display');
             if (priceContainer) {
-                // Remove existing bulk indicator if any
                 const existing = priceContainer.querySelector('.cartique-bulk-pricing');
                 if (existing) existing.remove();
 
@@ -335,28 +503,37 @@ export default class ProductRenderer {
 
         // Add image click handler
         const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
-        if (imgContainer) {
+        if (imgContainer && this.addEventListener) {
             imgContainer.dataset.productId = product.id;
             imgContainer.style.cursor = 'pointer';
             this.addEventListener(imgContainer, 'click', (e) => {
                 e.preventDefault();
-                this.showSingleProductView(product.id);
+                if (typeof this.showSingleProductView === 'function') {
+                    this.showSingleProductView(product.id);
+                }
             });
         }
 
         // Add to cart button
         const addToCartBtn = productCardTemplate.querySelector('.cartique_add_to_cart');
-        if (addToCartBtn) {
+        if (addToCartBtn && this.addEventListener) {
             addToCartBtn.id = product.id;
-            this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
+            this.addEventListener(addToCartBtn, 'click', (e) => {
+                if (typeof this.addToCart === 'function') {
+                    this.addToCart(e);
+                }
+            });
         }
 
         return productCardTemplate;
     }
 
     async createProductListing(product) {
-        const wrapper = this.templateHolder.content.getElementById('cartique-product-list-component');
-        if (!wrapper) return null;
+        const wrapper = this.templateHolder?.content?.getElementById('cartique-product-list-component');
+        if (!wrapper) {
+            console.warn('List component template not found');
+            return null;
+        }
 
         const productListingTemplate = wrapper.firstElementChild?.cloneNode(true);
         if (!productListingTemplate) return null;
@@ -365,18 +542,31 @@ export default class ProductRenderer {
         await this.updateProductElement(productListingTemplate, product);
 
         // --- BULK PRICING: List Card ---
-        const variant = this.adapter.getSelectedVariant(product);
-        const decision = await this.adapter.resolvePricing({
-            sellable: product,
-            variant: variant,
-            quantity: 1,
-            customer: this.customer,
-            place: this.place
-        });
+        let variant = null;
+        try {
+            variant = this.adapter?.getSelectedVariant(product);
+        } catch (e) {
+            console.warn('Failed to get variant:', e.message);
+            variant = { price: product.price || 0 };
+        }
+        
+        let decision;
+        try {
+            decision = await this.adapter?.resolvePricing({
+                sellable: product,
+                variant: variant,
+                quantity: 1,
+                customer: this.customer,
+                place: this.place
+            });
+        } catch (e) {
+            console.warn('Pricing resolution failed:', e.message);
+            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
+        }
 
         // Extract data from CommercialDecision directly
-        const item = decision.items?.[0] || {};
-        const adjustments = decision.adjustments || [];
+        const item = decision?.items?.[0] || {};
+        const adjustments = decision?.adjustments || [];
         
         const hasBulk = adjustments.some(a => 
             a.type === 'bulk_discount' || 
@@ -408,10 +598,8 @@ export default class ProductRenderer {
         };
 
         if (bulkDisplay.hasBulk) {
-            // Find the currency-price-display container
             const priceContainer = productListingTemplate.querySelector('.currency-price-display');
             if (priceContainer) {
-                // Remove existing bulk indicator if any
                 const existing = priceContainer.querySelector('.cartique-bulk-pricing');
                 if (existing) existing.remove();
 
@@ -427,29 +615,32 @@ export default class ProductRenderer {
         }
         // --- END BULK PRICING ---
 
-        // FIX: Add image click handler for single product view
         const imgContainer = productListingTemplate.querySelector('.cartique_product_image_container');
-        if (imgContainer) {
+        if (imgContainer && this.addEventListener) {
             imgContainer.dataset.productId = product.id;
             imgContainer.style.cursor = 'pointer';
             this.addEventListener(imgContainer, 'click', (e) => {
                 e.preventDefault();
-                this.showSingleProductView(product.id);
+                if (typeof this.showSingleProductView === 'function') {
+                    this.showSingleProductView(product.id);
+                }
             });
         }
 
-        // FIX: Add lazy loading to image
         const img = productListingTemplate.querySelector('#image');
         if (img) {
             img.loading = 'lazy';
             img.decoding = 'async';
         }
 
-        // Add to cart button
         const addToCartBtn = productListingTemplate.querySelector('.cartique_add_to_cart');
-        if (addToCartBtn) {
+        if (addToCartBtn && this.addEventListener) {
             addToCartBtn.id = product.id;
-            this.addEventListener(addToCartBtn, 'click', (e) => this.addToCart(e));
+            this.addEventListener(addToCartBtn, 'click', (e) => {
+                if (typeof this.addToCart === 'function') {
+                    this.addToCart(e);
+                }
+            });
         }
 
         return productListingTemplate;
@@ -457,26 +648,26 @@ export default class ProductRenderer {
 
     async updateProductElement(element, product) {
         // Update all product fields EXCEPT currency
-        for (const [key, value] of Object.entries(product)) {
-            if (key === 'currency') continue; // Skip - handled below
+        for (const [key, value] of Object.entries(product || {})) {
+            if (key === 'currency') continue;
             
             const target = element.querySelector(`#${key}`);
             if (!target) continue;
 
             switch (target.tagName) {
             case 'IMG':
-                target.src = value;
-                target.alt = product.title || '';
+                target.src = value || '';
+                target.alt = product?.title || '';
                 break;
             case 'A':
-                target.href = value;
+                target.href = value || '';
                 break;
             default:
-                target.textContent = value;
+                target.textContent = value || '';
             }
         }
 
-        // Update ALL currency symbols (both regular and sale)
+        // Update ALL currency symbols
         const currencyEls = element.querySelectorAll('#currency');
         currencyEls.forEach(el => {
             el.textContent = this.currencySymbol || '$';
@@ -489,7 +680,7 @@ export default class ProductRenderer {
         const salePriceEl = element.querySelector('#sale_price');
         const salePriceCurrencyEl = element.querySelector('#sale_price_currency');
 
-        if (product.sale_price && product.original_price) {
+        if (product?.sale_price && product?.original_price) {
             if (priceEl) {
                 priceEl.textContent = this.formatPrice(product.original_price);
                 priceEl.style.textDecoration = 'line-through';
@@ -511,7 +702,7 @@ export default class ProductRenderer {
                 salePriceCurrencyEl.style.color = 'red';
                 salePriceCurrencyEl.style.fontWeight = 'bold';
             }
-        } else if (product.sale_price) {
+        } else if (product?.sale_price) {
             if (priceEl) {
                 priceEl.textContent = this.formatPrice(product.price);
                 priceEl.style.textDecoration = 'line-through';
@@ -535,7 +726,7 @@ export default class ProductRenderer {
             }
         } else {
             if (priceEl) {
-                priceEl.textContent = this.formatPrice(product.price);
+                priceEl.textContent = this.formatPrice(product?.price || 0);
                 priceEl.style.textDecoration = '';
                 priceEl.style.color = '';
                 priceEl.style.opacity = '';
@@ -555,46 +746,53 @@ export default class ProductRenderer {
             }
         }
 
-        // STOCK MANAGEMENT: Handle Add to Cart button state and stock display
-        const variant = this.adapter.getSelectedVariant(product);
-        const inventory = await this.adapter.resolveInventory({
-            sellable: product,
-            variant: variant
-        });
-        const stockCount = inventory.quantity || 0;
+        // STOCK MANAGEMENT
+        let variant = null;
+        try {
+            variant = this.adapter?.getSelectedVariant(product);
+        } catch (e) {
+            console.warn('Failed to get variant for stock:', e.message);
+        }
+        
+        let inventory;
+        try {
+            inventory = await this.adapter?.resolveInventory({
+                sellable: product,
+                variant: variant
+            });
+        } catch (e) {
+            console.warn('Inventory resolution failed:', e.message);
+            inventory = { quantity: 10 };
+        }
+        
+        const stockCount = inventory?.quantity || 0;
         const addToCartBtn = element.querySelector('.cartique_add_to_cart');
         
         if (addToCartBtn) {
-            // Store stock data as dataset attributes for later validation
             addToCartBtn.dataset.stock = stockCount;
-            addToCartBtn.dataset.productId = product.id;
+            addToCartBtn.dataset.productId = product?.id;
             
             if (stockCount === 0) {
-                // SOLD OUT - disable button
                 addToCartBtn.disabled = true;
                 addToCartBtn.style.opacity = '0.5';
                 addToCartBtn.style.cursor = 'not-allowed';
                 addToCartBtn.title = 'SOLD OUT';
                 
-                // Update button text to show SOLD OUT
                 const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
                 if (btnText && btnText.textContent?.includes('ADD TO CART')) {
                     btnText.textContent = 'SOLD OUT';
                 }
             } else if (stockCount > 0 && stockCount <= 5) {
-                // Low stock - enable but show warning
                 addToCartBtn.disabled = false;
                 addToCartBtn.style.opacity = '1';
                 addToCartBtn.style.cursor = 'pointer';
                 addToCartBtn.title = `Only ${stockCount} left in stock`;
                 
-                // Optionally show stock count on the button
                 const btnText = addToCartBtn.querySelector('span') || addToCartBtn;
                 if (btnText && btnText.textContent?.includes('SOLD OUT')) {
                     btnText.textContent = 'ADD TO CART';
                 }
             } else {
-                // Normal stock - enable button
                 addToCartBtn.disabled = false;
                 addToCartBtn.style.opacity = '1';
                 addToCartBtn.style.cursor = 'pointer';
@@ -607,7 +805,7 @@ export default class ProductRenderer {
             }
         }
 
-        // Optional: Add stock indicator near the product
+        // Optional: Add stock indicator
         const existingStockIndicator = element.querySelector('.cartique-stock-indicator');
         if (existingStockIndicator) {
             existingStockIndicator.remove();
@@ -625,7 +823,6 @@ export default class ProductRenderer {
                 text-transform: uppercase;
             `;
             
-            // Insert after the add to cart button or at the end of the element
             if (addToCartBtn && addToCartBtn.parentNode) {
                 addToCartBtn.parentNode.insertBefore(stockIndicator, addToCartBtn.nextSibling);
             } else {
@@ -651,21 +848,12 @@ export default class ProductRenderer {
     }
 
     async renderProductDisplays() {
-        // 1. Determine Source Data
-        // Use filtered products if available, otherwise fall back to the master list
-        const displayData = this.filteredProducts || this.products;
-
-        // 2. Determine Active Layout
-        // Defaults to 'grid' if no layout state is stored
+        const displayData = this.filteredProducts || this.products || [];
         const layout = this.currentLayout || 'grid';
 
-        // 3. Locate UI Containers
         const gridContainer = document.getElementById('cartique-product-grid');
         const listContainer = document.getElementById('cartique-product-list');
 
-        // 4. Handle Visibility & Rendering Logic
-        // We toggle displays to 'none' for the inactive layout to prevent 
-        // products from stacking or appearing twice on the page.
         if (layout === 'grid') {
             if (listContainer) listContainer.style.display = 'none';
             if (gridContainer) {
@@ -693,14 +881,12 @@ export default class ProductRenderer {
             return;
         }
 
-        // 1. RESET STATE: Reset the count for the infinite scroll batch
-        this.itemsPerBatch = this.features.itemsPerPage || 12;
+        this.itemsPerBatch = this.features?.itemsPerPage || 12;
         this.loadedCount = this.itemsPerBatch;
         container.innerHTML = '';
         
         const productsToRender = data || this.filteredProducts || [];
 
-        // 2. EMPTY STATE GUARD
         if (productsToRender.length === 0) {
             container.innerHTML = `
                 <div class="no-results-msg" style="grid-column: 1 / -1; width: 100%; text-align: center; padding: 4rem 1rem;">
@@ -712,35 +898,36 @@ export default class ProductRenderer {
             return;
         }
 
-        // 3. INITIAL SLICE: Only render the first batch
         const initialSlice = productsToRender.slice(0, this.itemsPerBatch);
-
-        // 4. BATCH RENDER (Fragment)
         const fragment = document.createDocumentFragment();
+        
         for (const product of initialSlice) {
-            const productElement = layout === 'grid'
-                ? await this.createProductCard(product)
-                : await this.createProductListing(product);
+            let productElement;
+            try {
+                productElement = layout === 'grid'
+                    ? await this.createProductCard(product)
+                    : await this.createProductListing(product);
+            } catch (e) {
+                console.warn('Product creation failed:', e.message);
+                continue;
+            }
             
             if (productElement) fragment.appendChild(productElement);
         }
 
         container.appendChild(fragment);
 
-        // 5. INITIALIZE INFINITE SCROLL OBSERVER
-        // We only start observing if there are more products left to load
-        if (productsToRender.length > this.itemsPerBatch) {
+        if (productsToRender.length > this.itemsPerBatch && typeof this.setupInfiniteScroll === 'function') {
             this.setupInfiniteScroll();
         }
     }
 
     async renderMainFrame() {
-        // Ensure container exists
-        const containerId = this.features.containerId || 'cartique';
+        const containerId = this.features?.containerId || 'cartique';
         let container = this.container || document.getElementById(containerId);
         
         if (!container) {
-            if (this.features.debug) {
+            if (this.features?.debug) {
                 console.warn(`#${containerId} missing. Creating demo mount.`);
             }
             container = document.createElement('div');
@@ -752,7 +939,7 @@ export default class ProductRenderer {
         const mainFrameTemplate = document.createElement('template');
         mainFrameTemplate.innerHTML = `
             <div class="cartique-container" id="cartique-container">
-                <aside class="cartique-sidebar" id="cartique-sidebar" style="display: ${this.features.sidebarDisplay}">
+                <aside class="cartique-sidebar" id="cartique-sidebar" style="display: ${this.features?.sidebarDisplay || 'block'}">
                     <div id="cartique-menu-anchor-sidebar" class="cartique-menu-anchor"></div>
                     <div id="cartique-sidebar-content"></div>
                 </aside>
@@ -768,7 +955,7 @@ export default class ProductRenderer {
                         <div class="cartique-product-grid" id="cartique-product-grid"></div>
                         <div class="cartique-product-list" id="cartique-product-list"></div>
                     </div>
-                    <footer class="cartique-product-footer" id="cartique-product-footer" style="display:${this.features.footerDisplay}"></footer>
+                    <footer class="cartique-product-footer" id="cartique-product-footer" style="display:${this.features?.footerDisplay || 'block'}"></footer>
                 </main>
             </div>
             <div id="cartique-hidden-blocks"></div>
@@ -790,18 +977,24 @@ export default class ProductRenderer {
         container.appendChild(mainFrameTemplate.content.cloneNode(true));
         
         const overlay = document.getElementById('cart-slide-overlay');
-        if (overlay) {
-            this.addEventListener(overlay, 'click', this.closeCart.bind(this));
+        if (overlay && this.addEventListener) {
+            this.addEventListener(overlay, 'click', () => {
+                if (typeof this.closeCart === 'function') {
+                    this.closeCart();
+                }
+            });
         }
     }
 
     async renderSidebar() {
-        const sidebarWrapper = this.templateHolder.content.getElementById('cartique-sidebar-component');
-        if (!sidebarWrapper) return;
+        const sidebarWrapper = this.templateHolder?.content?.getElementById('cartique-sidebar-component');
+        if (!sidebarWrapper) {
+            console.warn('Sidebar template not found');
+            return;
+        }
 
         let sidebarContainer = document.getElementById('cartique-sidebar');
         if (!sidebarContainer) {
-            // Create sidebar container if missing
             const mainContent = document.getElementById('cartique-main-content');
             if (mainContent) {
                 sidebarContainer = document.createElement('aside');
@@ -819,7 +1012,6 @@ export default class ProductRenderer {
     }
 
     async renderControls() {
-        // Helper to ensure container exists
         const ensureContainer = (id) => {
             let el = document.getElementById(id);
             if (!el) {
@@ -838,59 +1030,75 @@ export default class ProductRenderer {
             return el;
         };
 
-        // Search
-        const searchWrapper = this.templateHolder.content.getElementById('cartique-search-container-component');
+        const searchWrapper = this.templateHolder?.content?.getElementById('cartique-search-container-component');
         if (searchWrapper) {
             const searchContainer = ensureContainer('cartique-search-container');
             searchContainer.innerHTML = '';
             searchContainer.appendChild(searchWrapper.cloneNode(true));
             
             const searchInput = searchContainer.querySelector('.cartique-search');
-            if (searchInput) {
-                this.addEventListener(searchInput, 'input', 
-                    this.debounce(this.handleSearch.bind(this), 300)
-                );
+            if (searchInput && this.addEventListener) {
+                const debouncedHandler = this.debounce ? 
+                    this.debounce(() => {
+                        if (typeof this.handleSearch === 'function') {
+                            this.handleSearch({ target: searchInput });
+                        }
+                    }, 300) : 
+                    () => {
+                        if (typeof this.handleSearch === 'function') {
+                            this.handleSearch({ target: searchInput });
+                        }
+                    };
+                this.addEventListener(searchInput, 'input', debouncedHandler);
             }
         }
 
-        // Sort
-        const sortWrapper = this.templateHolder.content.getElementById('cartique-sort-container-component');
+        const sortWrapper = this.templateHolder?.content?.getElementById('cartique-sort-container-component');
         if (sortWrapper) {
             const sortContainer = ensureContainer('cartique-sort-container');
             sortContainer.innerHTML = '';
             sortContainer.appendChild(sortWrapper.cloneNode(true));
             
             const sortDropdown = sortContainer.querySelector('.cartique-sort');
-            if (sortDropdown) {
-                this.addEventListener(sortDropdown, 'change', this.handleSort.bind(this));
+            if (sortDropdown && this.addEventListener) {
+                this.addEventListener(sortDropdown, 'change', () => {
+                    if (typeof this.handleSort === 'function') {
+                        this.handleSort({ target: sortDropdown });
+                    }
+                });
             }
         }
 
-        // View toggles
-        const togglesWrapper = this.templateHolder.content.getElementById('cartique-view-toggles-container-component');
+        const togglesWrapper = this.templateHolder?.content?.getElementById('cartique-view-toggles-container-component');
         if (togglesWrapper) {
             const togglesContainer = ensureContainer('cartique-view-toggles-container');
             togglesContainer.innerHTML = '';
             togglesContainer.appendChild(togglesWrapper.cloneNode(true));
         }
 
-        // Cart icon
-        const cartIconWrapper = this.templateHolder.content.getElementById('shopping-cart-icon-container-component');
+        const cartIconWrapper = this.templateHolder?.content?.getElementById('shopping-cart-icon-container-component');
         if (cartIconWrapper) {
             const cartIconContainer = ensureContainer('shopping-cart-icon-container');
             cartIconContainer.innerHTML = '';
             cartIconContainer.appendChild(cartIconWrapper.cloneNode(true));
             
             const cartIcon = document.getElementById('shopping-cart-icon');
-            if (cartIcon) {
-                this.addEventListener(cartIcon, 'click', this.showCart.bind(this));
+            if (cartIcon && this.addEventListener) {
+                this.addEventListener(cartIcon, 'click', () => {
+                    if (typeof this.showCart === 'function') {
+                        this.showCart();
+                    }
+                });
             }
         }
     }
 
     async renderFooter() {
-        const wrapper = this.templateHolder.content.getElementById('cartique-product-footer-component');
-        if (!wrapper) return;
+        const wrapper = this.templateHolder?.content?.getElementById('cartique-product-footer-component');
+        if (!wrapper) {
+            console.warn('Footer template not found');
+            return;
+        }
 
         let footerContainer = document.getElementById('cartique-product-footer');
         if (!footerContainer) {
