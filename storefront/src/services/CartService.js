@@ -3,7 +3,6 @@
  *
  * CartService — Cart operations
  *
- * Migrated from: cartique/storefront/src/Storefront.js
  * Phase 2: Integrated adapter for inventory resolution.
  * Phase 3.7.1: Shared state integration, dataset-based product ID, callback-based updates.
  */
@@ -12,7 +11,7 @@ export default class CartService {
     constructor(context = {}) {
         Object.assign(this, context);
         
-        // Validate shared state
+        //  Validate shared state
         if (!this.state) {
             throw new Error('CartService requires shared state object');
         }
@@ -26,7 +25,7 @@ export default class CartService {
      * @param {Event} event - The click event
      */
     async addToCart(event) {
-        // Use dataset instead of id for better separation
+        //  Use dataset instead of id for better separation
         const productId = Number(event.target.dataset.productId);
         
         if (!productId) {

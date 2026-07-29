@@ -343,6 +343,34 @@ export default class StorefrontCore {
     // ==========================================================
     // 14. FIRE OFF THE ENGINE
     // ==========================================================
+
+    // 7. Initialize Adapter (Phase 2A: legacy mode)
+    this.adapter = new CartiqueAdapter(this.kernel, {
+        legacyMode: true,
+        debug: this.features.debug || false
+    });
+
+    // 8. Pass adapter to services
+    if (this.services?.pricing?.setAdapter) {
+        this.services.pricing.setAdapter(this.adapter);
+    }
+    if (this.services?.cart?.setAdapter) {
+        this.services.cart.setAdapter(this.adapter);
+    }
+
+    // 7. Initialize Adapter (Phase 2A: legacy mode)
+    this.adapter = new CartiqueAdapter(this.kernel, {
+        legacyMode: true,
+        debug: this.features.debug || false
+    });
+
+    // 8. Pass adapter to services
+    if (this.services?.pricing?.setAdapter) {
+        this.services.pricing.setAdapter(this.adapter);
+    }
+    if (this.services?.cart?.setAdapter) {
+        this.services.cart.setAdapter(this.adapter);
+    }
     this.init();
   }
 
