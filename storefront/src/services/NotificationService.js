@@ -4,7 +4,7 @@
  * NotificationService — UI notifications
  *
  * Safe for both browser and Node.js environments.
- * Phase 3.7.1: Removed green emoji, replaced with checkmark icon.
+ * Phase 3.7: Removed green emoji, replaced with checkmark icon.
  */
 
 export default class NotificationService {
@@ -60,7 +60,7 @@ export default class NotificationService {
 
         this.clearToastTimeouts();
 
-        // Update toast content - remove green emoji, use checkmark icon
+        // ✅ Remove green emoji, use SVG checkmark
         const svgEl = toast.querySelector('.svg');
         if (svgEl) {
             svgEl.innerHTML = `
