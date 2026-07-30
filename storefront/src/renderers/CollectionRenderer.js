@@ -8,6 +8,7 @@
  * Phase 3.6.2: Safe context method checks and recursion prevention.
  * Phase 3.6.3: Callback-based UI interactions.
  * Phase 3.7.1: Shared state integration.
+ * Phase 3.7: Category filtering, back navigation, single render trigger.
  *
  * Single ownership: Search, Sort, Filters, Categories
  */
@@ -52,6 +53,11 @@ export default class CollectionRenderer {
      * @param {string} query - The search query
      */
     handleSearch(query) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CollectionRenderer.handleSearch:', query);
+            console.trace();
+        }
+        
         this.state.currentSearchQuery = query || '';
         this.currentSearchQuery = this.state.currentSearchQuery; // Legacy alias
         this.applyAllFilters();
@@ -62,6 +68,11 @@ export default class CollectionRenderer {
      * @param {string} sortType - The sort type (price-asc, price-desc, title-asc, title-desc)
      */
     handleSort(sortType) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CollectionRenderer.handleSort:', sortType);
+            console.trace();
+        }
+        
         if (!sortType) return;
         this.state.currentSortType = sortType;
         this.currentSortType = this.state.currentSortType; // Legacy alias
@@ -69,12 +80,68 @@ export default class CollectionRenderer {
     }
 
     /**
+     * Handles category selection from menu
+     * @param {string} catId - The category ID (or 'all' for all products)
+     */
+    async handleCategorySelect(catId) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CollectionRenderer.handleCategorySelect:', catId);
+            console.trace();
+        }
+
+        // Update state
+        this.activeCategoryId = (catId === 'all') ? null : catId;
+        this.state.activeCategoryId = this.activeCategoryId;
+
+        // Update UI using INSTANCE container, NOT global query
+        const containerId = this.features?.containerId || 'cartique';
+        const container = document.getElementById(containerId);
+        if (container) {
+            const menuContainer = container.querySelector('[data-menu-container]');
+            if (menuContainer) {
+                menuContainer.querySelectorAll('.cartique-menu-item').forEach(item => {
+                    const isActive = item.dataset.catId === catId;
+                    item.classList.toggle('active', isActive);
+                });
+            }
+        }
+
+        // Apply filters — triggers onFilterApplied → render (ONLY ONE)
+        await this.applyAllFilters();
+        
+        // Trigger callback if set
+        if (typeof this.onCategorySelect === 'function') {
+            this.onCategorySelect(this.activeCategoryId);
+        }
+    }
+
+    /**
      * Returns to product list view (called from ProductRenderer)
      */
-    handleBackToList() {
+    async handleBackToList() {
+        if (this.features?.debug) {
+            console.log('[TRACE] CollectionRenderer.handleBackToList called');
+            console.trace();
+        }
+        
+        // Reset state
         this.state.singleProductViewActive = false;
-        this.singleProductViewActive = false; // Legacy alias
-        this.applyAllFilters();
+        this.singleProductViewActive = false;
+        this.state.selectedProduct = null;
+        
+        // Clear single product DOM container
+        const containerId = this.features?.containerId || 'cartique';
+        const container = document.getElementById(containerId);
+        if (container) {
+            const productView = container.querySelector('#single-product-view-container');
+            if (productView) {
+                productView.innerHTML = '';
+                productView.style.display = 'none';
+            }
+        }
+        
+        // Re-render collection
+        await this.applyAllFilters();
     }
 
     /**
@@ -108,6 +175,7 @@ export default class CollectionRenderer {
                 if (mainContent) {
                     anchor = document.createElement('div');
                     anchor.id = 'cartique-menu-anchor-top';
+                    anchor.dataset.menuContainer = 'true';
                     mainContent.prepend(anchor);
                 } else {
                     console.warn('Menu anchor not found, skipping menu render');
@@ -121,7 +189,7 @@ export default class CollectionRenderer {
 
             // Build simple menu HTML
             let html = `
-                <div class="cartique-menu-container">
+                <div class="cartique-menu-container" data-menu-container>
                     <ul class="cartique-menu-list">
                         <li class="cartique-menu-item ${activeId === 'all' ? 'active' : ''}" data-cat-id="all">
                             All Products
@@ -144,19 +212,7 @@ export default class CollectionRenderer {
                     this.addEventListener(item, 'click', async (e) => {
                         e.preventDefault();
                         const catId = item.getAttribute('data-cat-id');
-                        this.state.activeCategoryId = (catId === 'all') ? null : catId;
-                        this.activeCategoryId = this.state.activeCategoryId; // Legacy alias
-                        
-                        // Re-render menu WITHOUT recursion
-                        await this._renderMenuInternal();
-                        
-                        // Apply filters and notify
-                        await this.applyAllFilters();
-                        
-                        // Trigger callback if set
-                        if (typeof this.onCategorySelect === 'function') {
-                            this.onCategorySelect(this.state.activeCategoryId);
-                        }
+                        await this.handleCategorySelect(catId);
                     });
                 }
             });
@@ -182,7 +238,7 @@ export default class CollectionRenderer {
         const activeId = String(this.state.activeCategoryId || 'all');
 
         let html = `
-            <div class="cartique-menu-container">
+            <div class="cartique-menu-container" data-menu-container>
                 <ul class="cartique-menu-list">
                     <li class="cartique-menu-item ${activeId === 'all' ? 'active' : ''}" data-cat-id="all">
                         All Products
@@ -205,6 +261,11 @@ export default class CollectionRenderer {
      * @deprecated Use applyAllFilters() instead
      */
     async applyFilters(activeFilters) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CollectionRenderer.applyFilters (deprecated):', activeFilters);
+            console.trace();
+        }
+        
         const hasActiveFilters = Object.keys(activeFilters || {}).length > 0;
 
         if (!hasActiveFilters) {
@@ -228,25 +289,52 @@ export default class CollectionRenderer {
      * Updates filteredProducts and triggers re-render
      */
     async applyAllFilters() {
-        if (!this.products || !Array.isArray(this.products)) {
-            console.warn('Products not available for filtering');
-            this.state.filteredProducts = [];
-            this.filteredProducts = this.state.filteredProducts; // Legacy alias
-            await this._notifyFilterApplied();
-            return;
+        if (this.features?.debug) {
+            console.log('[TRACE] applyAllFilters called');
+            console.trace();
         }
 
-        // Start with all products
-        let result = [...this.products];
+        // ✅ Always start from the master product list
+        let result = [...(this.products || [])];
 
-        // 1. Category Filter
+        // --- CATEGORY FILTER ---
         if (this.state.activeCategoryId) {
-            result = result.filter(product => 
-                product.categories?.some(c => String(c.id) === String(this.state.activeCategoryId)) || false
+            result = result.filter(product =>
+                product.categories?.some(c => 
+                    String(c.id) === String(this.state.activeCategoryId)
+                )
             );
         }
 
-        // 2. Search Query Filter
+        // --- ATTRIBUTE FILTERS ---
+        if (this.state.activeFilters && Object.keys(this.state.activeFilters).length > 0) {
+            result = result.filter(product => {
+                return Object.entries(this.state.activeFilters).every(([key, selectedValues]) => {
+                    if (!selectedValues || !selectedValues.length) return true;
+                    
+                    if (key === 'priceRange') {
+                        const price = product.price || 0;
+                        return selectedValues.some(rangeLabel => {
+                            const numbers = rangeLabel.match(/\d+/g)?.map(Number);
+                            if (!numbers) return false;
+                            if (rangeLabel.includes('Under')) return price < numbers[0];
+                            if (rangeLabel.includes('Over')) return price > numbers[0];
+                            if (numbers.length === 2) return price >= numbers[0] && price <= numbers[1];
+                            return false;
+                        });
+                    }
+
+                    return product.variants?.some(variant =>
+                        variant.attributes?.some(attr =>
+                            attr.key.toLowerCase() === key.toLowerCase() &&
+                            selectedValues.includes(attr.value)
+                        )
+                    );
+                });
+            });
+        }
+
+        // --- SEARCH ---
         if (this.state.currentSearchQuery) {
             const query = this.state.currentSearchQuery.toLowerCase().trim();
             result = result.filter(product => {
@@ -263,60 +351,34 @@ export default class CollectionRenderer {
             });
         }
 
-        // 3. Sidebar Attribute Filters
-        if (this.state.activeFilters && Object.keys(this.state.activeFilters).length > 0) {
-            const attributeFilters = Object.entries(this.state.activeFilters).filter(
-                ([key]) => key !== 'category'
-            );
-            
-            result = result.filter(product => {
-                return attributeFilters.every(([key, selectedValues]) => {
-                    if (!selectedValues || !selectedValues.length) return true;
-                    
-                    if (key === 'priceRange') {
-                        const effectivePrice = product.sale_price || product.price || 
-                            Math.min(...(product.variants?.map(v => v.sale_price || v.price) || [product.price]));
-                        return selectedValues.some(rangeLabel => this._checkPriceMatch(effectivePrice, rangeLabel));
-                    }
-
-                    return product.variants?.some(variant => 
-                        variant.attributes?.some(attr => 
-                            String(attr.key).toLowerCase() === String(key).toLowerCase() && 
-                            selectedValues.includes(attr.value)
-                        )
-                    ) || false;
-                });
-            });
+        // --- SORT ---
+        switch (this.state.currentSortType) {
+            case 'price-asc':
+                result.sort((a, b) => (a.price || 0) - (b.price || 0));
+                break;
+            case 'price-desc':
+                result.sort((a, b) => (b.price || 0) - (a.price || 0));
+                break;
+            case 'title-asc':
+                result.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                break;
+            case 'title-desc':
+                result.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+                break;
         }
 
-        // 4. Apply sort if active
-        if (this.state.currentSortType) {
-            switch (this.state.currentSortType) {
-                case 'price-asc':
-                    result.sort((a, b) => (a.price || 0) - (b.price || 0));
-                    break;
-                case 'price-desc':
-                    result.sort((a, b) => (b.price || 0) - (a.price || 0));
-                    break;
-                case 'title-asc':
-                    result.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                    break;
-                case 'title-desc':
-                    result.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        // 5. Update state
+        // ✅ Update state
         this.state.filteredProducts = result;
-        this.filteredProducts = result; // Legacy alias
-        this.state.loadedCount = 0;
-        this.loadedCount = 0; // Legacy alias
+        this.filteredProducts = result;
 
-        // 6. Notify
-        await this._notifyFilterApplied();
+        // ✅ Single render trigger
+        if (typeof this.onFilterApplied === 'function') {
+            if (this.features?.debug) {
+                console.log('[TRACE] calling onFilterApplied with', result.length, 'products');
+                console.trace();
+            }
+            this.onFilterApplied(result);
+        }
     }
 
     /**
@@ -324,6 +386,11 @@ export default class CollectionRenderer {
      * Calls onFilterApplied callback if set
      */
     async _notifyFilterApplied() {
+        if (this.features?.debug) {
+            console.log('[TRACE] _notifyFilterApplied called');
+            console.trace();
+        }
+        
         if (typeof this.onFilterApplied === 'function') {
             await this.onFilterApplied(this.state.filteredProducts);
         } else if (typeof this.renderProductDisplays === 'function') {
@@ -540,6 +607,11 @@ export default class CollectionRenderer {
      * @param {HTMLElement} element - The changed checkbox
      */
     async handleFilterChange(element) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CollectionRenderer.handleFilterChange');
+            console.trace();
+        }
+        
         const activeFilters = {};
         const checkedBoxes = document.querySelectorAll('.option-item input:checked');
 
@@ -647,6 +719,11 @@ export default class CollectionRenderer {
      * Clears all active filters
      */
     async clearAllFilters() {
+        if (this.features?.debug) {
+            console.log('[TRACE] CollectionRenderer.clearAllFilters');
+            console.trace();
+        }
+        
         const checkboxes = document.querySelectorAll('#cartique-filter-sidebar input[type="checkbox"]');
         checkboxes.forEach(cb => {
             cb.checked = false;
