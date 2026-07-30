@@ -9,6 +9,7 @@
  * Phase 3.6.3: Callback-based UI interactions.
  * Phase 3.7.1: Shared state integration.
  * Phase 3.7: Add to Cart pipeline, Back navigation, FOUC prevention.
+ * Phase 2: Theme Component System integration.
  *
  * Single ownership: Layout + Product Display
  */
@@ -64,6 +65,10 @@ export default class ProductRenderer {
         this.onFilterChange = null;
         this.onClearFilters = null;
         this.onLayoutChange = null;
+        
+        // THEME COMPONENTS
+        this.themeManager = context.themeManager || null;
+        this.componentRegistry = context.componentRegistry || null;
     }
 
     async renderSingleProduct(product) {
@@ -169,7 +174,7 @@ export default class ProductRenderer {
             bulkPrice: bulkPrice,
             unitPrice: unitPrice,
             minimumQty: bulkMinQty,
-            heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            heading: hasBulk ? 'Bulk Price Applied' : 'BULK PRICE',
             message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
             displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
             bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
@@ -243,7 +248,7 @@ export default class ProductRenderer {
             </div>
         `;
 
-        // ✅ Back button — uses onBackToList callback
+        // Back button — uses onBackToList callback
         const backBtn = productView.querySelector('.back-to-products');
         if (backBtn) {
             backBtn.onclick = async (e) => {
@@ -262,7 +267,7 @@ export default class ProductRenderer {
             };
         }
 
-        // ✅ Add to Cart button — uses dataset.productId
+        // Add to Cart button — uses dataset.productId
         const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
         if (addToCartBtn) {
             addToCartBtn.dataset.productId = product.id;
@@ -449,197 +454,235 @@ export default class ProductRenderer {
         `;
     }
 
-
-
- async createProductCard(product) {
-    // --- BULK PRICING: Get variant and decision first ---
-    let variant = null;
-    try {
-        variant = this.adapter?.getSelectedVariant(product);
-    } catch (e) {
-        console.warn('Failed to get variant:', e.message);
-        variant = { price: product.price || 0 };
-    }
-    
-    let decision;
-    try {
-        decision = await this.adapter?.resolvePricing({
-            sellable: product,
-            variant: variant,
-            quantity: 1,
-            customer: this.customer,
-            place: this.place
-        });
-    } catch (e) {
-        console.warn('Pricing resolution failed:', e.message);
-        decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
-    }
-
-    // Check if theme has a custom ProductCard component
-    const themeName = this.themeManager?.currentName || 'default';
-    const customCard = this.componentRegistry?.get(themeName, 'ProductCard');
-    
-    if (customCard) {
-        // Use theme-specific component
-        const card = new customCard(this);
-        const html = card.render(product, decision);
+    /**
+     * Create a product card — supports theme components with fallback
+     * @param {Object} product - Product data
+     * @returns {Promise<HTMLElement|null>}
+     */
+    async createProductCard(product) {
+        // Get variant and decision first (needed for both theme and default)
+        let variant = null;
+        try {
+            variant = this.adapter?.getSelectedVariant(product);
+        } catch (e) {
+            console.warn('Failed to get variant:', e.message);
+            variant = { price: product.price || 0 };
+        }
         
-        // Create a wrapper and set innerHTML
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = html;
-        const productCardTemplate = wrapper.firstElementChild;
-        
+        let decision;
+        try {
+            decision = await this.adapter?.resolvePricing({
+                sellable: product,
+                variant: variant,
+                quantity: 1,
+                customer: this.customer,
+                place: this.place
+            });
+        } catch (e) {
+            console.warn('Pricing resolution failed:', e.message);
+            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
+        }
+
+        // Check if theme has custom ProductCard component
+        const theme = this.themeManager?.currentName || 'default';
+        const override = this.componentRegistry?.get(theme, 'ProductCard');
+
+        if (this.features?.debug) {
+            console.log('[Theme Component Lookup]', {
+                theme,
+                override: override ? 'Found' : 'Not found',
+                productId: product.id
+            });
+        }
+
+        // If theme has an override, use it
+        if (override) {
+            try {
+                const card = new override(this);
+                const result = card.render(product, decision);
+
+                // Handle string result (HTML)
+                if (typeof result === 'string') {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = result;
+                    const element = wrapper.firstElementChild;
+                    if (element) {
+                        this._attachThemeCardEvents(element, product);
+                        return element;
+                    }
+                    return wrapper;
+                }
+
+                // Handle HTMLElement result
+                if (result instanceof HTMLElement) {
+                    this._attachThemeCardEvents(result, product);
+                    return result;
+                }
+
+                return result;
+            } catch (error) {
+                console.warn('[ProductRenderer] Theme card failed, falling back to default:', error);
+                // Fall through to default
+            }
+        }
+
+        // Fallback to default rendering
+        return this._createDefaultProductCard(product, variant, decision);
+    }
+
+    /**
+     * Create default product card (fallback)
+     * @param {Object} product - Product data
+     * @param {Object} variant - Product variant
+     * @param {Object} decision - CommercialDecision
+     * @returns {HTMLElement}
+     */
+    _createDefaultProductCard(product, variant, decision) {
+        const wrapper = this.templateHolder?.content?.getElementById('cartique-product-grid-component');
+        if (!wrapper) {
+            console.warn('Grid component template not found');
+            return null;
+        }
+
+        const productCardTemplate = wrapper.firstElementChild?.cloneNode(true);
         if (!productCardTemplate) return null;
+
+        this.updateProductElement(productCardTemplate, product);
+
+        // Extract data from CommercialDecision directly
+        const item = decision?.items?.[0] || {};
+        const adjustments = decision?.adjustments || [];
         
-        // Add event listeners for the theme component
-        this._attachThemeCardEvents(productCardTemplate, product);
+        const hasBulk = adjustments.some(a => 
+            a.type === 'bulk_discount' || 
+            a.label?.toLowerCase().includes('bulk')
+        );
+        const unitPrice = item.unitPrice?.amount || 0;
+        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
         
+        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
+        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
+        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
+
+        const bulkDisplay = {
+            hasBulk: hasBulk,
+            isBulk: hasBulk,
+            retailPrice: retailPrice,
+            bulkPrice: bulkPrice,
+            unitPrice: unitPrice,
+            minimumQty: bulkMinQty,
+            heading: hasBulk ? 'Bulk Price Applied' : 'BULK PRICE',
+            message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
+            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
+            bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
+            staticDisplay: {
+                label: 'BULK PRICE',
+                price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
+                minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
+            }
+        };
+
+        if (bulkDisplay.hasBulk) {
+            const priceContainer = productCardTemplate.querySelector('.currency-price-display');
+            if (priceContainer) {
+                const existing = priceContainer.querySelector('.cartique-bulk-pricing');
+                if (existing) existing.remove();
+
+                const bulkEl = document.createElement('div');
+                bulkEl.className = 'cartique-bulk-pricing';
+                bulkEl.innerHTML = `
+                    <div class="bulk-label">${bulkDisplay.staticDisplay.label}</div>
+                    <div class="bulk-price">${bulkDisplay.staticDisplay.price}</div>
+                    <div class="bulk-min-qty">${bulkDisplay.staticDisplay.minQty}</div>
+                `;
+                priceContainer.appendChild(bulkEl);
+            }
+        }
+
+        // Image click handler
+        const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
+        if (imgContainer && this.addEventListener) {
+            imgContainer.dataset.productId = product.id;
+            imgContainer.style.cursor = 'pointer';
+            this.addEventListener(imgContainer, 'click', async (e) => {
+                e.preventDefault();
+                if (typeof this.renderSingleProduct === 'function') {
+                    await this.renderSingleProduct(product);
+                }
+            });
+        }
+
+        // Add to Cart button
+        const addToCartBtn = productCardTemplate.querySelector('.cartique_add_to_cart');
+        if (addToCartBtn) {
+            addToCartBtn.dataset.productId = product.id;
+            addToCartBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = Number(e.currentTarget.dataset.productId);
+                
+                if (this.features?.debug) {
+                    console.log('[TRACE] Add to Cart clicked:', productId);
+                    console.trace();
+                }
+                
+                if (productId && typeof this.addToCart === 'function') {
+                    await this.addToCart({ productId, quantity: 1 });
+                } else {
+                    console.warn('[TRACE] this.addToCart is not a function');
+                }
+            };
+        }
+
         return productCardTemplate;
     }
 
-    // --- FALLBACK: Default rendering ---
-    const wrapper = this.templateHolder?.content?.getElementById('cartique-product-grid-component');
-    if (!wrapper) {
-        console.warn('Grid component template not found');
-        return null;
-    }
-
-    const productCardTemplate = wrapper.firstElementChild?.cloneNode(true);
-    if (!productCardTemplate) return null;
-
-    await this.updateProductElement(productCardTemplate, product);
-
-    // Extract data from CommercialDecision directly
-    const item = decision?.items?.[0] || {};
-    const adjustments = decision?.adjustments || [];
-    
-    const hasBulk = adjustments.some(a => 
-        a.type === 'bulk_discount' || 
-        a.label?.toLowerCase().includes('bulk')
-    );
-    const unitPrice = item.unitPrice?.amount || 0;
-    const retailPrice = item.comparePrice?.amount || variant?.price || 0;
-    
-    const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
-    const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
-    const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
-
-    const bulkDisplay = {
-        hasBulk: hasBulk,
-        isBulk: hasBulk,
-        retailPrice: retailPrice,
-        bulkPrice: bulkPrice,
-        unitPrice: unitPrice,
-        minimumQty: bulkMinQty,
-        heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
-        message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
-        displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
-        bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-        staticDisplay: {
-            label: 'BULK PRICE',
-            price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-            minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
+    /**
+     * Attach events to theme component card
+     * @param {HTMLElement} element - The card element
+     * @param {Object} product - Product data
+     */
+    _attachThemeCardEvents(element, product) {
+        // Add to cart button
+        const addBtn = element.querySelector('[data-action="add-to-cart"], .fashion-add-to-cart, .add-to-cart, .cartique_add_to_cart');
+        if (addBtn && this.addEventListener) {
+            addBtn.dataset.productId = product.id;
+            this.addEventListener(addBtn, 'click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = Number(e.currentTarget.dataset.productId);
+                if (productId && typeof this.addToCart === 'function') {
+                    await this.addToCart({ productId, quantity: 1 });
+                }
+            });
         }
-    };
 
-    if (bulkDisplay.hasBulk) {
-        const priceContainer = productCardTemplate.querySelector('.currency-price-display');
-        if (priceContainer) {
-            const existing = priceContainer.querySelector('.cartique-bulk-pricing');
-            if (existing) existing.remove();
-
-            const bulkEl = document.createElement('div');
-            bulkEl.className = 'cartique-bulk-pricing';
-            bulkEl.innerHTML = `
-                <div class="bulk-label">${bulkDisplay.staticDisplay.label}</div>
-                <div class="bulk-price">${bulkDisplay.staticDisplay.price}</div>
-                <div class="bulk-min-qty">${bulkDisplay.staticDisplay.minQty}</div>
-            `;
-            priceContainer.appendChild(bulkEl);
+        // Image click - view product
+        const imageContainer = element.querySelector('[data-action="view-product"], .fashion-product-image, .product-image, .cartique_product_image_container');
+        if (imageContainer && this.addEventListener) {
+            imageContainer.style.cursor = 'pointer';
+            this.addEventListener(imageContainer, 'click', async (e) => {
+                e.preventDefault();
+                if (typeof this.renderSingleProduct === 'function') {
+                    await this.renderSingleProduct(product);
+                }
+            });
         }
-    }
-    // --- END BULK PRICING ---
 
-    // Image click handler — calls renderSingleProduct directly
-    const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
-    if (imgContainer && this.addEventListener) {
-        imgContainer.dataset.productId = product.id;
-        imgContainer.style.cursor = 'pointer';
-        this.addEventListener(imgContainer, 'click', async (e) => {
-            e.preventDefault();
-            if (typeof this.renderSingleProduct === 'function') {
-                await this.renderSingleProduct(product);
-            }
+        // Any other data-action elements
+        const actionElements = element.querySelectorAll('[data-action]');
+        actionElements.forEach(el => {
+            const action = el.dataset.action;
+            if (action === 'add-to-cart' || action === 'view-product') return;
+
+            this.addEventListener(el, 'click', (e) => {
+                e.preventDefault();
+                if (this.features?.debug) {
+                    console.log(`[ProductRenderer] Theme action: ${action}`, { product, element: el });
+                }
+            });
         });
     }
-
-    // Add to Cart button — uses dataset.productId and onclick
-    const addToCartBtn = productCardTemplate.querySelector('.cartique_add_to_cart');
-    if (addToCartBtn) {
-        addToCartBtn.dataset.productId = product.id;
-        
-        addToCartBtn.onclick = async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const productId = Number(e.currentTarget.dataset.productId);
-            
-            if (this.features?.debug) {
-                console.log('[TRACE] Add to Cart clicked:', productId);
-                console.trace();
-            }
-            
-            if (productId && typeof this.addToCart === 'function') {
-                await this.addToCart({ productId, quantity: 1 });
-            } else {
-                console.warn('[TRACE] this.addToCart is not a function');
-            }
-        };
-    }
-
-    return productCardTemplate;
-}
-
-/**
- * Attach event listeners to theme component cards
- */
-_attachThemeCardEvents(cardElement, product) {
-    // Image click handler
-    const imgContainer = cardElement.querySelector('.fashion-product-image, .product-image, .cartique_product_image_container');
-    if (imgContainer && this.addEventListener) {
-        imgContainer.style.cursor = 'pointer';
-        this.addEventListener(imgContainer, 'click', async (e) => {
-            e.preventDefault();
-            if (typeof this.renderSingleProduct === 'function') {
-                await this.renderSingleProduct(product);
-            }
-        });
-    }
-
-    // Add to Cart button
-    const addToCartBtn = cardElement.querySelector('.fashion-add-to-cart, .add-to-cart, .cartique_add_to_cart');
-    if (addToCartBtn) {
-        addToCartBtn.dataset.productId = product.id;
-        addToCartBtn.onclick = async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const productId = Number(e.currentTarget.dataset.productId);
-            
-            if (this.features?.debug) {
-                console.log('[TRACE] Theme Add to Cart clicked:', productId);
-                console.trace();
-            }
-            
-            if (productId && typeof this.addToCart === 'function') {
-                await this.addToCart({ productId, quantity: 1 });
-            }
-        };
-    }
-}
-
-
-
-
-    
 
     async createProductListing(product) {
         const wrapper = this.templateHolder?.content?.getElementById('cartique-product-list-component');
@@ -699,7 +742,7 @@ _attachThemeCardEvents(cardElement, product) {
             bulkPrice: bulkPrice,
             unitPrice: unitPrice,
             minimumQty: bulkMinQty,
-            heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            heading: hasBulk ? 'Bulk Price Applied' : 'BULK PRICE',
             message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
             displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
             bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
@@ -728,7 +771,7 @@ _attachThemeCardEvents(cardElement, product) {
         }
         // --- END BULK PRICING ---
 
-        // Image click handler — calls renderSingleProduct directly
+        // Image click handler
         const imgContainer = productListingTemplate.querySelector('.cartique_product_image_container');
         if (imgContainer && this.addEventListener) {
             imgContainer.dataset.productId = product.id;
@@ -747,11 +790,10 @@ _attachThemeCardEvents(cardElement, product) {
             img.decoding = 'async';
         }
 
-        // ✅ Add to Cart button — uses dataset.productId and onclick
+        // Add to Cart button
         const addToCartBtn = productListingTemplate.querySelector('.cartique_add_to_cart');
         if (addToCartBtn) {
             addToCartBtn.dataset.productId = product.id;
-            
             addToCartBtn.onclick = async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
