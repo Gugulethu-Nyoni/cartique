@@ -23,6 +23,7 @@ export default class ThemeManager {
         this._listeners = [];
         this._isLoaded = false;
         this._cssLoaded = false;
+        this._previewToken = null;
     }
 
     _registerDefaultThemes() {
@@ -38,8 +39,13 @@ export default class ThemeManager {
         const theme = await this._load(name);
         this.currentTheme = theme;
         this.currentName = name;
+
         this._applyCSS(theme);
         this._applyVariables(theme.config);
+
+        // Apply components
+        await this._applyComponents(name);
+
         this._isLoaded = true;
         this._emit('theme:initialized', { name, theme });
         return theme;
@@ -52,32 +58,48 @@ export default class ThemeManager {
         }
 
         try {
-            const theme = await this.loader.load(name);
-
-            // Load component overrides for this theme
-            const components = await this._loadComponents(name);
-            if (components) {
-                Object.entries(components).forEach(([componentName, Component]) => {
-                    this.componentRegistry.register(name, componentName, Component);
-                });
-                console.log(`[ThemeManager] Loaded ${Object.keys(components).length} components for theme "${name}"`);
-            }
-
-            return theme;
+            return await this.loader.load(name);
         } catch (error) {
             console.error(`[ThemeManager] Failed to load theme "${name}":`, error);
             throw error;
         }
     }
 
+    /**
+     * Load component overrides for a theme
+     * Pure data loading — no side effects
+     * @param {string} name - Theme name
+     * @returns {Promise<Object|null>} Component map or null
+     */
     async _loadComponents(name) {
         try {
             const module = await import(`./catalog/${name}/components/index.js`);
             return module.default || module;
         } catch (error) {
-            // No component overrides for this theme
+            if (this.options.debug) {
+                console.log(`[ThemeManager] No components found for theme "${name}"`);
+            }
             return null;
         }
+    }
+
+    /**
+     * Apply component overrides to registry
+     * This mutates the registry (side effect)
+     * @param {string} name - Theme name
+     */
+    async _applyComponents(name) {
+        const components = await this._loadComponents(name);
+        if (!components) return;
+
+        Object.entries(components).forEach(([componentName, component]) => {
+            this.componentRegistry.register(name, componentName, component);
+            if (this.options.debug) {
+                console.log(`[ThemeManager] Registered ${componentName} for theme "${name}"`);
+            }
+        });
+
+        console.log(`[ThemeManager] Loaded ${Object.keys(components).length} components for theme "${name}"`);
     }
 
     async load(name) {
@@ -95,13 +117,18 @@ export default class ThemeManager {
 
         const previous = this.currentName;
 
+        // Unload current CSS
         this._unloadCSS();
 
+        // Load new theme
         const theme = await this._load(name);
         this.currentTheme = theme;
         this.currentName = name;
+
+        // Apply CSS, variables, components
         this._applyCSS(theme);
         this._applyVariables(theme.config);
+        await this._applyComponents(name);
 
         this._emit('theme:switched', { from: previous, to: name });
 
@@ -113,23 +140,58 @@ export default class ThemeManager {
             throw new Error(`[ThemeManager] Theme "${name}" not registered`);
         }
 
+        // Store current state
         const previousTheme = this.currentTheme;
         const previousName = this.currentName;
 
+        // Race condition guard
+        const previewToken = Date.now();
+        this._previewToken = previewToken;
+
+        // Load theme data (NO side effects)
         const theme = await this._load(name);
+
+        if (this._previewToken !== previewToken) {
+            return {
+                restore: () => ({
+                    restored: false,
+                    reason: 'Preview superseded'
+                })
+            };
+        }
+
+        // Apply visually (NO state changes)
         this._applyCSS(theme);
         this._applyVariables(theme.config);
+
+        // Apply components for preview
+        await this._applyComponents(name);
 
         this._emit('theme:preview', { name, theme });
 
         return {
             restore: () => {
-                if (!previousTheme) return;
+                if (!previousTheme) {
+                    return { restored: false, reason: 'No previous theme' };
+                }
+
+                // Restore previous theme
                 this._applyCSS(previousTheme);
                 this._applyVariables(previousTheme.config);
+
+                // Restore previous components
+                const prevComponents = this.componentRegistry.getOverrides(previousName);
+                Object.entries(prevComponents).forEach(([compName, comp]) => {
+                    this.componentRegistry.register(previousName, compName, comp);
+                });
+
+                // Restore state
                 this.currentTheme = previousTheme;
                 this.currentName = previousName;
+
                 this._emit('theme:preview:restored', { name: previousName });
+
+                return { restored: true, name: previousName };
             }
         };
     }
