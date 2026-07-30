@@ -1,0 +1,26 @@
+/**
+ * Fashion Theme — Cartique Storefront
+ */
+
+:root {
+    --cartique-theme-primary: #6C3B2A;
+    --cartique-theme-accent: #D4A574;
+    --cartique-theme-background: #F5E6D3;
+    --cartique-theme-text: #1A1A1A;
+    --cartique-theme-radius: 0px;
+}
+
+.cartique-product-card {
+    border-radius: var(--cartique-theme-radius);
+    box-shadow: none;
+    border-bottom: 2px solid var(--cartique-theme-primary);
+}
+
+.cartique-product-card:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.cartique-product-card .cartique-product-title {
+    color: var(--cartique-theme-primary);
+}
