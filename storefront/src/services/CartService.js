@@ -5,13 +5,14 @@
  *
  * Phase 2: Integrated adapter for inventory resolution.
  * Phase 3.7.1: Shared state integration, dataset-based product ID, callback-based updates.
+ * Phase 3.7: Intent-based addToCart, proper quantity handling.
  */
 
 export default class CartService {
     constructor(context = {}) {
         Object.assign(this, context);
         
-        //  Validate shared state
+        // Validate shared state
         if (!this.state) {
             throw new Error('CartService requires shared state object');
         }
@@ -21,20 +22,28 @@ export default class CartService {
     }
 
     /**
-     * Adds a product to the cart
-     * @param {Event} event - The click event
+     * Adds a product to the cart using an intent object
+     * @param {Object} intent - The add to cart intent { productId, quantity }
      */
-    async addToCart(event) {
-        //  Use dataset instead of id for better separation
-        const productId = Number(event.target.dataset.productId);
-        
+    async addToCart(intent) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CartService.addToCart called with:', intent);
+            console.trace();
+        }
+
+        const productId = intent?.productId;
+        const quantity = intent?.quantity || 1;
+
+        // Validate productId
         if (!productId) {
-            console.error('No product ID found in dataset');
+            console.error('CartService: No productId provided in intent');
             return;
         }
-        
-        const product = this.products.find(p => p.id === productId);
 
+        // Check both this.products and this.state.products
+        const product = this.products?.find(p => p.id === productId)
+            || this.state?.products?.find(p => p.id === productId);
+        
         if (!product) {
             console.error('Product not found:', productId);
             return;
@@ -69,18 +78,19 @@ export default class CartService {
             return;
         }
 
+        // Get current cart
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const existingIndex = cart.findIndex(item => item.id === product.id);
 
         if (existingIndex === -1) {
-            // New item - can add 1
+            // New item - add with requested quantity
             cart.push({
                 ...product,
-                cart_quantity: 1
+                cart_quantity: quantity
             });
         } else {
             // Existing item - check if adding more exceeds stock
-            const newQuantity = cart[existingIndex].cart_quantity + 1;
+            const newQuantity = cart[existingIndex].cart_quantity + quantity;
             if (newQuantity > availableStock) {
                 if (typeof this.showStockAlert === 'function') {
                     this.showStockAlert(
@@ -92,9 +102,15 @@ export default class CartService {
             cart[existingIndex].cart_quantity = newQuantity;
         }
 
+        // Save to localStorage
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
         
-        //  Use callback instead of direct UI call
+        if (this.features?.debug) {
+            console.log('[TRACE] Cart updated, calling onCartUpdated');
+            console.trace();
+        }
+        
+        // Use callback instead of direct UI call
         if (typeof this.onCartUpdated === 'function') {
             this.onCartUpdated();
         }
@@ -104,6 +120,11 @@ export default class CartService {
      * Handles checkout action
      */
     checkout() {
+        if (this.features?.debug) {
+            console.log('[TRACE] CartService.checkout called');
+            console.trace();
+        }
+        
         // Check if cart page is open
         const cartPage = document.getElementById('cartique-cart-page');
         if (cartPage) {
@@ -135,7 +156,7 @@ export default class CartService {
             this.state.singleProductViewActive = false;
             this.singleProductViewActive = false; // Legacy alias
         } else {
-            //  Use callback instead of direct UI call
+            // Use callback instead of direct UI call
             if (typeof this.onCartUpdated === 'function') {
                 this.onCartUpdated();
             }
