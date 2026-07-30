@@ -29,6 +29,7 @@ import ProductRenderer from './renderers/ProductRenderer.js';
 import CollectionRenderer from './renderers/CollectionRenderer.js';
 import CartRenderer from './renderers/CartRenderer.js';
 import CartiqueInspector from './debug/CartiqueInspector.js';
+import ThemeManager from './theme/ThemeManager.js';
 
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
@@ -76,7 +77,7 @@ export default class StorefrontCore {
 
     this.features = deepMerge(this.defaultFeatures, features);
     
-    //  Remove fallback — use features.currencySymbol directly
+    // Remove fallback — use features.currencySymbol directly
     this.currencySymbol = this.features.currencySymbol;
 
     // ==========================================================
@@ -126,7 +127,7 @@ export default class StorefrontCore {
       // Selected product for single view
       selectedProduct: null,
       
-      //  No fallback — use features.currencySymbol directly
+      // No fallback — use features.currencySymbol directly
       currencySymbol: this.features?.currencySymbol
     };
 
@@ -183,13 +184,24 @@ export default class StorefrontCore {
     });
 
     // ==========================================================
-    // 6. THEME
+    // 6. THEME (Legacy — kept for backward compatibility)
     // ==========================================================
     this.theme = new DefaultTheme({
       features: this.features,
       containerId: this.features.containerId
     });
 
+    // ==========================================================
+    // 6.5 THEME MANAGER (New theme system)
+    // ==========================================================
+    this.themeManager = new ThemeManager({
+      catalogPath: this.features.catalogPath || '/catalog/',
+      themes: this.features.themes || {}
+    });
+
+    // Initialize with theme from features or default
+    const initialTheme = this.features.theme || 'default';
+    
     // ==========================================================
     // 7. SERVICES
     // ==========================================================
@@ -255,7 +267,7 @@ export default class StorefrontCore {
       container: this.container,
       eventListeners: this.eventListeners,
       
-      //  No fallback — use features.currencySymbol directly
+      // No fallback — use features.currencySymbol directly
       currencySymbol: this.features?.currencySymbol,
       
       // SHARED STATE (SINGLE SOURCE OF TRUTH)
@@ -373,7 +385,7 @@ export default class StorefrontCore {
       // No render here — onFilterApplied handles it
     };
     
-    //  CartService → CartRenderer (cart updated) — async with debug
+    // CartService → CartRenderer (cart updated) — async with debug
     this.services.cart.onCartUpdated = async () => {
       if (this.features?.debug) {
         console.log('[TRACE] onCartUpdated triggered');
@@ -442,7 +454,7 @@ export default class StorefrontCore {
   // ==========================================================
 
   openCart() {
-    console.log('🔍 openCart() called');
+    console.log('openCart() called');
     this.showCartPage();
   }
 
@@ -467,12 +479,12 @@ export default class StorefrontCore {
   }
 
   async restoreStateFromUrl() {
-    console.log('🔍 restoreStateFromUrl() called');
+    console.log('restoreStateFromUrl() called');
     await this.restoreCartState();
   }
 
   restoreCartState() {
-    console.log('🔍 restoreCartState() called');
+    console.log('restoreCartState() called');
     const route = this.getCurrentRoute();
     if (route.hash === '#cart' || route.params.get('ui') === 'cart') {
       this.openCart();
@@ -608,6 +620,53 @@ export default class StorefrontCore {
   }
 
   // ==========================================================
+  // THEME MANAGEMENT API
+  // ==========================================================
+
+  /**
+   * Switch to a different theme
+   * @param {string} name - Theme name
+   * @returns {Promise<Object>} Theme object
+   */
+  setTheme(name) {
+    return this.themeManager.switch(name);
+  }
+
+  /**
+   * Get current theme information
+   * @returns {Object} { name, theme }
+   */
+  getTheme() {
+    return this.themeManager.current();
+  }
+
+  /**
+   * List available themes
+   * @returns {Array<string>} Theme names
+   */
+  listThemes() {
+    return this.themeManager.list();
+  }
+
+  /**
+   * Preview a theme without switching
+   * @param {string} name - Theme name
+   * @returns {Promise<Object>} { restore: Function }
+   */
+  previewTheme(name) {
+    return this.themeManager.preview(name);
+  }
+
+  /**
+   * Get theme information
+   * @param {string} name - Theme name
+   * @returns {Object} Theme info
+   */
+  getThemeInfo(name) {
+    return this.themeManager.getThemeInfo(name);
+  }
+
+  // ==========================================================
   // INITIALIZATION
   // ==========================================================
 
@@ -624,16 +683,20 @@ export default class StorefrontCore {
     this._initialized = true;
 
     try {
-      // 1. Initialize Theme (CSS + FOUC)
+      // 1. Initialize Theme Manager
+      const initialTheme = this.features.theme || 'default';
+      await this.themeManager.initialize(initialTheme);
+      
+      // 2. Initialize Legacy Theme (for backward compatibility)
       await this.theme.initialize();
       
-      // 2. Sync display states
+      // 3. Sync display states
       const sidebarEnabled = this.features.sidebar &&
         (this.features.sidebarFeatures?.enabled !== false);
       this.features.sidebarDisplay = sidebarEnabled ? 'block' : 'none';
       this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
-      // 3. DOM setup
+      // 4. DOM setup
       if (this.isBrowser()) {
         this.container = document.querySelector(`#${this.features.containerId}`);
         if (!this.container) {
@@ -643,7 +706,7 @@ export default class StorefrontCore {
         this.rendererContext.container = this.container;
       }
 
-      // 4. Component loading & rendering
+      // 5. Component loading & rendering
       await this.fetchAndExtractComponents();
       await this.renderAllComponents();
       
@@ -652,11 +715,11 @@ export default class StorefrontCore {
       }
       await this.productRenderer.renderProductDisplays();
       
-      // 5. Event listeners & completion
+      // 6. Event listeners & completion
       this.setupEventListeners();
       await this.completeInitialization();
       
-      // 6. Reveal container
+      // 7. Reveal container
       this.theme.removeLoadingClass();
       
     } catch (error) {
