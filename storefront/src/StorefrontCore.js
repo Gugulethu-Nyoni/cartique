@@ -75,7 +75,8 @@ export default class StorefrontCore {
     };
 
     this.features = deepMerge(this.defaultFeatures, features);
-    this.currencySymbol = this.features.currencySymbol || '$';
+    console.log("[StorefrontCore] features:", this.features);
+    console.log("[StorefrontCore] themeCSS:", this.features.themeCSS);    this.currencySymbol = this.features.currencySymbol || '$';
 
     // ==========================================================
     // 3. DATA STATE MANAGEMENT
