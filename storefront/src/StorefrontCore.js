@@ -19,7 +19,6 @@
 import { deepMerge } from './utils/object.js';
 import { addEventListener, cleanupEventListeners } from './utils/dom.js';
 import { debounce } from './utils/performance.js';
-import DefaultTheme from './theme/DefaultTheme.js';
 import NotificationService from './services/NotificationService.js';
 import CartiqueAdapter from './adapters/CartiqueAdapter.js';
 import PricingService from './services/PricingService.js';
@@ -184,15 +183,7 @@ export default class StorefrontCore {
     });
 
     // ==========================================================
-    // 6. THEME (Legacy — kept for backward compatibility)
-    // ==========================================================
-    this.theme = new DefaultTheme({
-      features: this.features,
-      containerId: this.features.containerId
-    });
-
-    // ==========================================================
-    // 6.5 THEME MANAGER (New theme system)
+    // 6. THEME MANAGER (New theme system)
     // ==========================================================
     this.themeManager = new ThemeManager({
       catalogPath: this.features.catalogPath || '/catalog/',
@@ -291,7 +282,6 @@ export default class StorefrontCore {
       
       // Services
       services: this.services,
-      theme: this.theme,
       adapter: this.adapter,
       kernel: this.kernel,
       notification: this.notification,
@@ -687,16 +677,13 @@ export default class StorefrontCore {
       const initialTheme = this.features.theme || 'default';
       await this.themeManager.initialize(initialTheme);
       
-      // 2. Initialize Legacy Theme (for backward compatibility)
-      await this.theme.initialize();
-      
-      // 3. Sync display states
+      // 2. Sync display states
       const sidebarEnabled = this.features.sidebar &&
         (this.features.sidebarFeatures?.enabled !== false);
       this.features.sidebarDisplay = sidebarEnabled ? 'block' : 'none';
       this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
-      // 4. DOM setup
+      // 3. DOM setup
       if (this.isBrowser()) {
         this.container = document.querySelector(`#${this.features.containerId}`);
         if (!this.container) {
@@ -706,7 +693,7 @@ export default class StorefrontCore {
         this.rendererContext.container = this.container;
       }
 
-      // 5. Component loading & rendering
+      // 4. Component loading & rendering
       await this.fetchAndExtractComponents();
       await this.renderAllComponents();
       
@@ -715,12 +702,9 @@ export default class StorefrontCore {
       }
       await this.productRenderer.renderProductDisplays();
       
-      // 6. Event listeners & completion
+      // 5. Event listeners & completion
       this.setupEventListeners();
       await this.completeInitialization();
-      
-      // 7. Reveal container
-      this.theme.removeLoadingClass();
       
     } catch (error) {
       console.error('Failed to initialize Cartique:', error);
