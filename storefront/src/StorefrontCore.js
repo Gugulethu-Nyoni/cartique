@@ -185,11 +185,44 @@ export default class StorefrontCore {
     // ==========================================================
     // 6. THEME MANAGER (New theme system)
     // ==========================================================
-    this.themeManager = new ThemeManager({
-      catalogPath: this.features.catalogPath || '/catalog/',
-      themes: this.features.themes || {},
-      debug: this.features.debug || false
-    });
+    // ==========================================================
+// 6. THEME MANAGER (New theme system)
+// ==========================================================
+this.themeManager = new ThemeManager({
+    catalogPath: this.features.catalogPath || '/catalog/',
+    themes: this.features.themes || {},
+    debug: this.features.debug || false
+});
+
+// Refresh UI components after theme change
+this.themeManager.on('theme:switched', async ({ from, to }) => {
+
+    if (this.features?.debug) {
+        console.log(
+            `[Theme Render Refresh] ${from} → ${to}`
+        );
+    }
+
+    if (!this.productRenderer || !this.container) {
+        console.warn(
+            '[Theme Render Refresh] Renderer not ready'
+        );
+        return;
+    }
+
+    try {
+        this.productRenderer.container = this.container;
+
+        await this.productRenderer.renderProductDisplays();
+
+    } catch (error) {
+        console.error(
+            '[Theme Render Refresh] Failed:',
+            error
+        );
+    }
+
+});
 
     // ==========================================================
     // 7. SERVICES
