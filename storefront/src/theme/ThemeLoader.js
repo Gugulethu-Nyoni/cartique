@@ -43,13 +43,20 @@ export default class ThemeLoader {
     }
 
     loadCSS(name) {
+        const base = this.catalogPath.endsWith('/')
+            ? this.catalogPath
+            : `${this.catalogPath}/`;
+
         return {
-            url: `${this.catalogPath}${name}/theme.css`,
+            url: `${base}${name}/theme.css`,
             id: `cartique-theme-${name}`
         };
     }
 
     getThemePath(name) {
-        return `${this.catalogPath}${name}/`;
+        const base = this.catalogPath.endsWith('/')
+            ? this.catalogPath
+            : `${this.catalogPath}/`;
+        return `${base}${name}/`;
     }
 }
