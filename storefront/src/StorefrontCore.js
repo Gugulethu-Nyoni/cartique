@@ -187,12 +187,10 @@ export default class StorefrontCore {
     // ==========================================================
     this.themeManager = new ThemeManager({
       catalogPath: this.features.catalogPath || '/catalog/',
-      themes: this.features.themes || {}
+      themes: this.features.themes || {},
+      debug: this.features.debug || false
     });
 
-    // Initialize with theme from features or default
-    const initialTheme = this.features.theme || 'default';
-    
     // ==========================================================
     // 7. SERVICES
     // ==========================================================
@@ -250,7 +248,7 @@ export default class StorefrontCore {
     // ==========================================================
     // 10. RENDERER CONTEXT (WITH SHARED STATE + LEGACY ALIASES)
     // ==========================================================
-    this.rendererContext = {
+    const baseRendererContext = {
       // Data
       products: this.products,
       features: this.features,
@@ -299,11 +297,25 @@ export default class StorefrontCore {
     };
 
     // ==========================================================
-    // 11. CREATE RENDERERS
+    // 11. CREATE RENDERERS (WITH THEMEMANAGER + COMPONENTREGISTRY)
     // ==========================================================
-    this.productRenderer = new ProductRenderer(this.rendererContext);
-    this.collectionRenderer = new CollectionRenderer(this.rendererContext);
-    this.cartRenderer = new CartRenderer(this.rendererContext);
+    this.productRenderer = new ProductRenderer({
+      ...baseRendererContext,
+      themeManager: this.themeManager,
+      componentRegistry: this.themeManager.componentRegistry
+    });
+
+    this.collectionRenderer = new CollectionRenderer({
+      ...baseRendererContext,
+      themeManager: this.themeManager,
+      componentRegistry: this.themeManager.componentRegistry
+    });
+
+    this.cartRenderer = new CartRenderer({
+      ...baseRendererContext,
+      themeManager: this.themeManager,
+      componentRegistry: this.themeManager.componentRegistry
+    });
 
     // ==========================================================
     // 12. WIRE CALLBACKS
@@ -656,6 +668,14 @@ export default class StorefrontCore {
     return this.themeManager.getThemeInfo(name);
   }
 
+  /**
+   * Get the ThemeManager instance
+   * @returns {ThemeManager}
+   */
+  getThemeManager() {
+    return this.themeManager;
+  }
+
   // ==========================================================
   // INITIALIZATION
   // ==========================================================
@@ -690,7 +710,6 @@ export default class StorefrontCore {
           throw new Error(`Container with ID "${this.features.containerId}" not found`);
         }
         this.notification.container = this.container;
-        this.rendererContext.container = this.container;
       }
 
       // 4. Component loading & rendering
@@ -734,7 +753,6 @@ export default class StorefrontCore {
     this.productRenderer.templateHolder = this.templateHolder;
     this.collectionRenderer.templateHolder = this.templateHolder;
     this.cartRenderer.templateHolder = this.templateHolder;
-    this.rendererContext.templateHolder = this.templateHolder;
   }
 
   async renderAllComponents() {
