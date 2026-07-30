@@ -3,9 +3,9 @@
  *
  * DefaultTheme — Built-in storefront theme
  *
- * Migrated from: cartique/storefront/src/Storefront.js
  * Phase 1: Pure extraction. No refactoring.
  * Phase 3.7.1: Browser environment guard for Node/SSR.
+ * Phase 3.7: FOUC prevention, loading class methods, initialize method.
  *
  * TODO: Phase 2 — Move navigation to Router.
  */
@@ -15,8 +15,74 @@ const CARTIQUE_CSS = `
 `;
 
 export default class DefaultTheme {
-    constructor(context) {
+    constructor(context = {}) {
         Object.assign(this, context);
+        this._initialized = false;
+    }
+
+    /**
+     * Check if running in browser environment
+     * @returns {boolean}
+     */
+    isBrowser() {
+        return typeof document !== 'undefined' && typeof window !== 'undefined';
+    }
+
+    /**
+     * Initialize the theme — CSS injection + FOUC prevention
+     */
+    async initialize() {
+        if (this._initialized) {
+            return;
+        }
+        
+        if (!this.isBrowser()) {
+            return;
+        }
+        
+        // Hide container using internal CSS class
+        this.addLoadingClass();
+        
+        // Load CSS
+        this.injectCSS();
+        this.applyTheme();
+        
+        this._initialized = true;
+        
+        if (this.features?.debug) {
+            console.log('[DefaultTheme] Initialized');
+        }
+    }
+
+    /**
+     * Add loading class to container (internal CSS)
+     */
+    addLoadingClass() {
+        if (!this.isBrowser()) return;
+        
+        const containerId = this.features?.containerId || 'cartique';
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.classList.add('cartique-loading');
+            container.style.visibility = 'hidden';
+            container.style.opacity = '0';
+            container.style.transition = 'opacity 0.25s ease, visibility 0.25s ease';
+        }
+    }
+
+    /**
+     * Remove loading class (reveal container)
+     */
+    removeLoadingClass() {
+        if (!this.isBrowser()) return;
+        
+        const containerId = this.features?.containerId || 'cartique';
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.classList.remove('cartique-loading');
+            container.style.visibility = 'visible';
+            container.style.opacity = '1';
+        }
     }
 
     /**
@@ -24,8 +90,8 @@ export default class DefaultTheme {
      * Browser guard for Node/SSR environments
      */
     injectCSS() {
-        // ✅ Browser guard for Node/SSR environments
-        if (typeof document === 'undefined') {
+        // Browser guard for Node/SSR environments
+        if (!this.isBrowser()) {
             return;
         }
         
@@ -46,10 +112,23 @@ export default class DefaultTheme {
                 min-height: 100vh;
             }
             
+            /* =============================================
+               FOUC PREVENTION — Internal Cartique CSS
+               ============================================= */
+            .cartique-loading {
+                opacity: 0;
+                visibility: hidden;
+                transition: opacity 0.25s ease, visibility 0.25s ease;
+            }
+            
             /* Main Cartique CSS */
             ${CARTIQUE_CSS}
         `;
         document.head.appendChild(style);
+        
+        if (this.features?.debug) {
+            console.log('[DefaultTheme] CSS injected');
+        }
     }
 
     /**
@@ -57,8 +136,8 @@ export default class DefaultTheme {
      * Browser guard for Node/SSR environments
      */
     applyTheme() {
-        // ✅ Browser guard for Node/SSR environments
-        if (typeof document === 'undefined') {
+        // Browser guard for Node/SSR environments
+        if (!this.isBrowser()) {
             return;
         }
         
@@ -73,6 +152,10 @@ export default class DefaultTheme {
         if (containerElement) {
             containerElement.setAttribute('data-theme', themeMode);
         }
+        
+        if (this.features?.debug) {
+            console.log('[DefaultTheme] Theme applied:', themeMode);
+        }
     }
 
     /**
@@ -81,8 +164,8 @@ export default class DefaultTheme {
      * Browser guard for Node/SSR environments
      */
     applyMinimalTheme() {
-        // ✅ Browser guard for Node/SSR environments
-        if (typeof document === 'undefined') {
+        // Browser guard for Node/SSR environments
+        if (!this.isBrowser()) {
             return;
         }
         
