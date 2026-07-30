@@ -157,6 +157,9 @@ export default class StorefrontCore {
     this.callbacks = callbacks || {};
     this.kernel = kernel;
 
+    //  Initialize guard to prevent double initialization
+    this._initialized = false;
+
     // Bind addEventListener to this instance
     this.addEventListener = addEventListener.bind(this);
 
@@ -186,18 +189,21 @@ export default class StorefrontCore {
         products: this.products,
         formatPrice: this.formatPrice.bind(this),
         features: this.features,
-        callbacks: this.callbacks
+        callbacks: this.callbacks,
+        state: this.state
       }),
       cart: new CartService({
         products: this.products,
         features: this.features,
         callbacks: this.callbacks,
-        showCart: this.showCart.bind(this)
+        showCart: this.showCart.bind(this),
+        state: this.state
       }),
       locale: new LocaleService({
         currencySymbol: this.currencySymbol,
         features: this.features,
-        callbacks: this.callbacks
+        callbacks: this.callbacks,
+        state: this.state
       })
     };
 
@@ -212,7 +218,7 @@ export default class StorefrontCore {
     });
 
     // ==========================================================
-    // 9. ADAPTER
+    // 9. ADAPTER (SINGLE INITIALIZATION — REMOVED DUPLICATES)
     // ==========================================================
     this.adapter = new CartiqueAdapter(this.kernel, {
       legacyMode: this.features.kernelMode !== true,
@@ -288,7 +294,7 @@ export default class StorefrontCore {
     this.cartRenderer = new CartRenderer(this.rendererContext);
 
     // ==========================================================
-    // 12. WIRE CALLBACKS (THIS IS THE CRITICAL PART)
+    // 12. WIRE CALLBACKS
     // ==========================================================
     
     // ProductRenderer → CollectionRenderer (search, sort, back)
@@ -341,42 +347,22 @@ export default class StorefrontCore {
     this.registerUrlStateRestorer(this.restoreSearchState);
 
     // ==========================================================
-    // 14. FIRE OFF THE ENGINE
+    // 14. NOTE: this.init() is NOT called here.
+    // Caller must call storefront.init() explicitly.
     // ==========================================================
-
-    // 7. Initialize Adapter (Phase 2A: legacy mode)
-    this.adapter = new CartiqueAdapter(this.kernel, {
-        legacyMode: true,
-        debug: this.features.debug || false
-    });
-
-    // 8. Pass adapter to services
-    if (this.services?.pricing?.setAdapter) {
-        this.services.pricing.setAdapter(this.adapter);
-    }
-    if (this.services?.cart?.setAdapter) {
-        this.services.cart.setAdapter(this.adapter);
-    }
-
-    // 7. Initialize Adapter (Phase 2A: legacy mode)
-    this.adapter = new CartiqueAdapter(this.kernel, {
-        legacyMode: true,
-        debug: this.features.debug || false
-    });
-
-    // 8. Pass adapter to services
-    if (this.services?.pricing?.setAdapter) {
-        this.services.pricing.setAdapter(this.adapter);
-    }
-    if (this.services?.cart?.setAdapter) {
-        this.services.cart.setAdapter(this.adapter);
-    }
-    this.init();
   }
 
   // ==========================================================
   // HELPERS
   // ==========================================================
+
+  /**
+   * Check if running in browser environment
+   * @returns {boolean}
+   */
+  isBrowser() {
+    return typeof document !== 'undefined' && typeof window !== 'undefined';
+  }
 
   recordDecision(decision) {
     if (this.inspector && this.inspector.enabled) {
@@ -411,6 +397,14 @@ export default class StorefrontCore {
   // ==========================================================
 
   getCurrentRoute() {
+    if (!this.isBrowser()) {
+      return {
+        pathname: '',
+        hash: '',
+        params: new URLSearchParams()
+      };
+    }
+
     return {
       pathname: window.location.pathname,
       hash: window.location.hash.toLowerCase(),
@@ -562,8 +556,20 @@ export default class StorefrontCore {
   // INITIALIZATION
   // ==========================================================
 
+  /**
+   * Initializes the Cartique instance
+   * Must be called explicitly after instantiation
+   */
   async init() {
+    if (this._initialized) {
+      console.warn('Storefront already initialized');
+      return;
+    }
+
+    this._initialized = true;
+
     try {
+      // Inject CSS (must be first)
       this.theme.injectCSS();
       this.theme.applyTheme();
 
@@ -594,6 +600,12 @@ export default class StorefrontCore {
   }
 
   async fetchAndExtractComponents() {
+    //  Browser guard for Node/SSR environments
+    if (!this.isBrowser()) {
+      this.templateHolder = null;
+      return;
+    }
+
     const cartiqueComponents = document.getElementById('cartique-components');
     if (!cartiqueComponents) {
       throw new Error('Could not find #cartique-components in the DOM');
@@ -621,31 +633,37 @@ export default class StorefrontCore {
     try { await this.cartRenderer.renderCartSlider(); } catch (e) { console.warn('renderCartSlider failed:', e.message); }
     try { await this.cartRenderer.renderCartItemTemplate(); } catch (e) { console.warn('renderCartItemTemplate failed:', e.message); }
 
-    const sidebar = document.getElementById('cartique-sidebar');
-    if (sidebar) {
-      sidebar.style.display = this.features.sidebarDisplay;
-      const mainContent = document.getElementById('cartique-main-content');
-      if (mainContent) {
-        if (this.features.sidebarDisplay === 'none') {
-          mainContent.classList.add('cartique-full-width');
-        } else {
-          mainContent.classList.remove('cartique-full-width');
+    //  Only run DOM operations in browser
+    if (this.isBrowser()) {
+      const sidebar = document.getElementById('cartique-sidebar');
+      if (sidebar) {
+        sidebar.style.display = this.features.sidebarDisplay;
+        const mainContent = document.getElementById('cartique-main-content');
+        if (mainContent) {
+          if (this.features.sidebarDisplay === 'none') {
+            mainContent.classList.add('cartique-full-width');
+          } else {
+            mainContent.classList.remove('cartique-full-width');
+          }
         }
       }
-    }
 
-    const sidebarEnabled = this.features.sidebar &&
-      (this.features.sidebarFeatures?.enabled !== false);
-    if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
-      try {
-        await this.collectionRenderer.renderSidebarFilters();
-      } catch (e) {
-        console.warn('renderSidebarFilters failed:', e.message);
+      const sidebarEnabled = this.features.sidebar &&
+        (this.features.sidebarFeatures?.enabled !== false);
+      if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
+        try {
+          await this.collectionRenderer.renderSidebarFilters();
+        } catch (e) {
+          console.warn('renderSidebarFilters failed:', e.message);
+        }
       }
     }
   }
 
   setupEventListeners() {
+    //  Browser guard for Node/SSR environments
+    if (!this.isBrowser()) return;
+
     const gridButton = document.querySelector('.cartique-grid-view');
     const listButton = document.querySelector('.cartique-list-view');
 
