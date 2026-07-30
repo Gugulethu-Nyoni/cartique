@@ -76,11 +76,8 @@ export default class StorefrontCore {
 
     this.features = deepMerge(this.defaultFeatures, features);
     
-    //  Debug logs for currencySymbol
-    console.log('[StorefrontCore] features:', this.features);
-    console.log('[StorefrontCore] currencySymbol:', this.features?.currencySymbol);
-    
-    this.currencySymbol = this.features.currencySymbol || '$';
+    //  Remove fallback — use features.currencySymbol directly
+    this.currencySymbol = this.features.currencySymbol;
 
     // ==========================================================
     // 3. DATA STATE MANAGEMENT
@@ -129,8 +126,8 @@ export default class StorefrontCore {
       // Selected product for single view
       selectedProduct: null,
       
-      //  Currency symbol
-      currencySymbol: this.features?.currencySymbol || '$'
+      //  No fallback — use features.currencySymbol directly
+      currencySymbol: this.features?.currencySymbol
     };
 
     // ==========================================================
@@ -258,8 +255,8 @@ export default class StorefrontCore {
       container: this.container,
       eventListeners: this.eventListeners,
       
-      //  Currency symbol
-      currencySymbol: this.features?.currencySymbol || '$',
+      //  No fallback — use features.currencySymbol directly
+      currencySymbol: this.features?.currencySymbol,
       
       // SHARED STATE (SINGLE SOURCE OF TRUTH)
       state: this.state,
@@ -287,7 +284,7 @@ export default class StorefrontCore {
       kernel: this.kernel,
       notification: this.notification,
       
-      //  Add to Cart (wired once, passed to all renderers)
+      // Add to Cart (wired once, passed to all renderers)
       addToCart: this.services.cart.addToCart.bind(this.services.cart),
       
       // Formatting
@@ -364,11 +361,11 @@ export default class StorefrontCore {
       }
       this.updateState('filteredProducts', filteredProducts);
       this.productRenderer.filteredProducts = filteredProducts;
-      //  Single render trigger — ONLY HERE
+      // Single render trigger — ONLY HERE
       this.productRenderer.renderProductDisplays();
     };
     
-    //  Updated: onCategorySelect — no render here, onFilterApplied handles it
+    // Updated: onCategorySelect — no render here, onFilterApplied handles it
     this.collectionRenderer.onCategorySelect = () => {
       if (this.features?.debug) {
         console.log('[TRACE] onCategorySelect triggered');
@@ -376,19 +373,24 @@ export default class StorefrontCore {
       // No render here — onFilterApplied handles it
     };
     
-    // CartService → CartRenderer (cart updated)
-    this.services.cart.onCartUpdated = () => {
+    //  CartService → CartRenderer (cart updated) — async with debug
+    this.services.cart.onCartUpdated = async () => {
       if (this.features?.debug) {
         console.log('[TRACE] onCartUpdated triggered');
         console.trace();
       }
-      
+
       if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
-        this.cartRenderer.showCart();
-      } else if (this.cartRenderer && typeof this.cartRenderer.open === 'function') {
-        this.cartRenderer.open();
+        if (this.features?.debug) {
+          console.log('[TRACE] Calling CartRenderer.showCart()');
+        }
+        await this.cartRenderer.showCart();
+        if (this.features?.debug) {
+          console.log('[TRACE] CartRenderer.showCart completed');
+        }
       } else {
-        console.warn('[TRACE] No showCart or open method found on cartRenderer');
+        console.warn('[TRACE] CartRenderer not available or showCart missing');
+        console.warn('[TRACE] cartRenderer:', this.cartRenderer);
       }
     };
 
@@ -622,16 +624,16 @@ export default class StorefrontCore {
     this._initialized = true;
 
     try {
-      //  1. Initialize Theme (CSS + FOUC)
+      // 1. Initialize Theme (CSS + FOUC)
       await this.theme.initialize();
       
-      //  2. Sync display states
+      // 2. Sync display states
       const sidebarEnabled = this.features.sidebar &&
         (this.features.sidebarFeatures?.enabled !== false);
       this.features.sidebarDisplay = sidebarEnabled ? 'block' : 'none';
       this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
-      //  3. DOM setup
+      // 3. DOM setup
       if (this.isBrowser()) {
         this.container = document.querySelector(`#${this.features.containerId}`);
         if (!this.container) {
@@ -641,7 +643,7 @@ export default class StorefrontCore {
         this.rendererContext.container = this.container;
       }
 
-      //  4. Component loading & rendering
+      // 4. Component loading & rendering
       await this.fetchAndExtractComponents();
       await this.renderAllComponents();
       
@@ -650,11 +652,11 @@ export default class StorefrontCore {
       }
       await this.productRenderer.renderProductDisplays();
       
-      //  5. Event listeners & completion
+      // 5. Event listeners & completion
       this.setupEventListeners();
       await this.completeInitialization();
       
-      //  6. Reveal container
+      // 6. Reveal container
       this.theme.removeLoadingClass();
       
     } catch (error) {
