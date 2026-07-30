@@ -4,6 +4,7 @@
 
 import ThemeRegistry from './ThemeRegistry.js';
 import ThemeLoader from './ThemeLoader.js';
+import ComponentRegistry from './ComponentRegistry.js';
 
 export default class ThemeManager {
     constructor(options = {}) {
@@ -13,6 +14,7 @@ export default class ThemeManager {
         this.loader = new ThemeLoader({
             catalogPath: options.catalogPath || '/catalog/'
         });
+        this.componentRegistry = new ComponentRegistry();
 
         this._registerDefaultThemes();
 
@@ -50,10 +52,31 @@ export default class ThemeManager {
         }
 
         try {
-            return await this.loader.load(name);
+            const theme = await this.loader.load(name);
+
+            // Load component overrides for this theme
+            const components = await this._loadComponents(name);
+            if (components) {
+                Object.entries(components).forEach(([componentName, Component]) => {
+                    this.componentRegistry.register(name, componentName, Component);
+                });
+                console.log(`[ThemeManager] Loaded ${Object.keys(components).length} components for theme "${name}"`);
+            }
+
+            return theme;
         } catch (error) {
             console.error(`[ThemeManager] Failed to load theme "${name}":`, error);
             throw error;
+        }
+    }
+
+    async _loadComponents(name) {
+        try {
+            const module = await import(`./catalog/${name}/components/index.js`);
+            return module.default || module;
+        } catch (error) {
+            // No component overrides for this theme
+            return null;
         }
     }
 
@@ -124,6 +147,18 @@ export default class ThemeManager {
 
     getThemeInfo(name) {
         return this.registry.getInfo(name);
+    }
+
+    getComponent(componentName) {
+        return this.componentRegistry.get(this.currentName, componentName);
+    }
+
+    getComponentOverrides() {
+        return this.componentRegistry.getOverrides(this.currentName);
+    }
+
+    getComponentRegistry() {
+        return this.componentRegistry;
     }
 
     on(event, callback) {
