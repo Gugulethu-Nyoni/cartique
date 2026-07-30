@@ -116,20 +116,20 @@ export default class CollectionRenderer {
     }
 
     /**
-     * Returns to product list view (called from ProductRenderer)
+     * ✅ Handle back to list view from single product
      */
     async handleBackToList() {
         if (this.features?.debug) {
             console.log('[TRACE] CollectionRenderer.handleBackToList called');
             console.trace();
         }
-        
+
         // Reset state
         this.state.singleProductViewActive = false;
         this.singleProductViewActive = false;
         this.state.selectedProduct = null;
-        
-        // Clear single product DOM container
+
+        // Clear single product DOM
         const containerId = this.features?.containerId || 'cartique';
         const container = document.getElementById(containerId);
         if (container) {
@@ -139,7 +139,13 @@ export default class CollectionRenderer {
                 productView.style.display = 'none';
             }
         }
-        
+
+        // Show product grid
+        const grid = document.getElementById('cartique-product-grid');
+        if (grid) {
+            grid.style.display = 'grid';
+        }
+
         // Re-render collection
         await this.applyAllFilters();
     }
@@ -294,7 +300,7 @@ export default class CollectionRenderer {
             console.trace();
         }
 
-        // ✅ Always start from the master product list
+        // Always start from the master product list
         let result = [...(this.products || [])];
 
         // --- CATEGORY FILTER ---
@@ -367,11 +373,11 @@ export default class CollectionRenderer {
                 break;
         }
 
-        // ✅ Update state
+        // Update state
         this.state.filteredProducts = result;
         this.filteredProducts = result;
 
-        // ✅ Single render trigger
+        // Single render trigger
         if (typeof this.onFilterApplied === 'function') {
             if (this.features?.debug) {
                 console.log('[TRACE] calling onFilterApplied with', result.length, 'products');
