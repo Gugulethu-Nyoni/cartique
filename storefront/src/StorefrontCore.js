@@ -302,19 +302,22 @@ export default class StorefrontCore {
     this.productRenderer = new ProductRenderer({
       ...baseRendererContext,
       themeManager: this.themeManager,
-      componentRegistry: this.themeManager.componentRegistry
+      componentRegistry: this.themeManager.componentRegistry,
+      container: this.container  // Pass container reference
     });
 
     this.collectionRenderer = new CollectionRenderer({
       ...baseRendererContext,
       themeManager: this.themeManager,
-      componentRegistry: this.themeManager.componentRegistry
+      componentRegistry: this.themeManager.componentRegistry,
+      container: this.container  // Pass container reference
     });
 
     this.cartRenderer = new CartRenderer({
       ...baseRendererContext,
       themeManager: this.themeManager,
-      componentRegistry: this.themeManager.componentRegistry
+      componentRegistry: this.themeManager.componentRegistry,
+      container: this.container  // Pass container reference
     });
 
     // ==========================================================
@@ -706,9 +709,16 @@ export default class StorefrontCore {
       // 3. DOM setup
       if (this.isBrowser()) {
         this.container = document.querySelector(`#${this.features.containerId}`);
+        
         if (!this.container) {
           throw new Error(`Container with ID "${this.features.containerId}" not found`);
         }
+        
+        // Bind resolved DOM container to renderers
+        this.productRenderer.container = this.container;
+        this.collectionRenderer.container = this.container;
+        this.cartRenderer.container = this.container;
+        
         this.notification.container = this.container;
       }
 
