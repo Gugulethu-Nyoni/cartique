@@ -8,6 +8,7 @@
  * Phase 3.6.2: Safe context method checks.
  * Phase 3.6.3: Callback-based UI interactions.
  * Phase 3.7.1: Shared state integration.
+ * Phase 3.7: Add to Cart pipeline, Back navigation, FOUC prevention.
  *
  * Single ownership: Layout + Product Display
  */
@@ -242,27 +243,46 @@ export default class ProductRenderer {
             </div>
         `;
 
-        // Add event listeners
+        // ✅ Back button — uses onBackToList callback
         const backBtn = productView.querySelector('.back-to-products');
-        const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
-        const tabButtons = productView.querySelectorAll('.tab-button');
-
-        if (backBtn && this.addEventListener) {
-            this.addEventListener(backBtn, 'click', () => {
+        if (backBtn) {
+            backBtn.onclick = async (e) => {
+                e.preventDefault();
+                
+                if (this.features?.debug) {
+                    console.log('[TRACE] Back button clicked');
+                    console.trace();
+                }
+                
                 if (typeof this.onBackToList === 'function') {
-                    this.onBackToList();
+                    await this.onBackToList();
+                } else {
+                    console.warn('[TRACE] this.onBackToList is not a function');
                 }
-            });
+            };
         }
 
-        if (addToCartBtn && this.addEventListener) {
-            this.addEventListener(addToCartBtn, 'click', async (e) => {
-                if (typeof this.addToCart === 'function') {
-                    await this.addToCart(e);
+        // ✅ Add to Cart button — uses dataset.productId
+        const addToCartBtn = productView.querySelector('.spv-cartique_add_to_cart');
+        if (addToCartBtn) {
+            addToCartBtn.dataset.productId = product.id;
+            addToCartBtn.onclick = async (e) => {
+                e.preventDefault();
+                const productId = Number(e.currentTarget.dataset.productId);
+                
+                if (this.features?.debug) {
+                    console.log('[TRACE] SPV Add to Cart clicked:', productId);
+                    console.trace();
                 }
-            });
+                
+                if (productId && typeof this.addToCart === 'function') {
+                    await this.addToCart({ productId, quantity: 1 });
+                }
+            };
         }
 
+        // Tab buttons
+        const tabButtons = productView.querySelectorAll('.tab-button');
         tabButtons.forEach(button => {
             if (this.addEventListener) {
                 this.addEventListener(button, 'click', () => {
@@ -528,15 +548,27 @@ export default class ProductRenderer {
             });
         }
 
-        // Add to cart button — use dataset instead of id
+        // ✅ Add to Cart button — uses dataset.productId and onclick
         const addToCartBtn = productCardTemplate.querySelector('.cartique_add_to_cart');
-        if (addToCartBtn && this.addEventListener) {
+        if (addToCartBtn) {
             addToCartBtn.dataset.productId = product.id;
-            this.addEventListener(addToCartBtn, 'click', (e) => {
-                if (typeof this.addToCart === 'function') {
-                    this.addToCart(e);
+            
+            addToCartBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = Number(e.currentTarget.dataset.productId);
+                
+                if (this.features?.debug) {
+                    console.log('[TRACE] Add to Cart clicked:', productId);
+                    console.trace();
                 }
-            });
+                
+                if (productId && typeof this.addToCart === 'function') {
+                    await this.addToCart({ productId, quantity: 1 });
+                } else {
+                    console.warn('[TRACE] this.addToCart is not a function');
+                }
+            };
         }
 
         return productCardTemplate;
@@ -648,15 +680,27 @@ export default class ProductRenderer {
             img.decoding = 'async';
         }
 
-        // Add to cart button — use dataset instead of id
+        // ✅ Add to Cart button — uses dataset.productId and onclick
         const addToCartBtn = productListingTemplate.querySelector('.cartique_add_to_cart');
-        if (addToCartBtn && this.addEventListener) {
+        if (addToCartBtn) {
             addToCartBtn.dataset.productId = product.id;
-            this.addEventListener(addToCartBtn, 'click', (e) => {
-                if (typeof this.addToCart === 'function') {
-                    this.addToCart(e);
+            
+            addToCartBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = Number(e.currentTarget.dataset.productId);
+                
+                if (this.features?.debug) {
+                    console.log('[TRACE] Add to Cart clicked:', productId);
+                    console.trace();
                 }
-            });
+                
+                if (productId && typeof this.addToCart === 'function') {
+                    await this.addToCart({ productId, quantity: 1 });
+                } else {
+                    console.warn('[TRACE] this.addToCart is not a function');
+                }
+            };
         }
 
         return productListingTemplate;
