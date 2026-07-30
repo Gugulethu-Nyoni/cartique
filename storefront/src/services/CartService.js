@@ -5,7 +5,7 @@
  *
  * Phase 2: Integrated adapter for inventory resolution.
  * Phase 3.7.1: Shared state integration, dataset-based product ID, callback-based updates.
- * Phase 3.7: Intent-based addToCart, proper quantity handling.
+ * Phase 3.7: Intent-based addToCart, proper quantity handling, debug traces.
  */
 
 export default class CartService {
@@ -26,6 +26,7 @@ export default class CartService {
      * @param {Object} intent - The add to cart intent { productId, quantity }
      */
     async addToCart(intent) {
+        // ✅ Debug trace
         if (this.features?.debug) {
             console.log('[TRACE] CartService.addToCart called with:', intent);
             console.trace();
@@ -105,6 +106,7 @@ export default class CartService {
         // Save to localStorage
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
         
+        // ✅ Debug trace before callback
         if (this.features?.debug) {
             console.log('[TRACE] Cart updated, calling onCartUpdated');
             console.trace();
