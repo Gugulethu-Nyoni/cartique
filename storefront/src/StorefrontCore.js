@@ -119,7 +119,10 @@ export default class StorefrontCore {
       
       // Pagination
       itemsPerBatch: this.features.itemsPerPage || 12,
-      loadedCount: 0
+      loadedCount: 0,
+      
+      // Selected product for single view
+      selectedProduct: null
     };
 
     // ==========================================================
@@ -137,6 +140,7 @@ export default class StorefrontCore {
       if (key === 'singleProductViewActive') this.singleProductViewActive = value;
       if (key === 'previousViewState') this.previousViewState = value;
       if (key === 'loadedCount') this.loadedCount = value;
+      if (key === 'selectedProduct') this.selectedProduct = value;
       
       if (this.features.debug) {
         console.log('[STATE UPDATE]', key, '→', value);
@@ -157,7 +161,7 @@ export default class StorefrontCore {
     this.callbacks = callbacks || {};
     this.kernel = kernel;
 
-    //  Initialize guard to prevent double initialization
+    // Initialize guard to prevent double initialization
     this._initialized = false;
 
     // Bind addEventListener to this instance
@@ -277,6 +281,9 @@ export default class StorefrontCore {
       showCartPage: this.showCartPage.bind(this),
       closeCartPage: this.closeCartPage.bind(this),
       
+      //  Add to Cart (wired once, passed to all renderers)
+      addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      
       // Formatting
       formatPrice: this.formatPrice.bind(this),
       formatDate: this.formatDate.bind(this),
@@ -299,45 +306,84 @@ export default class StorefrontCore {
     
     // ProductRenderer → CollectionRenderer (search, sort, back)
     this.productRenderer.onSearch = (query) => {
+      if (this.features?.debug) {
+        console.log('[TRACE] onSearch triggered:', query);
+      }
       this.collectionRenderer.handleSearch(query);
     };
     
     this.productRenderer.onSort = (sortType) => {
+      if (this.features?.debug) {
+        console.log('[TRACE] onSort triggered:', sortType);
+      }
       this.collectionRenderer.handleSort(sortType);
     };
     
-    this.productRenderer.onBackToList = () => {
-      this.collectionRenderer.handleBackToList();
+    this.productRenderer.onBackToList = async () => {
+      if (this.features?.debug) {
+        console.log('[TRACE] onBackToList triggered');
+        console.trace();
+      }
+      await this.collectionRenderer.handleBackToList();
     };
     
     this.productRenderer.onFilterChange = (filters) => {
+      if (this.features?.debug) {
+        console.log('[TRACE] onFilterChange triggered:', filters);
+      }
       this.collectionRenderer.handleFilterChange(filters);
     };
     
     this.productRenderer.onClearFilters = () => {
+      if (this.features?.debug) {
+        console.log('[TRACE] onClearFilters triggered');
+      }
       this.collectionRenderer.clearAllFilters();
     };
     
     // ProductRenderer → StorefrontCore (layout change)
     this.productRenderer.onLayoutChange = (layout) => {
+      if (this.features?.debug) {
+        console.log('[TRACE] onLayoutChange triggered:', layout);
+      }
       this.updateState('currentLayout', layout);
       this.productRenderer.renderProductDisplays();
     };
     
     // CollectionRenderer → StorefrontCore → ProductRenderer (filter results)
     this.collectionRenderer.onFilterApplied = (filteredProducts) => {
+      if (this.features?.debug) {
+        console.log('[TRACE] onFilterApplied triggered with', filteredProducts.length, 'products');
+        console.trace();
+      }
       this.updateState('filteredProducts', filteredProducts);
       this.productRenderer.filteredProducts = filteredProducts;
+      //  Single render trigger — ONLY HERE
       this.productRenderer.renderProductDisplays();
     };
     
+    //  Updated: onCategorySelect — no render here, onFilterApplied handles it
     this.collectionRenderer.onCategorySelect = () => {
-      this.productRenderer.renderProductDisplays();
+      if (this.features?.debug) {
+        console.log('[TRACE] onCategorySelect triggered');
+      }
+      // No render here — onFilterApplied handles it
     };
     
     // CartService → CartRenderer (cart updated)
     this.services.cart.onCartUpdated = () => {
-      this.cartRenderer.showCart();
+      if (this.features?.debug) {
+        console.log('[TRACE] onCartUpdated triggered');
+        console.trace();
+      }
+      
+      if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
+        this.cartRenderer.showCart();
+      } else if (this.cartRenderer && typeof this.cartRenderer.open === 'function') {
+        this.cartRenderer.open();
+      } else {
+        console.warn('[TRACE] No showCart or open method found on cartRenderer');
+      }
     };
 
     // ==========================================================
@@ -469,13 +515,14 @@ export default class StorefrontCore {
   async showSingleProductView(productId) {
     const product = this.products.find(p => p.id === productId);
     if (product && this.productRenderer) {
+      this.updateState('selectedProduct', product);
       await this.productRenderer.renderSingleProduct(product);
     }
   }
 
   async returnToListView() {
     if (this.productRenderer && this.productRenderer.onBackToList) {
-      this.productRenderer.onBackToList();
+      await this.productRenderer.onBackToList();
     }
   }
 
@@ -569,30 +616,41 @@ export default class StorefrontCore {
     this._initialized = true;
 
     try {
-      // Inject CSS (must be first)
-      this.theme.injectCSS();
-      this.theme.applyTheme();
-
+      //  1. Initialize Theme (CSS + FOUC)
+      await this.theme.initialize();
+      
+      //  2. Sync display states
       const sidebarEnabled = this.features.sidebar &&
         (this.features.sidebarFeatures?.enabled !== false);
       this.features.sidebarDisplay = sidebarEnabled ? 'block' : 'none';
       this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
-      this.container = document.querySelector(`#${this.features.containerId}`);
-      if (!this.container) {
-        throw new Error(`Container with ID "${this.features.containerId}" not found`);
+      //  3. DOM setup
+      if (this.isBrowser()) {
+        this.container = document.querySelector(`#${this.features.containerId}`);
+        if (!this.container) {
+          throw new Error(`Container with ID "${this.features.containerId}" not found`);
+        }
+        this.notification.container = this.container;
+        this.rendererContext.container = this.container;
       }
 
-      this.notification.container = this.container;
-      this.rendererContext.container = this.container;
-
+      //  4. Component loading & rendering
       await this.fetchAndExtractComponents();
       await this.renderAllComponents();
+      
+      if (this.features?.debug) {
+        console.log('[TRACE] Initial product render');
+      }
       await this.productRenderer.renderProductDisplays();
-
+      
+      //  5. Event listeners & completion
       this.setupEventListeners();
       await this.completeInitialization();
-
+      
+      //  6. Reveal container
+      this.theme.removeLoadingClass();
+      
     } catch (error) {
       console.error('Failed to initialize Cartique:', error);
       this.notification.showErrorMessage('Failed to load product catalog');
@@ -600,7 +658,7 @@ export default class StorefrontCore {
   }
 
   async fetchAndExtractComponents() {
-    //  Browser guard for Node/SSR environments
+    // Browser guard for Node/SSR environments
     if (!this.isBrowser()) {
       this.templateHolder = null;
       return;
@@ -633,7 +691,7 @@ export default class StorefrontCore {
     try { await this.cartRenderer.renderCartSlider(); } catch (e) { console.warn('renderCartSlider failed:', e.message); }
     try { await this.cartRenderer.renderCartItemTemplate(); } catch (e) { console.warn('renderCartItemTemplate failed:', e.message); }
 
-    //  Only run DOM operations in browser
+    // Only run DOM operations in browser
     if (this.isBrowser()) {
       const sidebar = document.getElementById('cartique-sidebar');
       if (sidebar) {
@@ -661,7 +719,7 @@ export default class StorefrontCore {
   }
 
   setupEventListeners() {
-    //  Browser guard for Node/SSR environments
+    // Browser guard for Node/SSR environments
     if (!this.isBrowser()) return;
 
     const gridButton = document.querySelector('.cartique-grid-view');
