@@ -1,0 +1,27 @@
+/**
+ * Default Theme — Cartique Storefront
+ * 
+ * This is the default theme CSS. It will be loaded when the default theme is active.
+ * You can replace this with your full CSS file.
+ */
+
+:root {
+    --cartique-theme-primary: #655793;
+    --cartique-theme-accent: #655793;
+    --cartique-theme-background: #ffffff;
+    --cartique-theme-text: #111111;
+    --cartique-theme-radius: 8px;
+}
+
+/* FOUC Prevention */
+.cartique-loading {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+#cartique.cartique-loaded,
+#cartique:not(.cartique-loading) {
+    visibility: visible;
+    opacity: 1;
+}
