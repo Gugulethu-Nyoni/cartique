@@ -1,0 +1,417 @@
+
+1. css loaded now (works)
+2. search works
+3. sort works
+4. grid toggle works
+5. list toogle works
+6. category menu filters not working properly 
+
+these ones:
+<div class="cartique-menu-container">
+                <ul class="cartique-menu-list">
+                    <li class="cartique-menu-item " data-cat-id="all">
+                        All Products
+                    </li>
+                    
+                        <li class="cartique-menu-item " data-cat-id="1">
+                            <span class="cat-name">Immune Boosters</span>
+                            <span class="cat-count">(1)</span>
+                        </li>
+                    
+                        <li class="cartique-menu-item active" data-cat-id="5">
+                            <span class="cat-name">Seeds &amp; Grains</span>
+                            <span class="cat-count">(1)</span>
+                        </li>
+                    
+                        <li class="cartique-menu-item " data-cat-id="2">
+                            <span class="cat-name">Teas &amp; Infusions</span>
+                            <span class="cat-count">(1)</span>
+                        </li>
+                    
+                </ul>
+            </div>
+
+when I click immune booster for example - I get get the same product duplicated 
+- this must simply yeild product in the selected category only:
+
+logs show:
+StorefrontCore.js:142 [STATE UPDATE] filteredProducts → [{…}]
+[
+    {
+        "id": 14,
+        "title": "Soursop Leaves",
+        "description": "Hand-picked soursop leaves for brewing a potent, traditional herbal tea. Known for their natural immune-modulating, anti-inflammatory, and calming properties.",
+        "price": 200,
+        "currency": "ZAR",
+        "image": "https://gobotaniq.com/images/products/soursop_leaves.png",
+        "sale_price": null,
+        "slug": "soursop-leaves",
+        "hasVariants": true,
+        "product_images": [],
+        "categories": [
+            {
+                "id": 2,
+                "name": "Teas & Infusions"
+            },
+            {
+                "id": 1,
+                "name": "Immune Boosters"
+            }
+        ],
+        "variants": [
+            {
+                "id": 14,
+                "productId": 14,
+                "sku": "SHR002",
+                "price": 200,
+                "compareAtPrice": null,
+                "costPrice": 100,
+                "inventoryPolicy": "deny",
+                "inventory": 30,
+                "weight_kg": 0.07,
+                "length_cm": 16,
+                "width_cm": 8,
+                "height_cm": 24,
+                "bulkPrice": 175,
+                "bulkMinimumQty": 10,
+                "attributes": [
+                    {
+                        "key": "form",
+                        "value": "Leaves",
+                        "dataType": "string"
+                    },
+                    {
+                        "key": "weight",
+                        "value": "50g",
+                        "dataType": "string"
+                    },
+                    {
+                        "key": "pouch_size",
+                        "value": "160x240mm + 80mm gusset",
+                        "dataType": "string"
+                    },
+                    {
+                        "key": "quantity",
+                        "value": "Pack of 10 leaves",
+                        "dataType": "string"
+                    }
+                ]
+            }
+        ],
+        "reviews": [
+            {
+                "id": 1,
+                "productId": 14,
+                "customerId": 3,
+                "customer": {
+                    "id": 3,
+                    "name": "Thandi N.",
+                    "email": "thandi@example.com"
+                },
+                "rating": 5,
+                "comment": "Traditional healing at its best! I brew this tea every evening and it helps me relax after a long day. The leaves are fresh and aromatic.",
+                "status": "approved",
+                "createdAt": "2026-05-20T16:45:00Z",
+                "updatedAt": "2026-05-20T16:45:00Z"
+            },
+            {
+                "id": 2,
+                "productId": 14,
+                "customerId": 4,
+                "customer": {
+                    "id": 4,
+                    "name": "Peter K.",
+                    "email": "peter@example.com"
+                },
+                "rating": 4,
+                "comment": "Great quality leaves. The tea has a mild, pleasant taste. It's become part of my daily routine.",
+                "status": "approved",
+                "createdAt": "2026-06-05T09:15:00Z",
+                "updatedAt": "2026-06-05T09:15:00Z"
+            },
+            {
+                "id": 3,
+                "productId": 14,
+                "customerId": 5,
+                "customer": {
+                    "id": 5,
+                    "name": "Linda M.",
+                    "email": "linda@example.com"
+                },
+                "rating": 5,
+                "comment": "Perfect for making soursop tea. The leaves are dried to perfection and the flavor is amazing. Highly recommend!",
+                "status": "approved",
+                "createdAt": "2026-06-10T11:00:00Z",
+                "updatedAt": "2026-06-10T11:00:00Z"
+            }
+        ]
+    }
+]
+
+CartiqueInspector.js:168 🛠️ Cartique Inspector: 3 decisions recorded.
+CartiqueInspector.js:168 🛠️ Cartique Inspector: 4 decisions recorded.
+ProductRenderer.js:887 [UI] Rendered 1 products in grid view.
+ProductRenderer.js:887 [UI] Rendered 1 products in grid view.
+
+after a category filter is worked - no other category filter works when clicked 
+
+7. click image to view single product view works
+8. add to cart not work 0 on both main UI grid and list and on single product view - yields no logs when buttons are clicked - it must yield slide cart view as in the legacy design
+8. <button class="back-to-products">← Back to Products</button> this on the single product view UI - not working too
+9. Aslo we have a major FOUC issues - THAT is why I prefer js drive css before UI is mounted 
+
+
+
+
+
+
+
+
+
+
+second run
+
+1. add to cart doesn't yield the slide in cart 
+log trace: 
+
+ProductRenderer.js:562 [TRACE] Add to Cart clicked: 14
+installHook.js:1 console.trace
+overrideMethod @ installHook.js:1
+addToCartBtn.onclick @ ProductRenderer.js:563
+CartService.js:30 [TRACE] CartService.addToCart called with: {productId: 14, quantity: 1}
+installHook.js:1 console.trace
+overrideMethod @ installHook.js:1
+addToCart @ CartService.js:31
+addToCartBtn.onclick @ ProductRenderer.js:567
+CartService.js:109 [TRACE] Cart updated, calling onCartUpdated
+installHook.js:1 console.trace
+overrideMethod @ installHook.js:1
+addToCart @ CartService.js:110
+await in addToCart
+addToCartBtn.onclick @ ProductRenderer.js:567
+StorefrontCore.js:377 [TRACE] onCartUpdated triggered
+installHook.js:1 console.trace
+overrideMethod @ installHook.js:1
+StorefrontCore.services.cart.onCartUpdated @ StorefrontCore.js:378
+addToCart @ CartService.js:115
+await in addToCart
+addToCartBtn.onclick @ ProductRenderer.js:567
+installHook.js:1 showCart failed: Invalid regular expression: /\s{4}(in|at)\s{1}/: Stack overflow
+overrideMethod @ installHook.js:1
+showCart @ StorefrontCore.js:555
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+showCart @ StorefrontCore.js:553
+await in showCart
+addToCartBtn.onclick @ ProductRenderer.js:567
+showCart failed: Invalid regular expression: /\s{4}(in|at)\s{1}/: Stack overflow
+
+2. 
+
+On the single product view 
+
+Soursop Leaves
+undefined200.00
+Hand-picked soursop leaves for brewing a potent, traditional herbal tea. Known for their natural immune-modulating, anti-inflammatory, and calming properties.
+
+3. back to products (in the single product view) yields blank screen - 
+<button class="back-to-products">← Back to Products</button>
+
+it should lead to main storefront UI 
+
+

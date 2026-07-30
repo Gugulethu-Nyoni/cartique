@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Cartique Kernel Test</title>
+</head>
+<body>
+    <h1>Cartique Kernel Test</h1>
+    <div id="output"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "@semantq/cartique": "../src/index.js"
+        }
+    }
+    </script>
+    <script type="module">
+        import { ResolutionEngine } from '../src/engine/ResolutionEngine.js';
+        import { VariantResolver } from '../src/engine/resolvers/VariantResolver.js';
+        import { PricingResolver } from '../src/engine/resolvers/PricingResolver.js';
+        import { PromotionResolver } from '../src/engine/resolvers/PromotionResolver.js';
+        import { TaxResolver } from '../src/engine/resolvers/TaxResolver.js';
+        import { ShippingResolver } from '../src/engine/resolvers/ShippingResolver.js';
+        import { Customer, Place } from '../src/commerce/index.js';
+        import { products } from './products.js';
+
+        // Create kernel with resolvers
+        const kernel = new ResolutionEngine({
+            resolvers: [
+                new VariantResolver(),
+                new PricingResolver(),
+                new PromotionResolver(),
+                new TaxResolver(),
+                new ShippingResolver()
+            ]
+        });
+
+        // Test product
+        const chia = products[0];
+        const customer = Customer.retail({ id: 'demo' });
+        const place = Place.southAfrica();
+
+        console.log('Testing product:', chia.title);
+        console.log('Variants:', chia.variants);
+
+        const result = await kernel.resolve({
+            sellable: chia,
+            customer: customer,
+            place: place,
+            configuration: { quantity: 10 },
+            contexts: []
+        });
+
+        document.getElementById('output').innerHTML = `
+            <h2>Kernel Resolution Result</h2>
+            <p><strong>Product:</strong> ${chia.title}</p>
+            <p><strong>Quantity:</strong> 10</p>
+            <p><strong>Subtotal:</strong> R${result.totals.subtotal.amount}</p>
+            <p><strong>Valid:</strong> ${result.valid}</p>
+            <p><strong>Items:</strong> ${result.items.length}</p>
+            <p><strong>Adjustments:</strong> ${result.adjustments.length}</p>
+            <pre>${JSON.stringify(result, null, 2)}</pre>
+        `;
+
+        window.__result = result;
+        console.log('Result:', result);
+    </script>
+</body>
+</html>

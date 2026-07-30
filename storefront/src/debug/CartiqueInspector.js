@@ -3,10 +3,7 @@
  *
  * Developer debugging tools for inspecting CommercialDecision objects
  * 
- * Usage:
- *   const inspector = new CartiqueInspector({ enabled: true });
- *   inspector.record(decision);
- *   window.__cartique.latest() // Get latest decision
+ * Safe for both browser and Node.js environments.
  */
 
 export default class CartiqueInspector {
@@ -16,7 +13,8 @@ export default class CartiqueInspector {
         this.maxHistory = options.maxHistory || 50;
         this.version = options.version || '2.0.0';
 
-        if (this.enabled) {
+        // Only expose to window if in browser
+        if (this.enabled && typeof window !== 'undefined') {
             this.expose();
         }
     }
@@ -35,7 +33,10 @@ export default class CartiqueInspector {
             this.decisions.pop();
         }
 
-        this.expose();
+        // Update window if in browser
+        if (typeof window !== 'undefined') {
+            this.expose();
+        }
     }
 
     /**
@@ -97,14 +98,16 @@ export default class CartiqueInspector {
      */
     clear() {
         this.decisions = [];
-        this.expose();
+        if (typeof window !== 'undefined') {
+            this.expose();
+        }
     }
 
     /**
-     * Expose inspector to window for console debugging
+     * Expose inspector to window for console debugging (browser only)
      */
     expose() {
-        if (!this.enabled) {
+        if (!this.enabled || typeof window === 'undefined') {
             return;
         }
 
@@ -171,7 +174,7 @@ export default class CartiqueInspector {
      */
     disable() {
         this.enabled = false;
-        if (window.__cartique) {
+        if (typeof window !== 'undefined' && window.__cartique) {
             delete window.__cartique;
         }
     }
@@ -181,6 +184,8 @@ export default class CartiqueInspector {
      */
     enable() {
         this.enabled = true;
-        this.expose();
+        if (typeof window !== 'undefined') {
+            this.expose();
+        }
     }
 }

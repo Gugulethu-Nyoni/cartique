@@ -327,28 +327,26 @@ restoreSearchState() {
 
 /* FILTERS AND SHOP MENU CAT BASED PAGES SIMULATION */
 
+/* FILTERS AND SHOP MENU CAT BASED PAGES SIMULATION */
+
+/**
+ * Legacy injectCSS - Disabled
+ * 
+ * CSS is now loaded via DefaultTheme from external file:
+ * storefront/src/theme/DefaultTheme.js → theme.css
+ * 
+ * This method is kept for backward compatibility only.
+ * It no longer injects CSS to prevent duplicate styles.
+ */
 injectCSS() {
-    // Prevent duplicate injection
-    if (document.getElementById('cartique-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'cartique-styles';
-    style.textContent = `
-        /* Critical render styles */
-        #${this.features.containerId} {
-            visibility: hidden;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .cartique-container {
-            position: relative;
-            min-height: 100vh;
-        }
-        
-        /* Main Cartique CSS */
-        ${CARTIQUE_CSS}
-    `;
-    document.head.appendChild(style);
+    // ❌ DISABLED: Using DefaultTheme external CSS
+    // This prevents duplicate injection from legacy Storefront.js
+    // 
+    // CSS is now loaded via:
+    //   1. DefaultTheme.initialize()
+    //   2. injectCSS() loads theme.css via <link>
+    //   3. theme.css contains all styles
+    return;
 }
 
 

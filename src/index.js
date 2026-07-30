@@ -1,13 +1,7 @@
 /**
- * ============================================================
  * @semantq/cartique
- * ============================================================
- *
- * Commerce Decision Kernel
- *
- * A deterministic, immutable commerce engine that resolves
- * commercial intent into commercial truth.
- * ============================================================
+ * 
+ * Kernel exports
  */
 
 // Core
@@ -31,5 +25,5 @@ export * from './rules/index.js';
 // Query
 export * from './query/index.js';
 
-// UI
+// UI (legacy)
 export * from './ui/index.js';

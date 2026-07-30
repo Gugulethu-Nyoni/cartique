@@ -1,12 +1,11 @@
 /**
- * ============================================================
  * @semantq/cartique-ui
- * ============================================================
- *
- * UI — Storefront Rendering
- * ============================================================
+ * 
+ * UI — Legacy UI Components
+ * 
+ * TODO: Refactor UI components into storefront/
  */
 
-export * from './components/index.js';
-export * from './renderers/index.js';
-export * from './state/index.js';
+// export * from './components/index.js';
+// export * from './renderers/index.js';
+// export * from './state/index.js';
