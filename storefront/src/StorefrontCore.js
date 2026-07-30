@@ -75,8 +75,12 @@ export default class StorefrontCore {
     };
 
     this.features = deepMerge(this.defaultFeatures, features);
-    console.log("[StorefrontCore] features:", this.features);
-    console.log("[StorefrontCore] themeCSS:", this.features.themeCSS);    this.currencySymbol = this.features.currencySymbol || '$';
+    
+    //  Debug logs for currencySymbol
+    console.log('[StorefrontCore] features:', this.features);
+    console.log('[StorefrontCore] currencySymbol:', this.features?.currencySymbol);
+    
+    this.currencySymbol = this.features.currencySymbol || '$';
 
     // ==========================================================
     // 3. DATA STATE MANAGEMENT
@@ -123,7 +127,10 @@ export default class StorefrontCore {
       loadedCount: 0,
       
       // Selected product for single view
-      selectedProduct: null
+      selectedProduct: null,
+      
+      //  Currency symbol
+      currencySymbol: this.features?.currencySymbol || '$'
     };
 
     // ==========================================================
@@ -142,6 +149,7 @@ export default class StorefrontCore {
       if (key === 'previousViewState') this.previousViewState = value;
       if (key === 'loadedCount') this.loadedCount = value;
       if (key === 'selectedProduct') this.selectedProduct = value;
+      if (key === 'currencySymbol') this.currencySymbol = value;
       
       if (this.features.debug) {
         console.log('[STATE UPDATE]', key, '→', value);
@@ -250,6 +258,9 @@ export default class StorefrontCore {
       container: this.container,
       eventListeners: this.eventListeners,
       
+      //  Currency symbol
+      currencySymbol: this.features?.currencySymbol || '$',
+      
       // SHARED STATE (SINGLE SOURCE OF TRUTH)
       state: this.state,
       
@@ -275,12 +286,6 @@ export default class StorefrontCore {
       adapter: this.adapter,
       kernel: this.kernel,
       notification: this.notification,
-      
-      // Cart actions (temporary)
-      showCart: this.showCart.bind(this),
-      closeCart: this.closeCart.bind(this),
-      showCartPage: this.showCartPage.bind(this),
-      closeCartPage: this.closeCartPage.bind(this),
       
       //  Add to Cart (wired once, passed to all renderers)
       addToCart: this.services.cart.addToCart.bind(this.services.cart),
