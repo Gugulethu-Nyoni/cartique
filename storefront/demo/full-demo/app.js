@@ -21,6 +21,7 @@ const storefront = new Cartique(products, {
     search: true,
     sorting: true,
     sale: true,
+    catalogPath: '/storefront/src/theme/catalog/',
     menu: {
         enabled: true,
         type: 'inline',
