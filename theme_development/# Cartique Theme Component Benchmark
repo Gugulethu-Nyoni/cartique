@@ -1,0 +1,222 @@
+# Cartique Theme Component Benchmark
+
+## Reference Component: ProductImage
+
+### Objective
+
+Create a benchmark theme component called **ProductImage** that demonstrates the recommended Cartique Theme Component architecture.
+
+This benchmark is **not** intended to replace the existing ProductImage implementation. It is an isolated reference implementation used to evaluate developer experience, directory structure, component contracts and future scalability.
+
+Do **not** modify the existing rendering pipeline. Create this as a standalone benchmark that can later be integrated into the Theme Component system.
+
+---
+
+# Directory Structure
+
+Create the following directory structure inside the Fashion theme.
+
+```text
+themes/
+└── fashion/
+    └── components/
+        └── productImage/
+            ├── index.js
+            ├── styles.css
+            ├── schema.json
+            └── behaviours/
+                └── imageZoom.js
+```
+
+---
+
+# Purpose of Each File
+
+## index.js
+
+Responsible only for rendering the ProductImage component.
+
+Responsibilities:
+
+* receive the Cartique context
+* render HTML
+* expose Cartique element hooks
+* no inline CSS
+* no inline JavaScript
+* keep rendering logic simple
+
+The render output should expose stable Cartique hooks such as:
+
+* data-cartique-component
+* data-cartique-element
+
+Example:
+
+* ProductImage root
+* image element
+* optional overlay element
+
+Do not hardcode framework logic inside this component.
+
+---
+
+## styles.css
+
+Contains all visual styling for ProductImage.
+
+This file should demonstrate:
+
+* rounded corners
+* object-fit
+* overflow
+* hover transition
+* image scaling support
+* responsive sizing
+
+The CSS should be completely replaceable by a theme developer.
+
+Avoid coupling styling to JavaScript.
+
+---
+
+## schema.json
+
+This file acts as developer documentation for the component.
+
+Include:
+
+* component name
+* description
+* exposed elements
+* optional elements
+* supported capabilities
+* supported behaviours
+* future events
+
+Example sections:
+
+* name
+* description
+* elements
+* capabilities
+* behaviours
+* events
+
+The schema is informational for now and does not need runtime validation.
+
+---
+
+## behaviours/imageZoom.js
+
+Demonstrates optional behaviour attachment.
+
+Responsibilities:
+
+* mount()
+* unmount()
+* optional update()
+
+The behaviour must not use global document queries.
+
+Instead it should operate only on elements provided by Cartique through context.
+
+For example:
+
+* ctx.root
+* ctx.elements.image
+
+The behaviour should simply demonstrate image zoom on hover.
+
+No external libraries.
+
+---
+
+# Context Contract
+
+Assume Cartique provides a context similar to:
+
+* product
+* pricing
+* actions
+* elements
+* services
+* theme
+
+The benchmark should consume the context naturally without depending on internal renderer implementations.
+
+---
+
+# Developer Experience Goals
+
+This benchmark should demonstrate three developer levels.
+
+## Beginner
+
+Developer edits only:
+
+styles.css
+
+No JavaScript required.
+
+---
+
+## Intermediate
+
+Developer enables or customizes behaviours.
+
+Example:
+
+imageZoom.js
+
+No renderer knowledge required.
+
+---
+
+## Advanced
+
+Developer edits index.js and completely changes the rendered HTML while preserving Cartique's required hooks.
+
+---
+
+# Cartique Hook Convention
+
+The benchmark should demonstrate use of stable Cartique hooks rather than relying on CSS selectors for framework functionality.
+
+Examples include:
+
+* data-cartique-component
+* data-cartique-element
+* data-cartique-action
+
+These attributes represent the public contract between Cartique and the theme.
+
+CSS class names should remain entirely under the theme developer's control.
+
+---
+
+# Important Notes
+
+This benchmark is intended to establish the future Cartique Theme Component standard.
+
+The implementation should prioritise:
+
+* readability
+* discoverability
+* modularity
+* predictable file layout
+* excellent developer experience
+
+over optimisation.
+
+This benchmark is expected to become the reference pattern for future components including:
+
+* ProductCard
+* ProductPrice
+* ProductGallery
+* CartItem
+* CartSlider
+* CategoryMenu
+* Footer
+* Checkout components
+
+The objective is to evaluate whether this architecture feels natural for developers writing Cartique themes before integrating it into the runtime.

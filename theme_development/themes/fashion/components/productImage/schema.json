@@ -1,0 +1,50 @@
+{
+    "name": "ProductImage",
+
+    "description": "Displays the primary product image.",
+
+    "elements": {
+
+        "image": {
+
+            "required": true,
+
+            "description": "Primary product image"
+
+        },
+
+        "overlay": {
+
+            "required": false,
+
+            "description": "Overlay layer"
+
+        }
+
+    },
+
+    "capabilities": [
+
+        "rounded-corners",
+        "aspect-ratio",
+        "object-fit",
+        "lazy-loading",
+        "zoom",
+        "gallery"
+
+    ],
+
+    "behaviours": [
+
+        "imageZoom"
+
+    ],
+
+    "events": [
+
+        "image.loaded",
+        "image.changed"
+
+    ]
+
+}

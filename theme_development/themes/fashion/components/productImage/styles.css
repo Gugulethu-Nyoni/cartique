@@ -1,0 +1,45 @@
+/*
+---------------------------------------------------------
+Cartique Theme Benchmark
+
+Component:
+ProductImage
+---------------------------------------------------------
+*/
+
+.fashion-product-image{
+
+    position:relative;
+
+    overflow:hidden;
+
+    border-radius:20px;
+
+    background:#f5f5f5;
+
+}
+
+
+.fashion-product-image__image{
+
+    width:100%;
+
+    display:block;
+
+    object-fit:cover;
+
+    transition:
+        transform .35s ease;
+
+}
+
+
+.fashion-product-image__overlay{
+
+    position:absolute;
+
+    inset:0;
+
+    pointer-events:none;
+
+}
