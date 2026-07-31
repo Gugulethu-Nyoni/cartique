@@ -1,26 +1,93 @@
 /**
- * Fashion Theme — Cartique Storefront
+ * Fashion Theme — Dramatically Different Visual Test
+ * 
+ * Makes theme switching visually obvious
  */
 
 :root {
-    --cartique-theme-primary: #6C3B2A;
-    --cartique-theme-accent: #D4A574;
-    --cartique-theme-background: #F5E6D3;
-    --cartique-theme-text: #1A1A1A;
+    --cartique-theme-primary: #b85c38;
+    --cartique-theme-accent: #e7b26a;
+    --cartique-theme-background: #fff3e6;
+    --cartique-theme-text: #3b1f14;
     --cartique-theme-radius: 0px;
 }
 
-.cartique-product-card {
-    border-radius: var(--cartique-theme-radius);
-    box-shadow: none;
-    border-bottom: 2px solid var(--cartique-theme-primary);
+/* Theme identity — fashion look */
+body {
+    background: var(--cartique-theme-background);
+    color: var(--cartique-theme-text);
 }
 
-.cartique-product-card:hover {
-    transform: none;
-    box-shadow: none;
+.cartique-product-grid {
+    background: var(--cartique-theme-background);
 }
 
-.cartique-product-card .cartique-product-title {
-    color: var(--cartique-theme-primary);
+.cartique_product_card {
+    border-radius: 0 !important;
+    border: none !important;
+    border-bottom: 5px solid var(--cartique-theme-primary) !important;
+    background: #fffaf5 !important;
+    padding: 20px !important;
+    box-shadow: 0 10px 25px rgba(184,92,56,0.25) !important;
+    transition: all 0.3s ease !important;
+}
+
+.cartique_product_card:hover {
+    transform: translateY(-10px) !important;
+    box-shadow: 0 20px 40px rgba(184,92,56,0.35) !important;
+}
+
+.cartique_product_title {
+    font-family: 'Georgia', serif !important;
+    text-transform: uppercase !important;
+    letter-spacing: 2px !important;
+    color: var(--cartique-theme-primary) !important;
+    font-weight: 700 !important;
+}
+
+.cartique_product_description {
+    font-family: 'Georgia', serif !important;
+    color: #5a4a3a !important;
+    line-height: 1.8 !important;
+}
+
+.cartique_product_price {
+    color: var(--cartique-theme-primary) !important;
+    font-weight: 700 !important;
+    font-size: 1.4rem !important;
+}
+
+.cartique_add_to_cart {
+    background: var(--cartique-theme-primary) !important;
+    border-radius: 0 !important;
+    color: white !important;
+    padding: 14px 30px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 2px !important;
+    font-weight: 700 !important;
+    border: none !important;
+    transition: all 0.3s ease !important;
+}
+
+.cartique_add_to_cart:hover {
+    background: var(--cartique-theme-accent) !important;
+    color: #3b1f14 !important;
+    transform: scale(1.05) !important;
+}
+
+/* Grid layout — more spacing */
+.cartique-product-grid {
+    gap: 2.5rem !important;
+    padding: 1.5rem !important;
+}
+
+/* Product images — no rounded corners */
+.cartique_product_image {
+    border-radius: 0 !important;
+}
+
+/* Divider styling */
+.currency-price-display {
+    border-top: 2px solid var(--cartique-theme-accent) !important;
+    padding-top: 10px !important;
 }

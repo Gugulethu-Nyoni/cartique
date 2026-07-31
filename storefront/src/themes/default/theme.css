@@ -1,61 +1,39 @@
-/* =============================================
-   FOUC PREVENTION — Internal Cartique CSS
-   ============================================= */
-
-.cartique-loading {
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.25s ease, visibility 0.25s ease;
-}
-
-#cartique.cartique-loaded,
-#cartique:not(.cartique-loading) {
-    visibility: visible;
-    opacity: 1;
-}
-
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
 :root {
   --font-family: 'Poppins', sans-serif;
-  --theme-primary: var(--white);
-  --theme-secondary: var(--gray-50);
-  --theme-text: var(--black);
-  --theme-text-secondary: var(--gray-600);
-  --theme-border: var(--gray-200);
-  --theme-accent: var(--primary);
-  --theme-shadow: var(--shadow-md);
-  --btn-bg: var(--primary);
-  --btn-border: var(--primary);
-  --btn-text: var(--black);
-  --btn-hover-bg: var(--primary-dark);
-  --btn-hover-text: var(--black);
-  --spv-btn-bg: var(--black);
-  --spv-btn-border: var(--white);
-  --spv-btn-text: var(--white);
-  --spv-btn-hover-bg: var(--white);
-  --spv-btn-hover-text: var(--black);
-  --cartique-accent: var(--primary);
+  --theme-primary: #ffffff;
+  --theme-secondary: #f8f8f8;
+  --theme-text: #222222;
+  --theme-text-secondary: #666666;
+  --theme-border: #e0e0e0;
+  --theme-accent: #2a2a2a;
+  --theme-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+  --btn-bg: #ffffff;
+  --btn-border: #000000;
+  --btn-text: #000000;
+  --btn-hover-bg: #000000;
+  --btn-hover-text: #ffffff;
+  --spv-btn-bg: #000000;
+  --spv-btn-border: #ffffff;
+  --spv-btn-text: #ffffff;
+  --spv-btn-hover-bg: #ffffff;
+  --spv-btn-hover-text: #000000;
+  --cartique-accent: #000000;
 }
 
 [data-theme="dark"] {
-  --theme-primary: var(--white);
-  --theme-secondary: var(--gray-50);
-  --theme-text: var(--black);
-  --theme-text-secondary: var(--gray-600);
-  --theme-border: var(--gray-200);
-  --theme-shadow: var(--shadow-md);
-  --btn-bg: var(--primary);
-  --btn-border: var(--primary);
-  --btn-text: var(--black);
-  --btn-hover-bg: var(--primary-dark);
-  --btn-hover-text: var(--black);
-  --spv-btn-bg: var(--black);
-  --spv-btn-border: var(--white);
-  --spv-btn-text: var(--white);
-  --spv-btn-hover-bg: var(--white);
-  --spv-btn-hover-text: var(--black);
-  --cartique-accent: var(--primary);
+  --theme-primary: #1a1a1a;
+  --theme-secondary: #252525;
+  --theme-text: #ffffff;
+  --theme-text-secondary: #bbbbbb;
+  --theme-border: #444444;
+  --theme-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  --btn-bg: #000000;
+  --btn-border: #ffffff;
+  --btn-text: #ffffff;
+  --btn-hover-bg: #ffffff;
+  --btn-hover-text: #000000;
 }
 
 * {
@@ -2165,20 +2143,12 @@
 }
 
 
-/* =============================================
-   BULK PRICING - Scoped Styles
+/*  BULK PRICING UIs CSS */
+
+  /* =============================================
+   BULK PRICING - Shared Styles
    ============================================= */
 
-/* 
-   IMPORTANT: All bulk pricing styles are scoped to:
-   - .cartique-bulk-pricing (container)
-   - .cart-bulk-status (cart slide-in)
-   - .cart-page-bulk-status (cart page)
-   
-   These classes are only used by Cartique bulk pricing components.
-*/
-
-/* ----- Base Bulk Pricing Container (Scoped) ----- */
 .cartique-bulk-pricing {
     margin-top: 8px;
     padding: 6px 10px;
@@ -2187,9 +2157,7 @@
     color: #ffffff;
     font-size: 12px;
     line-height: 1.4;
-    font-family: var(--font-family, inherit);
-    display: block;
-    clear: both;
+    font-family: var(--font-family);
 }
 
 .cartique-bulk-pricing .bulk-label {
@@ -2215,15 +2183,14 @@
     color: #ffffff;
 }
 
-/* ----- Grid View (Scoped to grid container) ----- */
+/* Grid View */
 .cartique-product-grid .cartique-bulk-pricing {
     margin: 4px 15px 8px;
     text-align: center;
 }
 
-/* ----- List View (Scoped to list container) ----- */
-.cartique-product-list .cartique-bulk-pricing.list-view,
-.cartique-product-listings .cartique-bulk-pricing.list-view {
+/* List View */
+.cartique-bulk-pricing.list-view {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -2231,41 +2198,31 @@
     font-size: 11px;
     margin-top: 4px;
     flex-wrap: wrap;
-    background: #1a1a1a;
-    border-radius: 4px;
-    color: #ffffff;
 }
 
-.cartique-product-list .cartique-bulk-pricing.list-view .bulk-label,
-.cartique-product-list .cartique-bulk-pricing.list-view .bulk-price,
-.cartique-product-list .cartique-bulk-pricing.list-view .bulk-min-qty,
-.cartique-product-listings .cartique-bulk-pricing.list-view .bulk-label,
-.cartique-product-listings .cartique-bulk-pricing.list-view .bulk-price,
-.cartique-product-listings .cartique-bulk-pricing.list-view .bulk-min-qty {
+.cartique-bulk-pricing.list-view .bulk-label,
+.cartique-bulk-pricing.list-view .bulk-price,
+.cartique-bulk-pricing.list-view .bulk-min-qty {
     display: inline;
 }
 
-.cartique-product-list .cartique-bulk-pricing.list-view .bulk-label,
-.cartique-product-listings .cartique-bulk-pricing.list-view .bulk-label {
+.cartique-bulk-pricing.list-view .bulk-label {
     font-size: 9px;
-    color: #ffd700;
 }
 
-.cartique-product-list .cartique-bulk-pricing.list-view .bulk-price,
-.cartique-product-listings .cartique-bulk-pricing.list-view .bulk-price {
+.cartique-bulk-pricing.list-view .bulk-price {
     font-size: 12px;
-    color: #ffffff;
 }
 
-.cartique-product-list .cartique-bulk-pricing.list-view .bulk-min-qty,
-.cartique-product-listings .cartique-bulk-pricing.list-view .bulk-min-qty {
+.cartique-bulk-pricing.list-view .bulk-min-qty {
     font-size: 10px;
-    color: #ffffff;
-    opacity: 0.7;
 }
 
-/* ----- Single Product View (Scoped to single product) ----- */
-.single-product-view .cartique-bulk-pricing.single-product {
+/* =============================================
+   SINGLE PRODUCT - Bulk Pricing
+   ============================================= */
+
+.cartique-bulk-pricing.single-product {
     margin: 12px 0 16px;
     padding: 12px 16px;
     background: #f8f9fa;
@@ -2274,7 +2231,7 @@
     border-radius: 0 4px 4px 0;
 }
 
-.single-product-view .cartique-bulk-pricing.single-product .bulk-header {
+.cartique-bulk-pricing.single-product .bulk-header {
     font-weight: 700;
     font-size: 13px;
     text-transform: uppercase;
@@ -2282,11 +2239,11 @@
     letter-spacing: 0.5px;
 }
 
-.single-product-view .cartique-bulk-pricing.single-product .bulk-header.active {
+.cartique-bulk-pricing.single-product .bulk-header.active {
     color: #28a745;
 }
 
-.single-product-view .cartique-bulk-pricing.single-product .bulk-price {
+.cartique-bulk-pricing.single-product .bulk-price {
     font-size: 18px;
     font-weight: 600;
     color: #1a1a1a;
@@ -2294,24 +2251,25 @@
     margin: 2px 0;
 }
 
-.single-product-view .cartique-bulk-pricing.single-product .bulk-min-qty {
+.cartique-bulk-pricing.single-product .bulk-min-qty {
     font-size: 12px;
     color: #6c757d;
     display: block;
 }
 
-/* ----- Cart Slide-in (Scoped to cart slide) ----- */
-#cart-slide .cart-bulk-status {
+/* =============================================
+   CART SLIDE-IN - Bulk Status
+   ============================================= */
+
+.cart-bulk-status {
     margin-top: 6px;
     padding: 4px 0;
     font-size: 11px;
-    font-family: var(--font-family, inherit);
+    font-family: var(--font-family);
     border-top: 1px solid rgba(0,0,0,0.05);
-    display: block;
-    clear: both;
 }
 
-#cart-slide .cart-bulk-status .bulk-heading {
+.cart-bulk-status .bulk-heading {
     font-weight: 600;
     color: #6c757d;
     font-size: 11px;
@@ -2319,31 +2277,32 @@
     letter-spacing: 0.3px;
 }
 
-#cart-slide .cart-bulk-status .bulk-heading.active {
+.cart-bulk-status .bulk-heading.active {
     color: #28a745;
 }
 
-#cart-slide .cart-bulk-status .bulk-price-display {
+.cart-bulk-status .bulk-price-display {
     font-weight: 500;
     font-size: 13px;
     color: #1a1a1a;
 }
 
-#cart-slide .cart-bulk-status .bulk-min-qty {
+.cart-bulk-status .bulk-min-qty {
     color: #6c757d;
     font-size: 10px;
 }
 
-/* ----- Cart Page (Scoped to cart page) ----- */
-.cartique-cart-page .cart-page-bulk-status {
+/* =============================================
+   CART PAGE - Bulk Status
+   ============================================= */
+
+.cart-page-bulk-status {
     margin: 4px 0 8px;
     font-size: 12px;
-    font-family: var(--font-family, inherit);
-    display: block;
-    clear: both;
+    font-family: var(--font-family);
 }
 
-.cartique-cart-page .cart-page-bulk-status .bulk-heading {
+.cart-page-bulk-status .bulk-heading {
     font-weight: 600;
     color: #6c757d;
     font-size: 11px;
@@ -2351,50 +2310,53 @@
     letter-spacing: 0.3px;
 }
 
-.cartique-cart-page .cart-page-bulk-status .bulk-heading-active {
+.cart-page-bulk-status .bulk-heading-active {
     font-weight: 600;
     color: #28a745;
     font-size: 12px;
 }
 
-.cartique-cart-page .cart-page-bulk-status .bulk-price-available {
+.cart-page-bulk-status .bulk-price-available {
     font-weight: 500;
     color: #1a1a1a;
     font-size: 13px;
 }
 
-.cartique-cart-page .cart-page-bulk-status .bulk-min-qty {
+.cart-page-bulk-status .bulk-min-qty {
     color: #6c757d;
     font-size: 11px;
 }
 
-.cartique-cart-page .cart-page-bulk-status.active {
+.cart-page-bulk-status.active {
     background: #f0faf0;
     padding: 4px 8px;
     border-radius: 4px;
     border-left: 3px solid #28a745;
 }
 
-/* Price strikethrough (Scoped to cart page items) */
-.cartique-cart-page .cart-page-item-price .original-price-strikethrough {
+/* Price strikethrough for bulk active state */
+.cart-page-item-price .original-price-strikethrough {
     text-decoration: line-through;
     color: #6c757d;
     font-size: 14px;
     margin-right: 8px;
 }
 
-.cartique-cart-page .cart-page-item-price .bulk-price-active {
+.cart-page-item-price .bulk-price-active {
     color: #28a745;
     font-weight: 700;
     font-size: 16px;
 }
 
-.cartique-cart-page .cart-page-item-price .retail-price {
+.cart-page-item-price .retail-price {
     color: #1a1a1a;
     font-weight: 600;
 }
 
-/* ----- Responsive - Scoped ----- */
+/* =============================================
+   RESPONSIVE - Bulk Pricing
+   ============================================= */
+
 @media (max-width: 768px) {
     .cartique-bulk-pricing {
         font-size: 11px;
@@ -2409,39 +2371,38 @@
         font-size: 10px;
     }
 
-    .single-product-view .cartique-bulk-pricing.single-product {
+    .cartique-bulk-pricing.single-product {
         padding: 10px 12px;
         margin: 10px 0 12px;
     }
 
-    .single-product-view .cartique-bulk-pricing.single-product .bulk-price {
+    .cartique-bulk-pricing.single-product .bulk-price {
         font-size: 16px;
     }
 
-    .cartique-product-list .cartique-bulk-pricing.list-view,
-    .cartique-product-listings .cartique-bulk-pricing.list-view {
+    .cartique-bulk-pricing.list-view {
         font-size: 10px;
         gap: 6px;
         padding: 3px 10px;
     }
 
-    #cart-slide .cart-bulk-status {
+    .cart-bulk-status {
         font-size: 10px;
     }
 
-    #cart-slide .cart-bulk-status .bulk-price-display {
+    .cart-bulk-status .bulk-price-display {
         font-size: 12px;
     }
 
-    .cartique-cart-page .cart-page-bulk-status {
+    .cart-page-bulk-status {
         font-size: 11px;
     }
 
-    .cartique-cart-page .cart-page-item-price .original-price-strikethrough {
+    .cart-page-item-price .original-price-strikethrough {
         font-size: 12px;
     }
 
-    .cartique-cart-page .cart-page-item-price .bulk-price-active {
+    .cart-page-item-price .bulk-price-active {
         font-size: 14px;
     }
 }
@@ -2456,18 +2417,166 @@
         font-size: 11px;
     }
 
-    .single-product-view .cartique-bulk-pricing.single-product {
+    .cartique-bulk-pricing.single-product {
         padding: 8px 10px;
     }
 
-    .single-product-view .cartique-bulk-pricing.single-product .bulk-price {
+    .cartique-bulk-pricing.single-product .bulk-price {
         font-size: 14px;
     }
 
-    .cartique-product-list .cartique-bulk-pricing.list-view,
-    .cartique-product-listings .cartique-bulk-pricing.list-view {
+    .cartique-bulk-pricing.list-view {
         font-size: 9px;
         padding: 2px 8px;
         gap: 4px;
     }
+}
+
+
+
+
+
+
+
+
+/* Variant Selector */
+.cartique-variant-selector {
+  margin: 12px 0;
+}
+
+.cartique-variant-group {
+  margin-bottom: 8px;
+}
+
+.cartique-variant-label {
+  font-weight: 600;
+  font-size: 14px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.cartique-variant-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cartique-variant-option {
+  padding: 6px 14px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.cartique-variant-option:hover {
+  border-color: #999;
+}
+
+.cartique-variant-option.selected {
+  border-color: var(--cartique-accent, #2a2a2a);
+  background: #f0f0f0;
+}
+
+.cartique-variant-option.out-of-stock {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Bulk Pricing */
+.cartique-bulk-pricing {
+  background: #f0f9f0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-left: 3px solid #28a745;
+  margin: 8px 0;
+}
+
+.cartique-bulk-header {
+  font-weight: 700;
+  font-size: 13px;
+  color: #1a7a3a;
+}
+
+.cartique-bulk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.cartique-bulk-price {
+  font-weight: 700;
+  font-size: 18px;
+  color: #28a745;
+}
+
+.cartique-bulk-min {
+  font-size: 12px;
+  color: #555;
+}
+
+.cartique-bulk-savings {
+  font-size: 12px;
+  color: #1a7a3a;
+  background: #d4edda;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.cartique-bulk-active {
+  font-size: 13px;
+  color: #155724;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Quantity Selector */
+.cartique-quantity-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.cartique-quantity-label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.cartique-quantity-selector {
+  display: flex;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cartique-qty-btn {
+  background: #f5f5f5;
+  border: none;
+  padding: 6px 14px;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cartique-qty-btn:hover {
+  background: #e5e5e5;
+}
+
+.cartique-quantity-input {
+  width: 50px;
+  text-align: center;
+  border: none;
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  padding: 6px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cartique-quantity-input:focus {
+  outline: none;
 }

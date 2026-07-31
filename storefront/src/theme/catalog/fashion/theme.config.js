@@ -4,10 +4,10 @@ export default {
     extends: 'default',
 
     variables: {
-        primary: '#6C3B2A',
-        accent: '#D4A574',
-        background: '#F5E6D3',
-        text: '#1A1A1A',
+        primary: '#b85c38',
+        accent: '#e7b26a',
+        background: '#fff3e6',
+        text: '#3b1f14',
         radius: '0px'
     },
 
