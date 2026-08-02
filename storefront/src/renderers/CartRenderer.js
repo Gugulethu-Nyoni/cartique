@@ -9,7 +9,6 @@
  * Phase 3.8: Navigation state restoration and CommercialDecision consumption.
  * Phase 3.8.1: CartRenderer migration completion — single enrichment pipeline.
  * Phase 3.8.2: Final fixes — strike-through, quantity buttons, checkout, view cart.
- * Phase 3.8.3: Drawer ownership fix — runtime drawer in component wrapper, not hidden blocks.
  */
 
 export default class CartRenderer {
@@ -130,14 +129,6 @@ export default class CartRenderer {
     // PRICING DISPLAY HELPER
     // ==========================================================
 
-    /**
-     * Get pricing display data from CommercialDecision line
-     * Single source of truth for all price rendering
-     * 
-     * @param {Object} line - CommercialDecision line item
-     * @param {Object} adjustments - CommercialDecision adjustments
-     * @returns {Object} Pricing display data
-     */
     _getPricingDisplay(line, adjustments = []) {
         const sellingPrice = line.unitPrice?.amount || 0;
         const retailPrice = line.comparePrice?.amount || sellingPrice;
@@ -168,10 +159,6 @@ export default class CartRenderer {
         };
     }
 
-    /**
-     * Get pricing display from legacy variant data
-     * Fallback for legacy cart items
-     */
     _getLegacyPricingDisplay(variant, quantity) {
         const retailPrice = variant.price || 0;
         const bulkPrice = variant.bulkPrice || null;
@@ -199,10 +186,6 @@ export default class CartRenderer {
     // SHARED ENRICHMENT PIPELINE
     // ==========================================================
 
-    /**
-     * Enrich CommercialDecision item with product catalogue data
-     * Single source of truth for all cart views
-     */
     _enrichCartDecisionItem(decisionItem) {
         const line = decisionItem?.items?.[0] || {};
         const adjustments = decisionItem?.adjustments || [];
@@ -214,21 +197,14 @@ export default class CartRenderer {
         const pricing = this._getPricingDisplay(line, adjustments);
         
         return {
-            // Product catalogue data
             id: productId,
             title: product?.title || `Product ${productId}`,
             image: product?.image || '',
             description: product?.description || '',
             categories: product?.categories || [],
             sku: product?.sku || '',
-            
-            // CommercialDecision data
             quantity: line.quantity || 1,
-            
-            // Pricing display data
             pricing: pricing,
-            
-            // Legacy compatibility
             unitPrice: pricing.sellingPrice,
             comparePrice: pricing.retailPrice,
             total: line.total?.amount || 0,
@@ -237,8 +213,6 @@ export default class CartRenderer {
             bulkMinimumQty: pricing.bulkMinimumQty,
             savings: pricing.savings,
             adjustments: adjustments,
-            
-            // Raw data for debugging
             _raw: {
                 decision: decisionItem,
                 product: product,
@@ -247,10 +221,6 @@ export default class CartRenderer {
         };
     }
 
-    /**
-     * Enrich legacy cart item with product catalogue data
-     * Fallback path
-     */
     _enrichLegacyCartItem(product) {
         const variant = product.variants?.[0] || { price: product.price || 0 };
         const quantity = product.cart_quantity || 1;
@@ -275,9 +245,6 @@ export default class CartRenderer {
         };
     }
 
-    /**
-     * Get enriched cart items from decision or fallback
-     */
     _getEnrichedCart() {
         const decision = this.cartService?.getCurrentDecision?.() || null;
         const cartDecision = this.state?.cartDecision || decision;
@@ -333,24 +300,16 @@ export default class CartRenderer {
             return;
         }
 
-        // ✅ FIX 1: Append runtime drawer to visible component wrapper, not hidden blocks
-        // This ensures showCart() targets the correct drawer instance
-        const componentWrapper = document.getElementById('cartique-cart-slider-component');
-        if (componentWrapper) {
-            // Clear any existing drawer first (prevents duplicates)
-            const existingDrawer = componentWrapper.querySelector('#cart-slide');
-            if (existingDrawer) existingDrawer.remove();
-            componentWrapper.appendChild(cartSlider);
-        } else {
-            // Fallback: create hidden blocks only for template storage
-            let hiddenBlocks = document.getElementById('cartique-hidden-blocks');
-            if (!hiddenBlocks) {
-                hiddenBlocks = document.createElement('div');
-                hiddenBlocks.id = 'cartique-hidden-blocks';
-                document.body.appendChild(hiddenBlocks);
-            }
-            hiddenBlocks.appendChild(cartSlider);
+        // ✅ KEEP: Drawer lives in hidden blocks (original architecture)
+        let hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+        if (!hiddenBlocks) {
+            hiddenBlocks = document.createElement('div');
+            hiddenBlocks.id = 'cartique-hidden-blocks';
+            hiddenBlocks.style.display = 'none';
+            document.body.appendChild(hiddenBlocks);
         }
+
+        hiddenBlocks.appendChild(cartSlider);
 
         const closeBtn = cartSlider.querySelector('#cart-close-btn');
         if (closeBtn && this.addEventListener) {
@@ -410,9 +369,6 @@ export default class CartRenderer {
         hiddenBlocks.appendChild(itemTemplate);
     }
 
-    /**
-     * Renders the full cart page
-     */
     async renderCartPage() {
         console.log('🔍 6. renderCartPage() called');
 
@@ -467,7 +423,6 @@ export default class CartRenderer {
             let priceHTML = '';
             let bulkStatusHTML = '';
 
-            // Fix: Use pricing display helper
             if (pricing.isBulk && pricing.retailPrice > pricing.sellingPrice) {
                 priceHTML = `
                     <span class="original-price-strikethrough">${pricing.displayRetail}</span>
@@ -538,9 +493,6 @@ export default class CartRenderer {
         this.attachCartPageEvents(cartPage);
     }
 
-    /**
-     * Shows the cart slider
-     */
     async showCart() {
         const enriched = this._getEnrichedCart();
         const items = enriched.items;
@@ -559,9 +511,17 @@ export default class CartRenderer {
 
         cartContainer.innerHTML = '';
 
-        const emptyMsg = document.getElementById('shopping-cart-empty');
-        const viewBtn = document.getElementById('view-cart-btn');
-        const checkoutBtn = document.getElementById('checkout-btn');
+        // ✅ FIX: Scope lookups to runtime drawer inside hidden blocks
+        const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+        const cartSlideEl = hiddenBlocks?.querySelector('#cart-slide');
+        
+        if (!cartSlideEl) {
+            console.warn('[CartRenderer] Runtime cart drawer not found in hidden blocks');
+        }
+        
+        const emptyMsg = cartSlideEl?.querySelector('#shopping-cart-empty');
+        const viewBtn = cartSlideEl?.querySelector('#view-cart-btn');
+        const checkoutBtn = cartSlideEl?.querySelector('#checkout-btn');
         
         if (emptyMsg) emptyMsg.classList.toggle('show', items.length === 0);
         if (viewBtn) viewBtn.style.display = items.length === 0 ? 'none' : 'block';
@@ -586,28 +546,33 @@ export default class CartRenderer {
         if (subtotalEl) subtotalEl.textContent = this.formatPrice(subtotal);
         if (subtotalCurrencyEl) subtotalCurrencyEl.textContent = this.currencySymbol || 'R';
 
-        // ✅ FIX 2: Target runtime drawer in component wrapper, not hidden blocks template
-        const cartSlide = document.querySelector('#cartique-cart-slider-component #cart-slide') 
-                       || document.getElementById('cart-slide');
+        // ✅ KEEP: Original visibility lifecycle
+        if (hiddenBlocks) {
+            hiddenBlocks.style.display = 'block';
+        }
+
         const overlay = document.getElementById('cart-slide-overlay');
         
-        if (cartSlide) cartSlide.classList.add('open');
+        if (cartSlideEl) cartSlideEl.classList.add('open');
         if (overlay) overlay.style.display = 'block';
     }
 
     closeCart() {
-        // ✅ FIX 3: Target runtime drawer in component wrapper
-        const cartSlide = document.querySelector('#cartique-cart-slider-component #cart-slide') 
-                       || document.getElementById('cart-slide');
+        // ✅ KEEP: Original close lifecycle with scoped lookup
+        const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+        const cartSlideEl = hiddenBlocks?.querySelector('#cart-slide');
         const overlay = document.getElementById('cart-slide-overlay');
 
-        if (cartSlide) cartSlide.classList.remove('open');
+        if (cartSlideEl) cartSlideEl.classList.remove('open');
         if (overlay) overlay.style.display = 'none';
+        
+        if (hiddenBlocks) {
+            setTimeout(() => {
+                hiddenBlocks.style.display = 'none';
+            }, 350);
+        }
     }
 
-    /**
-     * Renders a single cart item (shared by slide cart)
-     */
     async _renderCartItem(cartItem, item) {
         const imgEl = cartItem.querySelector('#image');
         if (imgEl) {
@@ -665,7 +630,7 @@ export default class CartRenderer {
                 detailsDiv.appendChild(bulkStatus);
             }
 
-            // ✅ FIX: Use raw numbers for price elements, currency handled by #currency span
+            // ✅ KEEP: Raw numbers for price, currency handled by #currency span
             if (bulkDisplay.isBulk && pricing.retailPrice > pricing.sellingPrice) {
                 if (priceEl) {
                     priceEl.textContent = this.formatPrice(pricing.retailPrice);
@@ -725,9 +690,6 @@ export default class CartRenderer {
         }
     }
 
-    /**
-     * Legacy updateCartItem — deprecated, use _renderCartItem instead
-     */
     async updateCartItem(cartItem, product) {
         const item = this._enrichLegacyCartItem(product);
         await this._renderCartItem(cartItem, item);
@@ -844,7 +806,6 @@ export default class CartRenderer {
 
     /**
      * Navigate to full cart page from any context
-     * Fix: View Cart button from single product view
      */
     navigateToCartPage() {
         console.log('🔍 Navigating to cart page...');
@@ -855,7 +816,7 @@ export default class CartRenderer {
         // Close drawer if open
         this.closeCart();
         
-        // ✅ FIX: Set state before rendering
+        // ✅ KEEP: Set state before rendering
         this.state.singleProductViewActive = false;
         this.state.currentView = 'cart';
         
@@ -889,18 +850,11 @@ export default class CartRenderer {
         });
     }
 
-    /**
-     * Shows the full cart page (legacy method)
-     * Deprecated: Use navigateToCartPage() instead
-     */
     showCartPage() {
         console.log('🔍 5. showCartPage() called (legacy)');
         this.navigateToCartPage();
     }
 
-    /**
-     * Closes the cart page and returns to previous view
-     */
     closeCartPage() {
         const cartPage = document.getElementById('cartique-cart-page');
         if (cartPage) cartPage.remove();
@@ -941,9 +895,6 @@ export default class CartRenderer {
         this.restoreState();
     }
 
-    /**
-     * Attaches events to cart page
-     */
     attachCartPageEvents(cartPage) {
         const backBtn = cartPage.querySelector('#cart-page-back');
         if (backBtn && this.addEventListener) {
@@ -957,7 +908,6 @@ export default class CartRenderer {
             }
         });
 
-        // Fix: Quantity buttons — DO NOT open drawer
         cartPage.querySelectorAll('.decrease-page-qty').forEach(btn => {
             if (this.addEventListener) {
                 this.addEventListener(btn, 'click', async (e) => {
@@ -970,7 +920,6 @@ export default class CartRenderer {
                         if (index !== -1) {
                             const newQty = cart[index].cart_quantity - 1;
                             await this.cartService.updateQuantity(productId, newQty);
-                            // ✅ Refresh cart page only — no drawer
                             await this.renderCartPage();
                         }
                     }
@@ -990,7 +939,6 @@ export default class CartRenderer {
                         if (index !== -1) {
                             const newQty = cart[index].cart_quantity + 1;
                             
-                            // Stock check
                             const product = this.products?.find(p => p.id === productId);
                             if (product) {
                                 let variant = null;
@@ -1020,7 +968,6 @@ export default class CartRenderer {
                             }
                             
                             await this.cartService.updateQuantity(productId, newQty);
-                            // ✅ Refresh cart page only — no drawer
                             await this.renderCartPage();
                         }
                     }
@@ -1042,7 +989,7 @@ export default class CartRenderer {
             }
         });
 
-        // ✅ FIX: Checkout button with fallback
+        // ✅ KEEP: Checkout button with fallback
         const checkoutBtn = cartPage.querySelector('#cart-page-checkout');
         if (checkoutBtn && this.addEventListener) {
             this.addEventListener(checkoutBtn, 'click', async (e) => {
@@ -1051,7 +998,6 @@ export default class CartRenderer {
                 if (this.cartService && typeof this.cartService.checkout === 'function') {
                     await this.cartService.checkout();
                 } else if (this.features?.checkoutUrl) {
-                    // ✅ Fallback: redirect to checkout URL
                     console.log('[CartRenderer] Redirecting to checkout:', this.features.checkoutUrl);
                     window.location.href = this.features.checkoutUrl;
                 } else {
@@ -1062,10 +1008,6 @@ export default class CartRenderer {
         }
     }
 
-    /**
-     * Decreases quantity on cart page — legacy method
-     * @deprecated Use CartService instead
-     */
     decreasePageQty(productId) {
         console.warn('[CartRenderer] decreasePageQty is deprecated. Use CartService.updateQuantity instead.');
         if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
@@ -1089,10 +1031,6 @@ export default class CartRenderer {
         }
     }
 
-    /**
-     * Increases quantity on cart page — legacy method
-     * @deprecated Use CartService instead
-     */
     async increasePageQty(productId) {
         console.warn('[CartRenderer] increasePageQty is deprecated. Use CartService.updateQuantity instead.');
         if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
@@ -1172,10 +1110,6 @@ export default class CartRenderer {
         }
     }
 
-    /**
-     * Removes item from cart page — legacy method
-     * @deprecated Use CartService instead
-     */
     removePageItem(productId) {
         console.warn('[CartRenderer] removePageItem is deprecated. Use CartService.removeItem instead.');
         if (this.cartService && typeof this.cartService.removeItem === 'function') {
