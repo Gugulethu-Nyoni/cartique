@@ -383,12 +383,39 @@ if (this.services?.cart?.syncWithKernel) {
     };
     
     this.productRenderer.onBackToList = async () => {
-      if (this.features?.debug) {
-        console.log('[TRACE] onBackToList triggered');
-        console.trace();
-      }
-      await this.collectionRenderer.handleBackToList();
-    };
+    if (this.features?.debug) {
+        console.trace("[TRACE] onBackToList triggered");
+    }
+
+    await this.collectionRenderer.handleBackToList();
+
+    const productDisplays = document.getElementById("cartique-product-displays");
+    const sidebar = document.getElementById("cartique-sidebar");
+    const controls = document.getElementById("cartique-controls");
+    const menuAnchor = document.getElementById("cartique-menu-anchor-top");
+    const mainContent = document.getElementById("cartique-main-content");
+
+    if (productDisplays) {
+        productDisplays.style.display = "block";
+    }
+
+    if (sidebar) {
+        sidebar.style.display = this.features?.sidebarDisplay || "";
+    }
+
+    if (controls) {
+        controls.style.display = "";
+    }
+
+    if (menuAnchor) {
+        menuAnchor.style.display = "";
+    }
+
+    if (mainContent) {
+        mainContent.classList.remove("cartique-full-width");
+    }
+};
+
     
     this.productRenderer.onFilterChange = (filters) => {
       if (this.features?.debug) {
