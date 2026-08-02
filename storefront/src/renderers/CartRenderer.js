@@ -662,10 +662,10 @@ export default class CartRenderer {
                 detailsDiv.appendChild(bulkStatus);
             }
 
-            // Fix: Show strike-through when bulk is active AND retailPrice > sellingPrice
+            // ✅ FIX: Use raw numbers for price elements, currency handled by #currency span
             if (bulkDisplay.isBulk && pricing.retailPrice > pricing.sellingPrice) {
                 if (priceEl) {
-                    priceEl.textContent = pricing.displayRetail;
+                    priceEl.textContent = this.formatPrice(pricing.retailPrice);
                     priceEl.style.textDecoration = 'line-through';
                     priceEl.style.color = '#6c757d';
                     priceEl.style.fontSize = '14px';
@@ -673,7 +673,7 @@ export default class CartRenderer {
                 }
                 
                 if (salePriceEl) {
-                    salePriceEl.textContent = pricing.displaySelling;
+                    salePriceEl.textContent = this.formatPrice(pricing.sellingPrice);
                     salePriceEl.style.display = 'inline';
                     salePriceEl.style.color = '#28a745';
                     salePriceEl.style.fontWeight = 'bold';
@@ -684,7 +684,7 @@ export default class CartRenderer {
                 }
             } else {
                 if (priceEl) {
-                    priceEl.textContent = pricing.displaySelling;
+                    priceEl.textContent = this.formatPrice(pricing.sellingPrice);
                     priceEl.style.textDecoration = 'none';
                     priceEl.style.color = '';
                     priceEl.style.fontSize = '';
@@ -700,7 +700,7 @@ export default class CartRenderer {
             }
         } else {
             if (priceEl) {
-                priceEl.textContent = pricing.displaySelling;
+                priceEl.textContent = this.formatPrice(pricing.sellingPrice);
                 priceEl.style.textDecoration = 'none';
                 priceEl.style.color = '';
                 priceEl.style.fontSize = '';
@@ -852,6 +852,10 @@ export default class CartRenderer {
         // Close drawer if open
         this.closeCart();
         
+        // ✅ FIX: Set state before rendering
+        this.state.singleProductViewActive = false;
+        this.state.currentView = 'cart';
+        
         // Hide product displays
         const productDisplays = document.getElementById('cartique-product-displays');
         const sidebar = document.getElementById('cartique-sidebar');
@@ -869,7 +873,6 @@ export default class CartRenderer {
             mainContent.classList.add('cartique-full-width');
         }
         
-        this.singleProductViewActive = true;
         this.renderCartPage();
         
         // Scroll to top
@@ -1036,7 +1039,7 @@ export default class CartRenderer {
             }
         });
 
-        // Fix: Checkout button
+        // ✅ FIX: Checkout button with fallback
         const checkoutBtn = cartPage.querySelector('#cart-page-checkout');
         if (checkoutBtn && this.addEventListener) {
             this.addEventListener(checkoutBtn, 'click', async (e) => {
@@ -1044,8 +1047,13 @@ export default class CartRenderer {
                 console.log('[CartRenderer] Checkout clicked');
                 if (this.cartService && typeof this.cartService.checkout === 'function') {
                     await this.cartService.checkout();
+                } else if (this.features?.checkoutUrl) {
+                    // ✅ Fallback: redirect to checkout URL
+                    console.log('[CartRenderer] Redirecting to checkout:', this.features.checkoutUrl);
+                    window.location.href = this.features.checkoutUrl;
                 } else {
-                    console.warn('[CartRenderer] CartService.checkout not available');
+                    console.warn('[CartRenderer] No checkout method available');
+                    alert('Checkout not configured');
                 }
             });
         }
