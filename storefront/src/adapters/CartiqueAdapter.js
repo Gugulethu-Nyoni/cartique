@@ -76,6 +76,12 @@ export default class CartiqueAdapter {
     async resolveCart(request) {
         const normalized = this._normalizeCartRequest(request);
         
+        // ✅ TRACE: Log normalized items received by kernel
+        console.log(
+            '[TRACE] KERNEL RECEIVED ITEMS',
+            JSON.parse(JSON.stringify(normalized.items))
+        );
+        
         if (!normalized.customer) {
             normalized.customer = {
                 id: 'guest',
@@ -84,8 +90,6 @@ export default class CartiqueAdapter {
             };
         }
         
-        // ✅ Phase 3.8: Deterministic — always return legacy decision
-        // Kernel path disabled until parity is proven
         return this._resolveCartLegacyToDecision(normalized);
     }
 
