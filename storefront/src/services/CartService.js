@@ -6,6 +6,7 @@
  * Phase 2: Integrated adapter for inventory resolution.
  * Phase 3.7.1: Shared state integration, dataset-based product ID, callback-based updates.
  * Phase 3.7: Intent-based addToCart, proper quantity handling, debug traces.
+ * Phase 3.8: Kernel synchronization.
  */
 
 export default class CartService {
@@ -19,14 +20,119 @@ export default class CartService {
         
         // Callback property (set by StorefrontCore)
         this.onCartUpdated = null;
+        
+        // Sync promise guard for concurrency
+        this._syncPromise = null;
+        this._lastDecision = null;
     }
+
+    // ==========================================================
+    // KERNEL SYNCHRONIZATION
+    // ==========================================================
+
+    /**
+     * Synchronize cart state with Cartique Kernel
+     * Creates CommercialDecision from current cart
+     * Concurrency-safe - prevents overlapping sync operations
+     */
+    async syncWithKernel() {
+        // Prevent concurrent syncs
+        if (this._syncPromise) {
+            if (this.features?.debug) {
+                console.log('[Cart] Sync already in progress, waiting...');
+            }
+            return this._syncPromise;
+        }
+        
+        this._syncPromise = this._performKernelSync();
+        
+        try {
+            return await this._syncPromise;
+        } finally {
+            this._syncPromise = null;
+        }
+    }
+
+    /**
+     * Internal: Perform actual kernel synchronization
+     * @returns {Promise<Object>} CommercialDecision
+     */
+    async _performKernelSync() {
+        if (!this.adapter || typeof this.adapter.resolveCart !== 'function') {
+            if (this.features?.debug) {
+                console.warn('[Cart] Cannot sync with kernel - adapter missing');
+            }
+            return null;
+        }
+        
+        // Get cart from localStorage
+        let cart = [];
+        try {
+            const stored = localStorage.getItem('cartiqueCart');
+            if (stored) {
+                cart = JSON.parse(stored);
+                if (!Array.isArray(cart)) cart = [];
+            }
+        } catch (e) {
+            if (this.features?.debug) {
+                console.warn('[Cart] Failed to parse cart from localStorage:', e);
+            }
+            cart = [];
+        }
+        
+        // Build request (customer handled by adapter)
+        const request = {
+            items: cart.map(item => ({
+                productId: item.id,
+                variantId: item.variantId || null,
+                quantity: item.cart_quantity || 1,
+                sellable: item
+            })),
+            customer: this.customer || null,
+            place: this.place || null,
+            contexts: {
+                currency: this.features?.currencySymbol || 'ZAR',
+                debug: this.features?.debug || false
+            }
+        };
+        
+        try {
+            const decision = await this.adapter.resolveCart(request);
+            this._lastDecision = decision;
+            
+            if (this.features?.debug) {
+                console.log('[Cart] Synced with kernel:', 
+                    decision.items?.length || 0, 
+                    'items, subtotal:', 
+                    decision.totals?.subtotal?.amount || 0
+                );
+            }
+            
+            return decision;
+        } catch (error) {
+            console.error('[Cart] Kernel sync failed:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get the last synced decision
+     * @returns {Object|null} CommercialDecision
+     */
+    getLastDecision() {
+        return this._lastDecision || null;
+    }
+
+    // ==========================================================
+    // CART OPERATIONS
+    // ==========================================================
 
     /**
      * Adds a product to the cart using an intent object
      * @param {Object} intent - The add to cart intent { productId, quantity }
      */
     async addToCart(intent) {
-        // ✅ Debug trace
+        // Debug trace
         if (this.features?.debug) {
             console.log('[TRACE] CartService.addToCart called with:', intent);
             console.trace();
@@ -106,7 +212,7 @@ export default class CartService {
         // Save to localStorage
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
         
-        // ✅ Debug trace before callback
+        // Debug trace before callback
         if (this.features?.debug) {
             console.log('[TRACE] Cart updated, calling onCartUpdated');
             console.trace();
@@ -116,16 +222,80 @@ export default class CartService {
         if (typeof this.onCartUpdated === 'function') {
             this.onCartUpdated();
         }
+        
+        // Sync with kernel after cart update
+        await this.syncWithKernel();
+    }
+
+    /**
+     * Remove an item from the cart
+     * @param {number} productId - Product ID to remove
+     */
+    async removeItem(productId) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CartService.removeItem called:', productId);
+            console.trace();
+        }
+        
+        let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+        cart = cart.filter(item => item.id !== productId);
+        localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        
+        // Sync with kernel after removal
+        await this.syncWithKernel();
+        
+        // Notify UI
+        if (typeof this.onCartUpdated === 'function') {
+            this.onCartUpdated();
+        }
+    }
+
+    /**
+     * Update quantity of an item in the cart
+     * @param {number} productId - Product ID
+     * @param {number} quantity - New quantity
+     */
+    async updateQuantity(productId, quantity) {
+        if (this.features?.debug) {
+            console.log('[TRACE] CartService.updateQuantity called:', { productId, quantity });
+            console.trace();
+        }
+        
+        if (quantity < 0) return;
+        
+        let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+        const index = cart.findIndex(item => item.id === productId);
+        
+        if (index === -1) return;
+        
+        if (quantity === 0) {
+            cart.splice(index, 1);
+        } else {
+            cart[index].cart_quantity = quantity;
+        }
+        
+        localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        
+        // Sync with kernel after update
+        await this.syncWithKernel();
+        
+        // Notify UI
+        if (typeof this.onCartUpdated === 'function') {
+            this.onCartUpdated();
+        }
     }
 
     /**
      * Handles checkout action
      */
-    checkout() {
+    async checkout() {
         if (this.features?.debug) {
             console.log('[TRACE] CartService.checkout called');
             console.trace();
         }
+        
+        // Sync with kernel before checkout
+        await this.syncWithKernel();
         
         // Check if cart page is open
         const cartPage = document.getElementById('cartique-cart-page');
