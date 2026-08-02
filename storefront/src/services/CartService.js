@@ -100,7 +100,7 @@ export default class CartService {
             const decision = await this.adapter.resolveCart(request);
             this._lastDecision = decision;
             
-            //  Store decision in shared state for renderers
+            // Store decision in shared state for renderers
             if (this.state) {
                 this.state.cartDecision = decision;
             }
@@ -232,7 +232,7 @@ export default class CartService {
         }
         
         // Use callback instead of direct UI call
-        //  FIX: Pass 'drawer' source — addToCart comes from product pages/drawer context
+        // FIX: Pass 'drawer' source — addToCart comes from product pages/drawer context
         if (typeof this.onCartUpdated === 'function') {
             this.onCartUpdated('drawer');
         }
@@ -259,7 +259,7 @@ export default class CartService {
         await this.syncWithKernel();
         
         // Notify UI
-        //  FIX: Pass 'page' source — removeItem comes from cart page context
+        // FIX: Pass 'page' source — removeItem comes from cart page context
         if (typeof this.onCartUpdated === 'function') {
             this.onCartUpdated('page');
         }
@@ -295,7 +295,7 @@ export default class CartService {
         await this.syncWithKernel();
         
         // Notify UI
-        //  FIX: Pass 'page' source — updateQuantity comes from cart page context
+        // FIX: Pass 'page' source — updateQuantity comes from cart page context
         if (typeof this.onCartUpdated === 'function') {
             this.onCartUpdated('page');
         }
@@ -350,19 +350,30 @@ export default class CartService {
             }
         }
         
-        // Show the checkout alert
-        if (typeof this.showCheckoutAlert === 'function') {
-            this.showCheckoutAlert();
+        // Show the checkout alert with fallback
+        // FIX: try/catch ensures checkout redirect happens even if notification fails
+        try {
+            if (typeof this.showCheckoutAlert === 'function') {
+                this.showCheckoutAlert();
+            }
+        } catch (error) {
+            console.error(
+                '[CartService] Checkout notification failed',
+                error
+            );
+            if (this.features?.checkoutUrl) {
+                window.location.href = this.features.checkoutUrl;
+            }
         }
     }
 
     /**
- * Get the current CommercialDecision
- * @returns {Object|null} CommercialDecision or null
- */
-getCurrentDecision() {
-    return this._lastDecision || null;
-}
+     * Get the current CommercialDecision
+     * @returns {Object|null} CommercialDecision or null
+     */
+    getCurrentDecision() {
+        return this._lastDecision || null;
+    }
 
     /**
      * Sets the adapter instance
