@@ -100,6 +100,7 @@ export default class StorefrontCore {
     this.state = {
       // Product display
       currentLayout: 'grid',
+
       
       // Search
       currentSearchQuery: '',
@@ -127,7 +128,9 @@ export default class StorefrontCore {
       selectedProduct: null,
       
       // No fallback — use features.currencySymbol directly
-      currencySymbol: this.features?.currencySymbol
+      currencySymbol: this.features?.currencySymbol,
+      cartDecision: null,
+
     };
 
     // ==========================================================
@@ -360,7 +363,9 @@ if (this.services?.cart?.syncWithKernel) {
       ...baseRendererContext,
       themeManager: this.themeManager,
       componentRegistry: this.themeManager.componentRegistry,
-      container: this.container  // Pass container reference
+      container: this.container,  // Pass container reference
+      cartService: this.services.cart  //  ADD THIS
+
     });
 
     // ==========================================================

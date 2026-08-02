@@ -354,6 +354,14 @@ export default class CartService {
     }
 
     /**
+ * Get the current CommercialDecision
+ * @returns {Object|null} CommercialDecision or null
+ */
+getCurrentDecision() {
+    return this._lastDecision || null;
+}
+
+    /**
      * Sets the adapter instance
      * @param {Object} adapter - The adapter instance
      */
