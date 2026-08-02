@@ -100,6 +100,11 @@ export default class CartService {
             const decision = await this.adapter.resolveCart(request);
             this._lastDecision = decision;
             
+            // ✅ Store decision in shared state for renderers
+            if (this.state) {
+                this.state.cartDecision = decision;
+            }
+            
             if (this.features?.debug) {
                 console.log('[Cart] Synced with kernel:', 
                     decision.items?.length || 0, 
@@ -212,11 +217,13 @@ export default class CartService {
         // Save to localStorage
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
         
-        // ✅ TRACE: Cart before kernel sync
-        console.log(
-            '[TRACE] CART BEFORE KERNEL SYNC',
-            JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('cartiqueCart'))))
-        );
+        // TRACE: Cart before kernel sync
+        if (this.features?.debug) {
+            console.log(
+                '[TRACE] CART BEFORE KERNEL SYNC',
+                JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('cartiqueCart'))))
+            );
+        }
         
         // Debug trace before callback
         if (this.features?.debug) {
