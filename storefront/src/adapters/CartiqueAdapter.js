@@ -69,6 +69,9 @@ export default class CartiqueAdapter {
     /**
      * Resolve entire cart
      * Returns: Cart resolution with CommercialDecision items (Phase 2D)
+     * 
+     * Phase 3.8: Deterministic routing — always uses legacy path
+     * Kernel path disabled until it can prove identical output
      */
     async resolveCart(request) {
         const normalized = this._normalizeCartRequest(request);
@@ -81,9 +84,8 @@ export default class CartiqueAdapter {
             };
         }
         
-        if (!this.legacyMode && this.kernel) {
-            return this._resolveCartWithKernel(normalized);
-        }
+        // ✅ Phase 3.8: Deterministic — always return legacy decision
+        // Kernel path disabled until parity is proven
         return this._resolveCartLegacyToDecision(normalized);
     }
 
@@ -192,7 +194,7 @@ export default class CartiqueAdapter {
     }
 
     // ==========================================================
-    // KERNEL RESOLVERS
+    // KERNEL RESOLVERS (Kept for future parity)
     // ==========================================================
 
     async _resolveWithKernel(request) {
@@ -224,29 +226,27 @@ export default class CartiqueAdapter {
         }
     }
 
+    /**
+     * Kernel cart resolver — kept for future parity
+     * Currently unused (resolveCart uses legacy path)
+     */
     async _resolveCartWithKernel(request) {
         const items = request.items || [];
         const decisions = [];
 
         for (const item of items) {
-            // PRESERVE the full sellable object from normalization
             const sellable = item.sellable || null;
-            
-            // Get the full variant with pricing
             const variant = this._getVariant(sellable, item.variantId);
-            
-            // Resolve currency (passed through if kernel supports it)
             const currency = sellable?.currency ||
                              variant?.currency ||
                              item.currency ||
                              this.currencySymbol;
 
-            // Call kernel with COMPLETE commercial data
             const decision = await this._resolveWithKernel({
                 sellable: sellable,
                 variant: variant,
                 quantity: item.quantity || 1,
-                currency: currency,  // Added: explicit currency context
+                currency: currency,
                 customer: request.customer,
                 place: request.place,
                 contexts: request.contexts
@@ -255,7 +255,6 @@ export default class CartiqueAdapter {
             decisions.push(decision);
         }
 
-        // Aggregate totals
         let subtotal = 0;
         let total = 0;
         let tax = 0;
