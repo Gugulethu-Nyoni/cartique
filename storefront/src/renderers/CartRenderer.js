@@ -61,7 +61,6 @@ export default class CartRenderer {
             scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
             product: this.state?.selectedProduct || null,
             view: this.state?.singleProductViewActive || false,
-            // Store references to product grid and list containers
             gridDisplay: document.getElementById('cartique-product-grid')?.style.display || '',
             listDisplay: document.getElementById('cartique-product-list')?.style.display || ''
         };
@@ -107,7 +106,6 @@ export default class CartRenderer {
 
         // Restore scroll position
         if (typeof window !== 'undefined' && snapshot.scrollY > 0) {
-            // Use requestAnimationFrame to ensure DOM is ready
             requestAnimationFrame(() => {
                 window.scrollTo(0, snapshot.scrollY);
             });
@@ -226,6 +224,19 @@ export default class CartRenderer {
         console.log('🔍 6. renderCartPage() called');
 
         const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+        
+        // ✅ TRACE: Log cart read by renderer
+        console.log(
+            '[TRACE] RENDERER READING CART',
+            JSON.parse(JSON.stringify(cart))
+        );
+        
+        // ✅ TRACE: Log last decision from CartService
+        console.log(
+            '[TRACE] LAST DECISION',
+            this.cartService?.getLastDecision()
+        );
+        
         const mainContent = document.getElementById('cartique-main-content');
         
         if (!mainContent) {
@@ -414,6 +425,13 @@ export default class CartRenderer {
      */
     async showCart() {
         const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+        
+        // ✅ TRACE: Log cart read by slider
+        console.log(
+            '[TRACE] SLIDER READING CART',
+            JSON.parse(JSON.stringify(cart))
+        );
+        
         const cartContainer = document.getElementById('cart-items-container');
         
         if (!cartContainer) {
