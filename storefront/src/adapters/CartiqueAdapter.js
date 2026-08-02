@@ -32,8 +32,6 @@ export default class CartiqueAdapter {
 
     /**
      * Set legacy mode on/off
-     * Phase 2A: legacyMode = true
-     * Phase 2B: legacyMode = false
      */
     setLegacyMode(mode) {
         this.legacyMode = mode;
@@ -91,7 +89,6 @@ export default class CartiqueAdapter {
 
     /**
      * Resolve inventory
-     * Phase 2B: Delegates to kernel when available
      */
     async resolveInventory(request) {
         return this._resolveInventoryLegacy(request);
@@ -99,20 +96,15 @@ export default class CartiqueAdapter {
 
     /**
      * Resolve catalog (query layer)
-     * Phase 2B: Delegates to kernel.query() when available
      */
     async resolveCatalog(query) {
         return this._resolveCatalogLegacy(query);
     }
 
     // ==========================================================
-    // UI HELPERS (Keep during Phase 2)
+    // UI HELPERS
     // ==========================================================
 
-    /**
-     * Find variant by ID (UI helper)
-     * Keep for UI responsiveness — not commerce logic
-     */
     resolveVariant(sellable, variantId) {
         if (!sellable || !sellable.variants) return null;
         if (variantId) {
@@ -121,10 +113,6 @@ export default class CartiqueAdapter {
         return sellable.variants[0] || null;
     }
 
-    /**
-     * Get selected variant (UI helper)
-     * Keep for UI responsiveness
-     */
     getSelectedVariant(sellable) {
         if (!sellable || !sellable.variants || sellable.variants.length === 0) {
             return null;
@@ -139,9 +127,6 @@ export default class CartiqueAdapter {
     /**
      * Get full variant object from sellable data
      * Preserves all pricing information
-     * Supports both:
-     * - Products with variants array
-     * - Already-resolved sellable variant objects
      *
      * @param {Object} sellable - Product/sellable object
      * @param {string|number} variantId - Variant ID to find (optional)
@@ -175,10 +160,6 @@ export default class CartiqueAdapter {
     /**
      * Normalize cart request to expected schema
      * Idempotent - supports both legacy and kernel formats
-     * 
-     * @param {Object} request - Raw cart request
-     * @param {Array} request.items - Cart items (legacy or kernel format)
-     * @returns {Object} Normalized request with canonical item format
      */
     _normalizeCartRequest(request) {
         if (!request) return { items: [], customer: null, place: null, contexts: {} };
@@ -188,18 +169,21 @@ export default class CartiqueAdapter {
             items: (request.items || []).map(item => {
                 const productId = item.productId || item.id;
                 const variantId = item.variantId || (item.variants?.[0]?.id) || null;
-                const quantity = item.quantity || item.cart_quantity || 1;
+                const quantity = item.quantity || item.cart_quantity || item.qty || 1;
                 
                 let sellable = item.sellable || null;
                 if (!sellable && this._findProduct && productId) {
                     sellable = this._findProduct(productId);
+                }
+                if (!sellable) {
+                    sellable = item;
                 }
                 
                 return {
                     productId: productId,
                     variantId: variantId,
                     quantity: quantity,
-                    sellable: sellable || item,
+                    sellable: sellable,
                     currency: sellable?.currency || item.currency || this.currencySymbol,
                     _original: item
                 };
@@ -208,13 +192,9 @@ export default class CartiqueAdapter {
     }
 
     // ==========================================================
-    // KERNEL RESOLVERS (Phase 2B/2D)
+    // KERNEL RESOLVERS
     // ==========================================================
 
-    /**
-     * Resolve pricing with kernel
-     * Returns CommercialDecision directly
-     */
     async _resolveWithKernel(request) {
         const sellable = request.sellable;
         const quantity = request.quantity || 1;
@@ -244,10 +224,6 @@ export default class CartiqueAdapter {
         }
     }
 
-    /**
-     * Resolve cart with kernel
-     * Returns aggregated CommercialDecision structure
-     */
     async _resolveCartWithKernel(request) {
         const items = request.items || [];
         const decisions = [];
@@ -297,7 +273,7 @@ export default class CartiqueAdapter {
     }
 
     // ==========================================================
-    // LEGACY TO COMMERCIAL DECISION CONVERTERS (Phase 2D)
+    // LEGACY TO COMMERCIAL DECISION CONVERTERS
     // ==========================================================
 
     /**
@@ -353,7 +329,6 @@ export default class CartiqueAdapter {
         const unitPrice = isBulk ? bulkPrice : retailPrice;
         const totalPrice = unitPrice * quantity;
 
-        // Zero price assertion
         if (this.debug && unitPrice === 0) {
             console.error("[CartiqueAdapter] ZERO PRICE DETECTED", {
                 sellable: sellable,
@@ -433,9 +408,13 @@ export default class CartiqueAdapter {
     /**
      * Convert legacy cart to CommercialDecision structure
      * Phase 2D: Always returns CommercialDecision structure
+     * 
+     * IMPORTANT: This method receives ALREADY NORMALIZED request
+     * from resolveCart(). Do NOT call _normalizeCartRequest() here.
      */
     _resolveCartLegacyToDecision(request) {
         const items = request.items || [];
+
         const decisions = [];
         let subtotal = 0;
 
