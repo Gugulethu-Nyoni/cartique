@@ -26,6 +26,7 @@ export default class CartiqueAdapter {
         this.debug = options.debug ?? false;
         this.currencySymbol = options.currencySymbol || 'USD';
         this.onDecision = options.onDecision || null;  // Phase 3: Decision recording callback
+        this._findProduct = null;  // Optional product lookup function
     }
 
     /**
@@ -42,6 +43,13 @@ export default class CartiqueAdapter {
      */
     setCurrencySymbol(symbol) {
         this.currencySymbol = symbol;
+    }
+
+    /**
+     * Set product lookup function for normalization
+     */
+    setProductLookup(fn) {
+        this._findProduct = fn;
     }
 
     // ==========================================================
@@ -65,10 +73,22 @@ export default class CartiqueAdapter {
      * Returns: Cart resolution with CommercialDecision items (Phase 2D)
      */
     async resolveCart(request) {
-        if (!this.legacyMode && this.kernel) {
-            return this._resolveCartWithKernel(request);
+        // Normalize incoming request (idempotent - supports both legacy and kernel formats)
+        const normalized = this._normalizeCartRequest(request);
+        
+        // Ensure customer context exists
+        if (!normalized.customer) {
+            normalized.customer = {
+                id: 'guest',
+                type: 'guest',
+                name: 'Guest User'
+            };
         }
-        return this._resolveCartLegacyToDecision(request);
+        
+        if (!this.legacyMode && this.kernel) {
+            return this._resolveCartWithKernel(normalized);
+        }
+        return this._resolveCartLegacyToDecision(normalized);
     }
 
     /**
@@ -117,6 +137,49 @@ export default class CartiqueAdapter {
     }
 
     // ==========================================================
+    // CART NORMALIZATION (Phase 3.8)
+    // ==========================================================
+
+    /**
+     * Normalize cart request to expected schema
+     * Idempotent - supports both legacy and kernel formats
+     * 
+     * @param {Object} request - Raw cart request
+     * @param {Array} request.items - Cart items (legacy or kernel format)
+     * @returns {Object} Normalized request with canonical item format
+     */
+    _normalizeCartRequest(request) {
+        if (!request) return { items: [], customer: null, place: null, contexts: {} };
+        
+        return {
+            ...request,
+            items: (request.items || []).map(item => {
+                // Support both legacy (id) and kernel (productId) formats
+                const productId = item.productId || item.id;
+                // Support both legacy (variants[0].id) and kernel (variantId) formats
+                const variantId = item.variantId || (item.variants?.[0]?.id) || null;
+                // Support both legacy (cart_quantity) and kernel (quantity) formats
+                const quantity = item.quantity || item.cart_quantity || 1;
+                
+                // Find the sellable product if not already present and we have a lookup
+                let sellable = item.sellable || null;
+                if (!sellable && this._findProduct && productId) {
+                    sellable = this._findProduct(productId);
+                }
+                
+                return {
+                    productId: productId,
+                    variantId: variantId,
+                    quantity: quantity,
+                    sellable: sellable || item,
+                    // Preserve original for fallback
+                    _original: item
+                };
+            })
+        };
+    }
+
+    // ==========================================================
     // KERNEL RESOLVERS (Phase 2B/2D)
     // ==========================================================
 
@@ -160,13 +223,14 @@ export default class CartiqueAdapter {
      * Returns aggregated CommercialDecision structure
      */
     async _resolveCartWithKernel(request) {
+        // Items are already normalized by _normalizeCartRequest
         const items = request.items || [];
         const decisions = [];
 
         for (const item of items) {
             const decision = await this._resolveWithKernel({
-                sellable: item.sellable,
-                variant: item.variant,
+                sellable: item.sellable || { id: item.productId },
+                variant: item.variantId ? { id: item.variantId } : null,
                 quantity: item.quantity || 1,
                 customer: request.customer,
                 place: request.place,
@@ -317,14 +381,19 @@ export default class CartiqueAdapter {
      * Phase 2D: Always returns CommercialDecision structure
      */
     _resolveCartLegacyToDecision(request) {
+        // Items are already normalized by _normalizeCartRequest
         const items = request.items || [];
         const decisions = [];
         let subtotal = 0;
 
         for (const item of items) {
+            // Use the sellable from normalized item, or create a minimal one
+            const sellable = item.sellable || { id: item.productId };
+            const variant = item.variantId ? { id: item.variantId } : null;
+            
             const decision = this._resolveLegacyToDecision({
-                sellable: item.sellable,
-                variant: item.variant || this.getSelectedVariant(item.sellable),
+                sellable: sellable,
+                variant: variant,
                 quantity: item.quantity || 1
             });
             decisions.push(decision);
