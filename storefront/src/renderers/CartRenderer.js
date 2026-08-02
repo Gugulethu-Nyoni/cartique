@@ -9,6 +9,7 @@
  * Phase 3.8: Navigation state restoration and CommercialDecision consumption.
  * Phase 3.8.1: CartRenderer migration completion — single enrichment pipeline.
  * Phase 3.8.2: Final fixes — strike-through, quantity buttons, checkout, view cart.
+ * Phase 3.8.3: Drawer ownership fix — runtime drawer in component wrapper, not hidden blocks.
  */
 
 export default class CartRenderer {
@@ -332,14 +333,24 @@ export default class CartRenderer {
             return;
         }
 
-        let hiddenBlocks = document.getElementById('cartique-hidden-blocks');
-        if (!hiddenBlocks) {
-            hiddenBlocks = document.createElement('div');
-            hiddenBlocks.id = 'cartique-hidden-blocks';
-            document.body.appendChild(hiddenBlocks);
+        // ✅ FIX 1: Append runtime drawer to visible component wrapper, not hidden blocks
+        // This ensures showCart() targets the correct drawer instance
+        const componentWrapper = document.getElementById('cartique-cart-slider-component');
+        if (componentWrapper) {
+            // Clear any existing drawer first (prevents duplicates)
+            const existingDrawer = componentWrapper.querySelector('#cart-slide');
+            if (existingDrawer) existingDrawer.remove();
+            componentWrapper.appendChild(cartSlider);
+        } else {
+            // Fallback: create hidden blocks only for template storage
+            let hiddenBlocks = document.getElementById('cartique-hidden-blocks');
+            if (!hiddenBlocks) {
+                hiddenBlocks = document.createElement('div');
+                hiddenBlocks.id = 'cartique-hidden-blocks';
+                document.body.appendChild(hiddenBlocks);
+            }
+            hiddenBlocks.appendChild(cartSlider);
         }
-
-        hiddenBlocks.appendChild(cartSlider);
 
         const closeBtn = cartSlider.querySelector('#cart-close-btn');
         if (closeBtn && this.addEventListener) {
@@ -575,12 +586,9 @@ export default class CartRenderer {
         if (subtotalEl) subtotalEl.textContent = this.formatPrice(subtotal);
         if (subtotalCurrencyEl) subtotalCurrencyEl.textContent = this.currencySymbol || 'R';
 
-        const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
-        if (hiddenBlocks) {
-            hiddenBlocks.style.display = 'block';
-        }
-
-        const cartSlide = document.getElementById('cart-slide');
+        // ✅ FIX 2: Target runtime drawer in component wrapper, not hidden blocks template
+        const cartSlide = document.querySelector('#cartique-cart-slider-component #cart-slide') 
+                       || document.getElementById('cart-slide');
         const overlay = document.getElementById('cart-slide-overlay');
         
         if (cartSlide) cartSlide.classList.add('open');
@@ -588,18 +596,13 @@ export default class CartRenderer {
     }
 
     closeCart() {
-        const cartSlide = document.getElementById('cart-slide');
+        // ✅ FIX 3: Target runtime drawer in component wrapper
+        const cartSlide = document.querySelector('#cartique-cart-slider-component #cart-slide') 
+                       || document.getElementById('cart-slide');
         const overlay = document.getElementById('cart-slide-overlay');
-        const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
 
         if (cartSlide) cartSlide.classList.remove('open');
         if (overlay) overlay.style.display = 'none';
-        
-        if (hiddenBlocks) {
-            setTimeout(() => {
-                hiddenBlocks.style.display = 'none';
-            }, 350);
-        }
     }
 
     /**
