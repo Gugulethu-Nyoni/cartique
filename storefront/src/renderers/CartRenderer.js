@@ -6,6 +6,7 @@
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks.
+ * Phase 3.8: Navigation state restoration.
  */
 
 export default class CartRenderer {
@@ -28,6 +29,107 @@ export default class CartRenderer {
                 this.eventListeners.get(key).push({ element: el, event, handler });
             };
         }
+        
+        // Callback property for cart restoration
+        this.onCartRestored = null;
+        
+        // State snapshot storage
+        this._stateSnapshot = null;
+    }
+
+    // ==========================================================
+    // STATE SNAPSHOT & RESTORE (for navigation)
+    // ==========================================================
+
+    /**
+     * Snapshot current state before navigation
+     * Uses CartService.snapshotState if available, or creates its own
+     */
+    snapshotState() {
+        // Try to use CartService's snapshot method first
+        if (this.cartService && typeof this.cartService.snapshotState === 'function') {
+            this.cartService.snapshotState();
+            return;
+        }
+
+        // Fallback: snapshot state directly
+        this._stateSnapshot = {
+            layout: this.state?.currentLayout || 'grid',
+            search: this.state?.currentSearchQuery || '',
+            category: this.state?.activeCategoryId || null,
+            filters: this.state?.activeFilters || {},
+            scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+            product: this.state?.selectedProduct || null,
+            view: this.state?.singleProductViewActive || false,
+            // Store references to product grid and list containers
+            gridDisplay: document.getElementById('cartique-product-grid')?.style.display || '',
+            listDisplay: document.getElementById('cartique-product-list')?.style.display || ''
+        };
+
+        if (this.features?.debug) {
+            console.log('[CartRenderer] State snapshot taken:', this._stateSnapshot);
+        }
+    }
+
+    /**
+     * Restore state after navigation
+     */
+    restoreState() {
+        // Try to use CartService's restore method first
+        if (this.cartService && typeof this.cartService.restoreState === 'function') {
+            this.cartService.restoreState();
+            return;
+        }
+
+        // Fallback: restore state directly
+        if (!this._stateSnapshot) {
+            if (this.features?.debug) {
+                console.warn('[CartRenderer] No state snapshot to restore');
+            }
+            return;
+        }
+
+        const snapshot = this._stateSnapshot;
+
+        if (this.features?.debug) {
+            console.log('[CartRenderer] Restoring state:', snapshot);
+        }
+
+        // Restore UI state
+        if (this.state) {
+            this.state.currentLayout = snapshot.layout;
+            this.state.currentSearchQuery = snapshot.search;
+            this.state.activeCategoryId = snapshot.category;
+            this.state.activeFilters = snapshot.filters || {};
+            this.state.selectedProduct = snapshot.product;
+            this.state.singleProductViewActive = snapshot.view;
+        }
+
+        // Restore scroll position
+        if (typeof window !== 'undefined' && snapshot.scrollY > 0) {
+            // Use requestAnimationFrame to ensure DOM is ready
+            requestAnimationFrame(() => {
+                window.scrollTo(0, snapshot.scrollY);
+            });
+        }
+
+        // Restore product grid/list visibility
+        const gridContainer = document.getElementById('cartique-product-grid');
+        const listContainer = document.getElementById('cartique-product-list');
+
+        if (gridContainer && snapshot.gridDisplay) {
+            gridContainer.style.display = snapshot.gridDisplay;
+        }
+        if (listContainer && snapshot.listDisplay) {
+            listContainer.style.display = snapshot.listDisplay;
+        }
+
+        // Notify renderers to refresh
+        if (typeof this.onCartRestored === 'function') {
+            this.onCartRestored();
+        }
+
+        this._stateSnapshot = null;
     }
 
     /**
@@ -712,6 +814,9 @@ export default class CartRenderer {
     showCartPage() {
         console.log('🔍 5. showCartPage() called');
 
+        // Snapshot state before navigating to cart
+        this.snapshotState();
+
         this.closeCart();
         
         const productDisplays = document.getElementById('cartique-product-displays');
@@ -781,6 +886,9 @@ export default class CartRenderer {
         if (!wasInSingleView) {
             this.singleProductViewActive = false;
         }
+
+        // Restore state after cart page is closed
+        this.restoreState();
     }
 
     /**
