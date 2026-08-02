@@ -212,6 +212,12 @@ export default class CartService {
         // Save to localStorage
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
         
+        // ✅ TRACE: Cart before kernel sync
+        console.log(
+            '[TRACE] CART BEFORE KERNEL SYNC',
+            JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('cartiqueCart'))))
+        );
+        
         // Debug trace before callback
         if (this.features?.debug) {
             console.log('[TRACE] Cart updated, calling onCartUpdated');
