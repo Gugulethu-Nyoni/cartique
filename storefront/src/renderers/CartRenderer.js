@@ -826,29 +826,36 @@ export default class CartRenderer {
     /**
      * Navigate to full cart page from any context
      */
-    navigateToCartPage() {
+        navigateToCartPage() {
         console.log('🔍 Navigating to cart page...');
         
-        // Snapshot current state
+        // Snapshot browsing state only — cart navigation must never restore single product view
         this.snapshotState();
+        
+        // Cart page owns the viewport. Kill single product ownership.
+        if (this.state) {
+            this.state.singleProductViewActive = false;
+            this.state.selectedProduct = null;
+            this.state.currentView = 'cart';
+        }
         
         // Close drawer if open
         this.closeCart();
         
-        // ✅ KEEP: Set state before rendering
-        this.state.singleProductViewActive = false;
-        this.state.currentView = 'cart';
-        
-        // Hide product displays
+        // Hide all storefront UIs — cart page owns the viewport
         const productDisplays = document.getElementById('cartique-product-displays');
         const sidebar = document.getElementById('cartique-sidebar');
         const menuAnchor = document.getElementById('cartique-menu-anchor-top');
         const controls = document.getElementById('cartique-controls');
+        const singleProductView = document.getElementById('single-product-view-container');
+        const stickyNav = document.getElementById('cartique-sticky-nav');
         
         if (productDisplays) productDisplays.style.display = 'none';
         if (sidebar) sidebar.style.display = 'none';
         if (menuAnchor) menuAnchor.style.display = 'none';
         if (controls) controls.style.display = 'none';
+        if (singleProductView) singleProductView.style.display = 'none';
+        if (stickyNav) stickyNav.style.display = 'none';
         
         // Make main content full width
         const mainContent = document.getElementById('cartique-main-content');
@@ -869,18 +876,20 @@ export default class CartRenderer {
         });
     }
 
+
     showCartPage() {
         console.log('🔍 5. showCartPage() called (legacy)');
         this.navigateToCartPage();
     }
 
-     closeCartPage() {
+         closeCartPage() {
         const cartPage = document.getElementById('cartique-cart-page');
         if (cartPage) cartPage.remove();
 
-        // Let restoreState() be the single authority on UI state
+        // Restore browsing context (filters, search, scroll)
         this.restoreState();
         
+        // Cart exit always returns to storefront grid. Never restore single product view.
         const singleProductViewEl = document.getElementById('single-product-view-container');
         const productDisplays = document.getElementById('cartique-product-displays');
         const sidebar = document.getElementById('cartique-sidebar');
@@ -888,23 +897,20 @@ export default class CartRenderer {
         const controls = document.getElementById('cartique-controls');
         const footer = document.getElementById('cartique-product-footer');
         
-        if (this.state.singleProductViewActive) {
-            // Restore single product view exclusively
-            if (singleProductViewEl) singleProductViewEl.style.display = 'block';
-            if (productDisplays) productDisplays.style.display = 'none';
-        } else {
-            // Restore product grid exclusively
-            if (singleProductViewEl) singleProductViewEl.style.display = 'none';
-            if (productDisplays) productDisplays.style.display = 'block';
-            if (sidebar) sidebar.style.display = this.features?.sidebarDisplay;
-            if (menuAnchor) menuAnchor.style.display = '';
-            if (controls) controls.style.display = '';
-            if (footer) footer.style.display = this.features?.footerDisplay;
-        }
+        if (singleProductViewEl) singleProductViewEl.style.display = 'none';
+        if (productDisplays) productDisplays.style.display = 'block';
+        if (sidebar) sidebar.style.display = this.features?.sidebarDisplay;
+        if (menuAnchor) menuAnchor.style.display = '';
+        if (controls) controls.style.display = '';
+        if (footer) footer.style.display = this.features?.footerDisplay;
+        
+        this.state.singleProductViewActive = false;
+        this.state.selectedProduct = null;
+        this.state.currentView = 'products';
         
         const mainContent = document.getElementById('cartique-main-content');
         if (mainContent) {
-            if (this.features?.sidebarDisplay === 'none' || this.state.singleProductViewActive) {
+            if (this.features?.sidebarDisplay === 'none') {
                 mainContent.classList.add('cartique-full-width');
             } else {
                 mainContent.classList.remove('cartique-full-width');
@@ -912,6 +918,7 @@ export default class CartRenderer {
         }
     }
 
+    
 
 
     attachCartPageEvents(cartPage) {
