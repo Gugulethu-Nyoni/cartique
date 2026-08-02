@@ -10,6 +10,7 @@
  * Phase 3.7.1: Shared state integration.
  * Phase 3.7: Add to Cart pipeline, Back navigation, FOUC prevention.
  * Phase 2: Theme Component System integration.
+ * Phase 3.8.2: Bulk pricing display on product UI.
  *
  * Single ownership: Layout + Product Display
  */
@@ -69,6 +70,67 @@ export default class ProductRenderer {
         // THEME COMPONENTS
         this.themeManager = context.themeManager || null;
         this.componentRegistry = context.componentRegistry || null;
+    }
+
+    // ==========================================================
+    // BULK PRICING DISPLAY HELPER
+    // ==========================================================
+
+    /**
+     * Get bulk pricing display data from product variant
+     * @param {Object} variant - Product variant
+     * @param {number} quantity - Optional quantity for bulk status
+     * @returns {Object} Bulk pricing display data
+     */
+    _getBulkPricingDisplay(variant, quantity = 0) {
+        const defaultDisplay = {
+            hasBulk: false,
+            isBulk: false,
+            retailPrice: variant?.price || 0,
+            bulkPrice: null,
+            unitPrice: variant?.price || 0,
+            minimumQty: null,
+            heading: null,
+            message: null,
+            displayPrice: null,
+            bulkDisplayPrice: null,
+            staticDisplay: {
+                label: null,
+                price: null,
+                minQty: null
+            }
+        };
+
+        if (!variant) return defaultDisplay;
+
+        const retailPrice = variant.price || 0;
+        const bulkPrice = variant.bulkPrice;
+        const minimumQty = variant.bulkMinimumQty;
+        const hasBulk = bulkPrice !== null && bulkPrice !== undefined && minimumQty !== null;
+        const isBulk = hasBulk && quantity >= minimumQty;
+        const unitPrice = isBulk ? bulkPrice : retailPrice;
+
+        if (!hasBulk) {
+            return defaultDisplay;
+        }
+
+        return {
+            hasBulk: hasBulk,
+            isBulk: isBulk,
+            retailPrice: retailPrice,
+            bulkPrice: bulkPrice,
+            unitPrice: unitPrice,
+            minimumQty: minimumQty,
+            heading: isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            message: `Minimum ${minimumQty} items`,
+            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
+            bulkDisplayPrice: `${this.currencySymbol}${this.formatPrice(bulkPrice)} each`,
+            staticDisplay: {
+                label: 'BULK PRICE',
+                price: `${this.currencySymbol}${this.formatPrice(bulkPrice)} each`,
+                minQty: `Minimum ${minimumQty} items`
+            }
+        };
     }
 
     async renderSingleProduct(product) {
@@ -134,6 +196,9 @@ export default class ProductRenderer {
             console.warn('Failed to get variant:', e.message);
             variant = { price: product.price || 0 };
         }
+        
+        // Get bulk pricing display for product UI
+        const bulkDisplayUI = this._getBulkPricingDisplay(variant);
         
         let decision;
         try {
@@ -201,7 +266,7 @@ export default class ProductRenderer {
             </div>
         `;
         
-        // Add bulk pricing section if available
+        // Add bulk pricing section if available (from cart decision)
         if (bulkDisplay && bulkDisplay.hasBulk && bulkDisplay.staticDisplay) {
             priceHTML += `
                 <div class="cartique-bulk-pricing single-product">
@@ -211,6 +276,19 @@ export default class ProductRenderer {
                     </div>
                     <div class="bulk-min-row">
                         <span class="bulk-min-qty">${bulkDisplay.message || ''}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Add bulk pricing display from product variant (shown before purchase)
+        if (bulkDisplayUI && bulkDisplayUI.hasBulk) {
+            priceHTML += `
+                <div class="cartique-bulk-pricing product-display single-product">
+                    <div class="bulk-info">
+                        <span class="bulk-label">Bulk Price Available</span>
+                        <span class="bulk-price">${bulkDisplayUI.bulkDisplayPrice}</span>
+                        <span class="bulk-min-qty">${bulkDisplayUI.message}</span>
                     </div>
                 </div>
             `;
@@ -469,6 +547,9 @@ export default class ProductRenderer {
             variant = { price: product.price || 0 };
         }
         
+        // Get bulk pricing display for product UI
+        const bulkDisplayUI = this._getBulkPricingDisplay(variant);
+        
         let decision;
         try {
             decision = await this.adapter?.resolvePricing({
@@ -527,7 +608,7 @@ export default class ProductRenderer {
         }
 
         // Fallback to default rendering
-        return this._createDefaultProductCard(product, variant, decision);
+        return this._createDefaultProductCard(product, variant, decision, bulkDisplayUI);
     }
 
     /**
@@ -535,9 +616,10 @@ export default class ProductRenderer {
      * @param {Object} product - Product data
      * @param {Object} variant - Product variant
      * @param {Object} decision - CommercialDecision
+     * @param {Object} bulkDisplayUI - Bulk pricing display data
      * @returns {HTMLElement}
      */
-    _createDefaultProductCard(product, variant, decision) {
+    _createDefaultProductCard(product, variant, decision, bulkDisplayUI) {
         const wrapper = this.templateHolder?.content?.getElementById('cartique-product-grid-component');
         if (!wrapper) {
             console.warn('Grid component template not found');
@@ -549,7 +631,28 @@ export default class ProductRenderer {
 
         this.updateProductElement(productCardTemplate, product);
 
-        // Extract data from CommercialDecision directly
+        // --- BULK PRICING DISPLAY: Product UI (shown before purchase) ---
+        if (bulkDisplayUI && bulkDisplayUI.hasBulk) {
+            const priceContainer = productCardTemplate.querySelector('.currency-price-display');
+            if (priceContainer) {
+                const existing = priceContainer.querySelector('.cartique-bulk-pricing-display');
+                if (existing) existing.remove();
+
+                const bulkEl = document.createElement('div');
+                bulkEl.className = 'cartique-bulk-pricing-display product-display';
+                bulkEl.innerHTML = `
+                    <div class="bulk-info">
+                        <span class="bulk-label">Bulk Price Available</span>
+                        <span class="bulk-price">${bulkDisplayUI.bulkDisplayPrice}</span>
+                        <span class="bulk-min-qty">${bulkDisplayUI.message}</span>
+                    </div>
+                `;
+                priceContainer.appendChild(bulkEl);
+            }
+        }
+        // --- END BULK PRICING DISPLAY ---
+
+        // Extract data from CommercialDecision directly (cart bulk logic)
         const item = decision?.items?.[0] || {};
         const adjustments = decision?.adjustments || [];
         
@@ -697,7 +800,7 @@ export default class ProductRenderer {
         productListingTemplate.classList.add('cartique-product-listing');
         await this.updateProductElement(productListingTemplate, product);
 
-        // --- BULK PRICING: List Card ---
+        // --- BULK PRICING DISPLAY: Product UI (shown before purchase) ---
         let variant = null;
         try {
             variant = this.adapter?.getSelectedVariant(product);
@@ -706,6 +809,29 @@ export default class ProductRenderer {
             variant = { price: product.price || 0 };
         }
         
+        const bulkDisplayUI = this._getBulkPricingDisplay(variant);
+        
+        if (bulkDisplayUI && bulkDisplayUI.hasBulk) {
+            const priceContainer = productListingTemplate.querySelector('.currency-price-display');
+            if (priceContainer) {
+                const existing = priceContainer.querySelector('.cartique-bulk-pricing-display');
+                if (existing) existing.remove();
+
+                const bulkEl = document.createElement('div');
+                bulkEl.className = 'cartique-bulk-pricing-display product-display list-view';
+                bulkEl.innerHTML = `
+                    <div class="bulk-info">
+                        <span class="bulk-label">Bulk Price Available</span>
+                        <span class="bulk-price">${bulkDisplayUI.bulkDisplayPrice}</span>
+                        <span class="bulk-min-qty">${bulkDisplayUI.message}</span>
+                    </div>
+                `;
+                priceContainer.appendChild(bulkEl);
+            }
+        }
+        // --- END BULK PRICING DISPLAY ---
+
+        // --- BULK PRICING: List Card (cart bulk logic) ---
         let decision;
         try {
             decision = await this.adapter?.resolvePricing({
