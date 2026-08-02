@@ -383,10 +383,14 @@ export default class CartiqueAdapter {
                 amount: unitPrice,
                 currency: currency
             },
-            comparePrice: comparePrice ? {
+            // ✅ FIX: Always set comparePrice to retailPrice when bulk pricing exists
+            comparePrice: (isBulk && retailPrice > unitPrice) ? {
+                amount: retailPrice,
+                currency: currency
+            } : (comparePrice ? {
                 amount: comparePrice,
                 currency: currency
-            } : null,
+            } : null),
             total: {
                 amount: totalPrice,
                 currency: currency
