@@ -229,17 +229,33 @@ export default class CartiqueAdapter {
         const decisions = [];
 
         for (const item of items) {
+            // PRESERVE the full sellable object from normalization
+            const sellable = item.sellable || null;
+            
+            // Get the full variant with pricing
+            const variant = this._getVariant(sellable, item.variantId);
+            
+            // Resolve currency (passed through if kernel supports it)
+            const currency = sellable?.currency ||
+                             variant?.currency ||
+                             item.currency ||
+                             this.currencySymbol;
+
+            // Call kernel with COMPLETE commercial data
             const decision = await this._resolveWithKernel({
-                sellable: item.sellable || { id: item.productId },
-                variant: this._getVariant(item.sellable, item.variantId),
+                sellable: sellable,
+                variant: variant,
                 quantity: item.quantity || 1,
+                currency: currency,  // Added: explicit currency context
                 customer: request.customer,
                 place: request.place,
                 contexts: request.contexts
             });
+            
             decisions.push(decision);
         }
 
+        // Aggregate totals
         let subtotal = 0;
         let total = 0;
         let tax = 0;
@@ -258,13 +274,15 @@ export default class CartiqueAdapter {
             }
         }
 
+        const currency = items[0]?.currency || this.currencySymbol;
+
         return {
             items: decisions,
             totals: {
-                subtotal: { amount: subtotal, currency: this.currencySymbol },
-                total: { amount: total, currency: this.currencySymbol },
-                tax: { amount: tax, currency: this.currencySymbol },
-                shipping: { amount: shipping, currency: this.currencySymbol }
+                subtotal: { amount: subtotal, currency: currency },
+                total: { amount: total, currency: currency },
+                tax: { amount: tax, currency: currency },
+                shipping: { amount: shipping, currency: currency }
             },
             adjustments: allAdjustments,
             _fromKernel: true,
