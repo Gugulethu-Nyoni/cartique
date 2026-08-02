@@ -466,23 +466,40 @@ if (this.services?.cart?.syncWithKernel) {
     };
     
     // CartService → CartRenderer (cart updated) — async with debug
-    this.services.cart.onCartUpdated = async () => {
+    // ✅ FIX: Accept source param to control drawer vs page behaviour
+    this.services.cart.onCartUpdated = async (source = 'drawer') => {
       if (this.features?.debug) {
-        console.log('[TRACE] onCartUpdated triggered');
+        console.log('[TRACE] onCartUpdated triggered from:', source);
         console.trace();
       }
 
-      if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
-        if (this.features?.debug) {
-          console.log('[TRACE] Calling CartRenderer.showCart()');
+      // ✅ FIX: Only open drawer if update came from drawer context
+      if (source === 'drawer') {
+        if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
+          if (this.features?.debug) {
+            console.log('[TRACE] Calling CartRenderer.showCart()');
+          }
+          await this.cartRenderer.showCart();
+          if (this.features?.debug) {
+            console.log('[TRACE] CartRenderer.showCart completed');
+          }
         }
-        await this.cartRenderer.showCart();
-        if (this.features?.debug) {
-          console.log('[TRACE] CartRenderer.showCart completed');
+      } else if (source === 'page') {
+        // ✅ FIX: Just refresh the cart page, no drawer
+        if (this.cartRenderer && typeof this.cartRenderer.renderCartPage === 'function') {
+          if (this.features?.debug) {
+            console.log('[TRACE] Calling CartRenderer.renderCartPage()');
+          }
+          await this.cartRenderer.renderCartPage();
+          if (this.features?.debug) {
+            console.log('[TRACE] CartRenderer.renderCartPage completed');
+          }
         }
       } else {
-        console.warn('[TRACE] CartRenderer not available or showCart missing');
-        console.warn('[TRACE] cartRenderer:', this.cartRenderer);
+        // Default: show cart
+        if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
+          await this.cartRenderer.showCart();
+        }
       }
     };
 
