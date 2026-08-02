@@ -7,13 +7,16 @@
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks.
  * Phase 3.8: Navigation state restoration and CommercialDecision consumption.
+ * Phase 3.8.1: CartRenderer migration completion — single enrichment pipeline.
  */
 
 export default class CartRenderer {
     constructor(context = {}) {
         Object.assign(this, context);
 
-        // Verify cartService reference
+        // Ensure cartService is available
+        this.cartService = context.services?.cart || context.cartService || null;
+
         if (this.features?.debug) {
             console.log("[TRACE] CartRenderer cartService:", this.cartService);
             console.log("[TRACE] CartRenderer state:", this.state);
@@ -47,18 +50,12 @@ export default class CartRenderer {
     // STATE SNAPSHOT & RESTORE (for navigation)
     // ==========================================================
 
-    /**
-     * Snapshot current state before navigation
-     * Uses CartService.snapshotState if available, or creates its own
-     */
     snapshotState() {
-        // Try to use CartService's snapshot method first
         if (this.cartService && typeof this.cartService.snapshotState === 'function') {
             this.cartService.snapshotState();
             return;
         }
 
-        // Fallback: snapshot state directly
         this._stateSnapshot = {
             layout: this.state?.currentLayout || 'grid',
             search: this.state?.currentSearchQuery || '',
@@ -76,17 +73,12 @@ export default class CartRenderer {
         }
     }
 
-    /**
-     * Restore state after navigation
-     */
     restoreState() {
-        // Try to use CartService's restore method first
         if (this.cartService && typeof this.cartService.restoreState === 'function') {
             this.cartService.restoreState();
             return;
         }
 
-        // Fallback: restore state directly
         if (!this._stateSnapshot) {
             if (this.features?.debug) {
                 console.warn('[CartRenderer] No state snapshot to restore');
@@ -100,7 +92,6 @@ export default class CartRenderer {
             console.log('[CartRenderer] Restoring state:', snapshot);
         }
 
-        // Restore UI state
         if (this.state) {
             this.state.currentLayout = snapshot.layout;
             this.state.currentSearchQuery = snapshot.search;
@@ -110,14 +101,12 @@ export default class CartRenderer {
             this.state.singleProductViewActive = snapshot.view;
         }
 
-        // Restore scroll position
         if (typeof window !== 'undefined' && snapshot.scrollY > 0) {
             requestAnimationFrame(() => {
                 window.scrollTo(0, snapshot.scrollY);
             });
         }
 
-        // Restore product grid/list visibility
         const gridContainer = document.getElementById('cartique-product-grid');
         const listContainer = document.getElementById('cartique-product-list');
 
@@ -128,7 +117,6 @@ export default class CartRenderer {
             listContainer.style.display = snapshot.listDisplay;
         }
 
-        // Notify renderers to refresh
         if (typeof this.onCartRestored === 'function') {
             this.onCartRestored();
         }
@@ -136,9 +124,140 @@ export default class CartRenderer {
         this._stateSnapshot = null;
     }
 
+    // ==========================================================
+    // SHARED ENRICHMENT PIPELINE
+    // ==========================================================
+
     /**
-     * Renders the cart slider
+     * Enrich CommercialDecision item with product catalogue data
+     * Single source of truth for all cart views
+     * 
+     * @param {Object} decisionItem - CommercialDecision item
+     * @returns {Object} Enriched cart item model
      */
+    _enrichCartDecisionItem(decisionItem) {
+        const line = decisionItem?.items?.[0] || {};
+        const adjustments = decisionItem?.adjustments || [];
+        
+        const sellableId = line.sellableId || 'unknown';
+        const productId = String(sellableId);
+        const product = this.products?.find(p => String(p.id) === productId);
+        
+        const hasBulk = adjustments.some(a => 
+            a.type === 'bulk_discount' || 
+            a.label?.toLowerCase().includes('bulk')
+        );
+        
+        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
+        
+        return {
+            // Product catalogue data
+            id: productId,
+            title: product?.title || `Product ${productId}`,
+            image: product?.image || '',
+            description: product?.description || '',
+            categories: product?.categories || [],
+            sku: product?.sku || '',
+            
+            // CommercialDecision data
+            quantity: line.quantity || 1,
+            unitPrice: line.unitPrice?.amount || 0,
+            comparePrice: line.comparePrice?.amount || line.unitPrice?.amount || 0,
+            total: line.total?.amount || 0,
+            isBulk: hasBulk,
+            bulkPrice: bulkAdjustment?.metadata?.bulkPrice || null,
+            bulkMinimumQty: bulkAdjustment?.metadata?.minimumQty || null,
+            savings: bulkAdjustment?.metadata?.savings || 0,
+            adjustments: adjustments,
+            
+            // Raw data for debugging
+            _raw: {
+                decision: decisionItem,
+                product: product,
+                line: line
+            }
+        };
+    }
+
+    /**
+     * Enrich legacy cart item with product catalogue data
+     * Fallback path
+     * 
+     * @param {Object} product - Legacy cart product
+     * @returns {Object} Enriched cart item model
+     */
+    _enrichLegacyCartItem(product) {
+        const variant = product.variants?.[0] || { price: product.price || 0 };
+        const quantity = product.cart_quantity || 1;
+        const isBulk = variant.bulkPrice && variant.bulkMinimumQty && quantity >= variant.bulkMinimumQty;
+        const unitPrice = isBulk ? variant.bulkPrice : variant.price;
+        const comparePrice = variant.price || 0;
+        
+        return {
+            id: String(product.id),
+            title: product.title || `Product ${product.id}`,
+            image: product.image || '',
+            description: product.description || '',
+            quantity: quantity,
+            unitPrice: unitPrice,
+            comparePrice: comparePrice,
+            total: unitPrice * quantity,
+            isBulk: isBulk,
+            bulkPrice: variant.bulkPrice || null,
+            bulkMinimumQty: variant.bulkMinimumQty || null,
+            savings: isBulk ? (comparePrice - unitPrice) * quantity : 0,
+            adjustments: [],
+            _raw: { product: product, variant: variant }
+        };
+    }
+
+    /**
+     * Get enriched cart items from decision or fallback
+     * @returns {Object} { items: [], subtotal: 0, totals: {} }
+     */
+    _getEnrichedCart() {
+        const decision = this.cartService?.getCurrentDecision?.() || null;
+        const cartDecision = this.state?.cartDecision || decision;
+
+        if (this.features?.debug) {
+            console.log('[TRACE] Enriching cart from decision:', cartDecision);
+        }
+
+        if (cartDecision?.items?.length > 0) {
+            const items = cartDecision.items.map(item => this._enrichCartDecisionItem(item));
+            const subtotal = cartDecision.totals?.subtotal?.amount || 0;
+            return {
+                items: items,
+                subtotal: subtotal,
+                totals: cartDecision.totals || {},
+                from: 'decision'
+            };
+        }
+
+        // Fallback: read from localStorage
+        console.warn('[TRACE] No decision available, falling back to localStorage');
+        const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+        const items = cart.map(item => this._enrichLegacyCartItem(item));
+        const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+        const currency = this.currencySymbol || 'R';
+        
+        return {
+            items: items,
+            subtotal: subtotal,
+            totals: {
+                subtotal: { amount: subtotal, currency: currency },
+                total: { amount: subtotal, currency: currency },
+                tax: { amount: 0, currency: currency },
+                shipping: { amount: 0, currency: currency }
+            },
+            from: 'legacy'
+        };
+    }
+
+    // ==========================================================
+    // RENDER METHODS
+    // ==========================================================
+
     async renderCartSlider() {
         const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-slider-component');
         if (!wrapper) {
@@ -161,7 +280,6 @@ export default class CartRenderer {
 
         hiddenBlocks.appendChild(cartSlider);
 
-        // Close button
         const closeBtn = cartSlider.querySelector('#cart-close-btn');
         if (closeBtn && this.addEventListener) {
             this.addEventListener(closeBtn, 'click', () => {
@@ -171,19 +289,17 @@ export default class CartRenderer {
             });
         }
 
-        // Checkout button
         const checkoutBtn = cartSlider.querySelector('#checkout-btn');
         if (checkoutBtn && this.addEventListener) {
             this.addEventListener(checkoutBtn, 'click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (typeof this.checkout === 'function') {
-                    this.checkout();
+                if (this.cartService && typeof this.cartService.checkout === 'function') {
+                    this.cartService.checkout();
                 }
             });
         }
 
-        // View Cart button
         const viewCartBtn = cartSlider.querySelector('#view-cart-btn');
         if (viewCartBtn && this.addEventListener) {
             this.addEventListener(viewCartBtn, 'click', (e) => {
@@ -195,9 +311,6 @@ export default class CartRenderer {
         }
     }
 
-    /**
-     * Renders the cart item template
-     */
     async renderCartItemTemplate() {
         const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-item-component');
         if (!wrapper) {
@@ -224,52 +337,33 @@ export default class CartRenderer {
     }
 
     /**
-     * Renders the full cart page using CommercialDecision from CartService
+     * Renders the full cart page
      */
     async renderCartPage() {
         console.log('🔍 6. renderCartPage() called');
 
-        // Get decision from CartService
-        const decision = this.cartService?.getCurrentDecision?.() || null;
-        const cartDecision = this.state?.cartDecision || decision;
+        const enriched = this._getEnrichedCart();
+        const items = enriched.items;
+        const totals = enriched.totals;
 
         if (this.features?.debug) {
-            console.log('[TRACE] RENDERER USING DECISION', cartDecision);
+            console.log('[TRACE] Rendered cart items:', items.length);
+            console.log('[TRACE] Cart subtotal:', enriched.subtotal);
+            console.log('[TRACE] Cart source:', enriched.from);
         }
 
-        // If we have a decision, render from it
-        if (cartDecision?.items?.length > 0) {
-            await this._renderFromDecision(cartDecision);
-            return;
-        }
-
-        // Fallback: read from localStorage
-        console.warn('[TRACE] No decision available, falling back to localStorage');
-        const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        await this._renderFromLegacyCart(cart);
-    }
-
-    /**
-     * Render cart from CommercialDecision
-     * @param {Object} decision - CommercialDecision from CartService
-     */
-    async _renderFromDecision(decision) {
         const mainContent = document.getElementById('cartique-main-content');
         if (!mainContent) {
             console.warn('Main content container not found for cart page');
             return;
         }
 
-        // Remove existing cart page if any
         const existingCartPage = document.getElementById('cartique-cart-page');
         if (existingCartPage) existingCartPage.remove();
 
         const cartPage = document.createElement('div');
         cartPage.id = 'cartique-cart-page';
         cartPage.className = 'cartique-cart-page';
-
-        const items = decision.items || [];
-        const totals = decision.totals || {};
 
         if (items.length === 0) {
             cartPage.innerHTML = `
@@ -284,256 +378,106 @@ export default class CartRenderer {
                     </div>
                 </div>
             `;
-        } else {
-            let subtotal = 0;
-            let itemsHTML = '';
-
-            for (const itemDecision of items) {
-                const line = itemDecision.items?.[0] || {};
-                const adjustments = itemDecision.adjustments || [];
-                
-                const quantity = line.quantity || 1;
-                const unitPrice = line.unitPrice?.amount || 0;
-                const retailPrice = line.comparePrice?.amount || unitPrice;
-                const lineTotal = line.total?.amount || 0;
-                
-                const hasBulk = adjustments.some(a => 
-                    a.type === 'bulk_discount' || 
-                    a.label?.toLowerCase().includes('bulk')
-                );
-                
-                const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
-                const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
-                const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
-                
-                subtotal += lineTotal;
-
-                // Build price HTML with bulk info
-                let priceHTML = '';
-                let bulkStatusHTML = '';
-
-                if (hasBulk) {
-                    priceHTML = `
-                        <span class="original-price-strikethrough">${this.currencySymbol}${this.formatPrice(retailPrice)}</span>
-                        <span class="bulk-price-active">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
-                    `;
-                    bulkStatusHTML = `
-                        <div class="cart-page-bulk-status active">
-                            <span class="bulk-heading-active">✓ Bulk Price Applied</span>
-                            <span class="bulk-min-qty">Minimum ${bulkMinQty || 0} items</span>
-                        </div>
-                    `;
-                } else {
-                    priceHTML = `
-                        <span class="retail-price">${this.currencySymbol}${this.formatPrice(retailPrice)}</span>
-                    `;
-                }
-
-                // Get product info (fallback to sellableId if no title)
-                const productId = line.sellableId || 'unknown';
-                const productTitle = this._findProductTitle(productId) || `Product ${productId}`;
-
-                itemsHTML += `
-                    <div class="cart-page-item" data-product-id="${productId}">
-                        <div class="cart-page-item-image">
-                            <img src="${this._findProductImage(productId) || ''}" alt="${productTitle}">
-                        </div>
-                        <div class="cart-page-item-details">
-                            <h3>${productTitle}</h3>
-                            <p class="cart-page-item-price">
-                                ${priceHTML}
-                            </p>
-                            ${bulkStatusHTML}
-                            <div class="cart-page-item-actions">
-                                <div class="cart-page-quantity">
-                                    <button class="cart-page-qty-btn decrease-page-qty" data-id="${productId}">−</button>
-                                    <input type="text" class="cart-page-qty-input" value="${quantity}" readonly data-id="${productId}">
-                                    <button class="cart-page-qty-btn increase-page-qty" data-id="${productId}">+</button>
-                                </div>
-                                <button class="cart-page-remove" data-id="${productId}">Remove</button>
-                            </div>
-                        </div>
-                        <div class="cart-page-item-total">
-                            ${this.currencySymbol}${this.formatPrice(lineTotal)}
-                        </div>
-                    </div>
-                `;
-            }
-
-            const subtotalAmount = totals.subtotal?.amount || subtotal;
-
-            cartPage.innerHTML = `
-                <div class="cart-page-container">
-                    <div class="cart-page-header">
-                        <button class="cart-page-back" id="cart-page-back">← Back to Shop</button>
-                        <h2>Shopping Cart (${items.length} ${items.length === 1 ? 'item' : 'items'})</h2>
-                    </div>
-                    <div class="cart-page-items">
-                        ${itemsHTML}
-                    </div>
-                    <div class="cart-page-footer">
-                        <div class="cart-page-subtotal">
-                            <span>Subtotal</span>
-                            <span>${this.currencySymbol}${this.formatPrice(subtotalAmount)}</span>
-                        </div>
-                        <button class="cart-page-checkout" id="cart-page-checkout">Proceed to Checkout</button>
-                        <button class="cart-page-continue" id="cart-page-continue">Continue Shopping</button>
-                    </div>
-                </div>
-            `;
-        }
-
-        mainContent.appendChild(cartPage);
-        this.attachCartPageEvents(cartPage);
-    }
-
-    /**
-     * Render cart from legacy localStorage (fallback)
-     * @param {Array} cart - Legacy cart array
-     */
-    async _renderFromLegacyCart(cart) {
-        const mainContent = document.getElementById('cartique-main-content');
-        if (!mainContent) {
-            console.warn('Main content container not found for cart page');
+            mainContent.appendChild(cartPage);
+            this.attachCartPageEvents(cartPage);
             return;
         }
 
-        // Remove existing cart page if any
-        const existingCartPage = document.getElementById('cartique-cart-page');
-        if (existingCartPage) existingCartPage.remove();
+        let itemsHTML = '';
 
-        const cartPage = document.createElement('div');
-        cartPage.id = 'cartique-cart-page';
-        cartPage.className = 'cartique-cart-page';
+        for (const item of items) {
+            const quantity = item.quantity;
+            const unitPrice = item.unitPrice;
+            const comparePrice = item.comparePrice;
+            const lineTotal = item.total;
+            const isBulk = item.isBulk;
+            const bulkMinQty = item.bulkMinimumQty;
 
-        if (cart.length === 0) {
-            cartPage.innerHTML = `
-                <div class="cart-page-empty">
-                    <div class="cart-page-header">
-                        <button class="cart-page-back" id="cart-page-back">← Back to Shop</button>
-                        <h2>Shopping Cart</h2>
+            let priceHTML = '';
+            let bulkStatusHTML = '';
+
+            // Fix: Show comparePrice with strike-through, unitPrice active
+            if (isBulk && comparePrice > unitPrice) {
+                priceHTML = `
+                    <span class="original-price-strikethrough">${this.currencySymbol}${this.formatPrice(comparePrice)}</span>
+                    <span class="bulk-price-active">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
+                `;
+                bulkStatusHTML = `
+                    <div class="cart-page-bulk-status active">
+                        <span class="bulk-heading-active">✓ Bulk Price Applied</span>
+                        <span class="bulk-min-qty">Minimum ${bulkMinQty || 0} items</span>
                     </div>
-                    <div class="cart-page-empty-content">
-                        <p>Your cart is empty.</p>
-                        <button class="cart-page-back-btn" id="cart-page-back-btn">Continue Shopping</button>
-                    </div>
-                </div>
-            `;
-        } else {
-            let subtotal = 0;
-            let itemsHTML = '';
-            
-            for (const product of cart) {
-                const variant = product.variants?.[0] || { price: product.price || 0 };
-                const quantity = product.cart_quantity || 1;
-                const unitPrice = variant.bulkPrice && quantity >= variant.bulkMinimumQty 
-                    ? variant.bulkPrice 
-                    : variant.price;
-                const retailPrice = variant.price || 0;
-                const lineTotal = unitPrice * quantity;
-                const hasBulk = variant.bulkPrice && variant.bulkMinimumQty && quantity >= variant.bulkMinimumQty;
-                
-                subtotal += lineTotal;
-
-                let priceHTML = '';
-                let bulkStatusHTML = '';
-
-                if (hasBulk) {
-                    priceHTML = `
-                        <span class="original-price-strikethrough">${this.currencySymbol}${this.formatPrice(retailPrice)}</span>
-                        <span class="bulk-price-active">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
-                    `;
-                    bulkStatusHTML = `
-                        <div class="cart-page-bulk-status active">
-                            <span class="bulk-heading-active">✓ Bulk Price Applied</span>
-                            <span class="bulk-min-qty">Minimum ${variant.bulkMinimumQty} items</span>
-                        </div>
-                    `;
-                } else {
-                    priceHTML = `
-                        <span class="retail-price">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
-                    `;
-                }
-
-                itemsHTML += `
-                    <div class="cart-page-item" data-product-id="${product.id}">
-                        <div class="cart-page-item-image">
-                            <img src="${product.image || ''}" alt="${product.title || ''}">
-                        </div>
-                        <div class="cart-page-item-details">
-                            <h3>${product.title || ''}</h3>
-                            <p class="cart-page-item-price">
-                                ${priceHTML}
-                            </p>
-                            ${bulkStatusHTML}
-                            <div class="cart-page-item-actions">
-                                <div class="cart-page-quantity">
-                                    <button class="cart-page-qty-btn decrease-page-qty" data-id="${product.id}">−</button>
-                                    <input type="text" class="cart-page-qty-input" value="${quantity}" readonly data-id="${product.id}">
-                                    <button class="cart-page-qty-btn increase-page-qty" data-id="${product.id}">+</button>
-                                </div>
-                                <button class="cart-page-remove" data-id="${product.id}">Remove</button>
-                            </div>
-                        </div>
-                        <div class="cart-page-item-total">
-                            ${this.currencySymbol}${this.formatPrice(lineTotal)}
-                        </div>
-                    </div>
+                `;
+            } else {
+                priceHTML = `
+                    <span class="retail-price">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
                 `;
             }
 
-            cartPage.innerHTML = `
-                <div class="cart-page-container">
-                    <div class="cart-page-header">
-                        <button class="cart-page-back" id="cart-page-back">← Back to Shop</button>
-                        <h2>Shopping Cart (${cart.length} ${cart.length === 1 ? 'item' : 'items'})</h2>
+            itemsHTML += `
+                <div class="cart-page-item" data-product-id="${item.id}">
+                    <div class="cart-page-item-image">
+                        <img src="${item.image}" alt="${item.title}" loading="lazy">
                     </div>
-                    <div class="cart-page-items">
-                        ${itemsHTML}
-                    </div>
-                    <div class="cart-page-footer">
-                        <div class="cart-page-subtotal">
-                            <span>Subtotal</span>
-                            <span>${this.currencySymbol}${this.formatPrice(subtotal)}</span>
+                    <div class="cart-page-item-details">
+                        <h3>${item.title}</h3>
+                        <p class="cart-page-item-price">
+                            ${priceHTML}
+                        </p>
+                        ${bulkStatusHTML}
+                        <div class="cart-page-item-actions">
+                            <div class="cart-page-quantity">
+                                <button class="cart-page-qty-btn decrease-page-qty" data-id="${item.id}">−</button>
+                                <input type="text" class="cart-page-qty-input" value="${quantity}" readonly data-id="${item.id}">
+                                <button class="cart-page-qty-btn increase-page-qty" data-id="${item.id}">+</button>
+                            </div>
+                            <button class="cart-page-remove" data-id="${item.id}">Remove</button>
                         </div>
-                        <button class="cart-page-checkout" id="cart-page-checkout">Proceed to Checkout</button>
-                        <button class="cart-page-continue" id="cart-page-continue">Continue Shopping</button>
+                    </div>
+                    <div class="cart-page-item-total">
+                        ${this.currencySymbol}${this.formatPrice(lineTotal)}
                     </div>
                 </div>
             `;
         }
 
+        const subtotalAmount = totals?.subtotal?.amount || enriched.subtotal;
+
+        cartPage.innerHTML = `
+            <div class="cart-page-container">
+                <div class="cart-page-header">
+                    <button class="cart-page-back" id="cart-page-back">← Back to Shop</button>
+                    <h2>Shopping Cart (${items.length} ${items.length === 1 ? 'item' : 'items'})</h2>
+                </div>
+                <div class="cart-page-items">
+                    ${itemsHTML}
+                </div>
+                <div class="cart-page-footer">
+                    <div class="cart-page-subtotal">
+                        <span>Subtotal</span>
+                        <span>${this.currencySymbol}${this.formatPrice(subtotalAmount)}</span>
+                    </div>
+                    <button class="cart-page-checkout" id="cart-page-checkout">Proceed to Checkout</button>
+                    <button class="cart-page-continue" id="cart-page-continue">Continue Shopping</button>
+                </div>
+            </div>
+        `;
+
         mainContent.appendChild(cartPage);
         this.attachCartPageEvents(cartPage);
-    }
-
-    /**
-     * Helper: Find product title from products list
-     */
-    _findProductTitle(productId) {
-        if (!productId) return null;
-        const product = this.products?.find(p => String(p.id) === String(productId));
-        return product?.title || null;
-    }
-
-    /**
-     * Helper: Find product image from products list
-     */
-    _findProductImage(productId) {
-        if (!productId) return null;
-        const product = this.products?.find(p => String(p.id) === String(productId));
-        return product?.image || null;
     }
 
     /**
      * Shows the cart slider
      */
     async showCart() {
-        const decision = this.cartService?.getCurrentDecision?.() || null;
-        const cartDecision = this.state?.cartDecision || decision;
+        const enriched = this._getEnrichedCart();
+        const items = enriched.items;
+        const subtotal = enriched.subtotal;
 
         if (this.features?.debug) {
-            console.log('[TRACE] SLIDER USING DECISION', cartDecision);
+            console.log('[TRACE] SLIDER ITEMS:', items.length);
+            console.log('[TRACE] SLIDER SUBTOTAL:', subtotal);
         }
 
         const cartContainer = document.getElementById('cart-items-container');
@@ -544,63 +488,6 @@ export default class CartRenderer {
 
         cartContainer.innerHTML = '';
 
-        // Get cart data from decision or fallback
-        let items = [];
-        let subtotal = 0;
-
-        if (cartDecision?.items?.length > 0) {
-            // Use decision data
-            items = cartDecision.items.map(itemDecision => {
-                const line = itemDecision.items?.[0] || {};
-                const adjustments = itemDecision.adjustments || [];
-                const hasBulk = adjustments.some(a => 
-                    a.type === 'bulk_discount' || 
-                    a.label?.toLowerCase().includes('bulk')
-                );
-                const productId = line.sellableId || 'unknown';
-                return {
-                    id: productId,
-                    title: this._findProductTitle(productId) || `Product ${productId}`,
-                    cart_quantity: line.quantity || 1,
-                    price: line.unitPrice?.amount || 0,
-                    total: line.total?.amount || 0,
-                    hasBulk: hasBulk,
-                    bulkPrice: adjustments.find(a => a.type === 'bulk_discount')?.metadata?.bulkPrice || null,
-                    bulkMinQty: adjustments.find(a => a.type === 'bulk_discount')?.metadata?.minimumQty || null,
-                    retailPrice: line.comparePrice?.amount || line.unitPrice?.amount || 0
-                };
-            });
-            subtotal = cartDecision.totals?.subtotal?.amount || 0;
-        } else {
-            // Fallback to localStorage
-            const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-            if (this.features?.debug) {
-                console.log('[TRACE] SLIDER READING CART (fallback)', cart);
-            }
-            
-            for (const product of cart) {
-                const variant = product.variants?.[0] || { price: product.price || 0 };
-                const quantity = product.cart_quantity || 1;
-                const unitPrice = variant.bulkPrice && quantity >= variant.bulkMinimumQty 
-                    ? variant.bulkPrice 
-                    : variant.price;
-                const total = unitPrice * quantity;
-                const hasBulk = variant.bulkPrice && variant.bulkMinimumQty && quantity >= variant.bulkMinimumQty;
-                
-                items.push({
-                    ...product,
-                    price: unitPrice,
-                    total: total,
-                    hasBulk: hasBulk,
-                    bulkPrice: variant.bulkPrice || null,
-                    bulkMinQty: variant.bulkMinimumQty || null,
-                    retailPrice: variant.price || 0
-                });
-                subtotal += total;
-            }
-        }
-
-        // Show/hide empty cart message
         const emptyMsg = document.getElementById('shopping-cart-empty');
         const viewBtn = document.getElementById('view-cart-btn');
         const checkoutBtn = document.getElementById('checkout-btn');
@@ -609,37 +496,30 @@ export default class CartRenderer {
         if (viewBtn) viewBtn.style.display = items.length === 0 ? 'none' : 'block';
         if (checkoutBtn) checkoutBtn.style.display = items.length === 0 ? 'none' : 'block';
 
-        // Render cart items
-        for (const product of items) {
+        for (const item of items) {
             const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-item-component');
             if (!wrapper) continue;
 
             const cartItem = wrapper.firstElementChild?.cloneNode(true);
             if (!cartItem) continue;
             
-            // Update product data
-            await this.updateCartItem(cartItem, product);
-            
-            // Add event listeners
-            this.addCartItemEventListeners(cartItem, product.id);
+            await this._renderCartItem(cartItem, item);
+            this.addCartItemEventListeners(cartItem, item.id);
             
             cartContainer.appendChild(cartItem);
         }
 
-        // Update subtotal display
         const subtotalEl = document.getElementById('subtotal');
         const subtotalCurrencyEl = document.getElementById('subtotal-currency');
         
         if (subtotalEl) subtotalEl.textContent = this.formatPrice(subtotal);
         if (subtotalCurrencyEl) subtotalCurrencyEl.textContent = this.currencySymbol || 'R';
 
-        // Show the hidden blocks container
         const hiddenBlocks = document.getElementById('cartique-hidden-blocks');
         if (hiddenBlocks) {
             hiddenBlocks.style.display = 'block';
         }
 
-        // Open cart slider and overlay
         const cartSlide = document.getElementById('cart-slide');
         const overlay = document.getElementById('cart-slide-overlay');
         
@@ -647,9 +527,6 @@ export default class CartRenderer {
         if (overlay) overlay.style.display = 'block';
     }
 
-    /**
-     * Closes the cart slider
-     */
     closeCart() {
         const cartSlide = document.getElementById('cart-slide');
         const overlay = document.getElementById('cart-slide-overlay');
@@ -666,48 +543,42 @@ export default class CartRenderer {
     }
 
     /**
-     * Updates a cart item in the slider
+     * Renders a single cart item (shared by slide cart)
      */
-    async updateCartItem(cartItem, product) {
-        // Update image
+    async _renderCartItem(cartItem, item) {
         const imgEl = cartItem.querySelector('#image');
         if (imgEl) {
-            imgEl.src = product.image || '';
-            imgEl.alt = product.title || '';
+            imgEl.src = item.image;
+            imgEl.alt = item.title;
+            imgEl.loading = 'lazy';
         }
 
-        // Update title
         const titleEl = cartItem.querySelector('#title');
-        if (titleEl) titleEl.textContent = product.title || '';
+        if (titleEl) titleEl.textContent = item.title;
 
-        // Get price elements
         const priceEl = cartItem.querySelector('#price');
         const salePriceEl = cartItem.querySelector('#sale_price');
         const currencyEls = cartItem.querySelectorAll('#currency');
 
-        // Update currency symbols
         currencyEls.forEach(el => el.textContent = this.currencySymbol || 'R');
 
-        // --- BULK PRICING: Cart Slide-in ---
-        // Remove existing bulk status message
         const existingBulkMsg = cartItem.querySelector('.cart-bulk-status');
         if (existingBulkMsg) existingBulkMsg.remove();
 
-        // Use decision data if available
-        const hasBulk = product.hasBulk || false;
-        const unitPrice = product.price || 0;
-        const retailPrice = product.retailPrice || unitPrice;
-        const bulkPrice = product.bulkPrice || null;
-        const bulkMinQty = product.bulkMinQty || null;
+        const isBulk = item.isBulk;
+        const unitPrice = item.unitPrice;
+        const comparePrice = item.comparePrice;
+        const bulkPrice = item.bulkPrice;
+        const bulkMinQty = item.bulkMinimumQty;
 
         const bulkDisplay = {
-            hasBulk: hasBulk,
-            isBulk: hasBulk,
-            retailPrice: retailPrice,
+            hasBulk: isBulk,
+            isBulk: isBulk,
+            retailPrice: comparePrice,
             bulkPrice: bulkPrice,
             unitPrice: unitPrice,
             minimumQty: bulkMinQty,
-            heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
+            heading: isBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
             message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
             displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
             bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
@@ -735,9 +606,9 @@ export default class CartRenderer {
                 detailsDiv.appendChild(bulkStatus);
             }
 
-            if (bulkDisplay.isBulk) {
+            if (bulkDisplay.isBulk && comparePrice > unitPrice) {
                 if (priceEl) {
-                    priceEl.textContent = this.formatPrice(bulkDisplay.retailPrice);
+                    priceEl.textContent = this.formatPrice(comparePrice);
                     priceEl.style.textDecoration = 'line-through';
                     priceEl.style.color = '#6c757d';
                     priceEl.style.fontSize = '14px';
@@ -745,7 +616,7 @@ export default class CartRenderer {
                 }
                 
                 if (salePriceEl) {
-                    salePriceEl.textContent = this.formatPrice(bulkDisplay.unitPrice);
+                    salePriceEl.textContent = this.formatPrice(unitPrice);
                     salePriceEl.style.display = 'inline';
                     salePriceEl.style.color = '#28a745';
                     salePriceEl.style.fontWeight = 'bold';
@@ -756,7 +627,7 @@ export default class CartRenderer {
                 }
             } else {
                 if (priceEl) {
-                    priceEl.textContent = this.formatPrice(bulkDisplay.retailPrice);
+                    priceEl.textContent = this.formatPrice(unitPrice);
                     priceEl.style.textDecoration = 'none';
                     priceEl.style.color = '';
                     priceEl.style.fontSize = '';
@@ -772,7 +643,7 @@ export default class CartRenderer {
             }
         } else {
             if (priceEl) {
-                priceEl.textContent = this.formatPrice(product.price || 0);
+                priceEl.textContent = this.formatPrice(unitPrice);
                 priceEl.style.textDecoration = 'none';
                 priceEl.style.color = '';
                 priceEl.style.fontSize = '';
@@ -786,19 +657,24 @@ export default class CartRenderer {
                 if (parentSpan) parentSpan.style.display = 'none';
             }
         }
-        // --- END BULK PRICING ---
 
-        // Set quantity
         const quantityInput = cartItem.querySelector('.quantity');
         if (quantityInput) {
-            quantityInput.value = product.cart_quantity || 1;
-            quantityInput.id = `quantity_${product.id}`;
+            quantityInput.value = item.quantity;
+            quantityInput.id = `quantity_${item.id}`;
         }
     }
 
     /**
-     * Adds event listeners to cart item
+     * Legacy updateCartItem — deprecated, use _renderCartItem instead
+     * Kept for backward compatibility
      */
+    async updateCartItem(cartItem, product) {
+        // Convert legacy product to enriched item
+        const item = this._enrichLegacyCartItem(product);
+        await this._renderCartItem(cartItem, item);
+    }
+
     addCartItemEventListeners(cartItem, productId) {
         const removeBtn = cartItem.querySelector('#remove-item');
         const decreaseBtn = cartItem.querySelector('.decrease-qty');
@@ -820,102 +696,94 @@ export default class CartRenderer {
         }
     }
 
-    /**
-     * Removes item from cart slider
-     */
     removeCartItem(event) {
         const productId = parseInt(event.target.id);
-        let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        cart = cart.filter(product => product.id !== productId);
-        localStorage.setItem('cartiqueCart', JSON.stringify(cart));
-        
-        // Notify CartService to sync
-        if (this.cartService?.syncWithKernel) {
-            this.cartService.syncWithKernel();
+        if (this.cartService && typeof this.cartService.removeItem === 'function') {
+            this.cartService.removeItem(productId);
+        } else {
+            // Fallback: legacy localStorage
+            let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            cart = cart.filter(product => product.id !== productId);
+            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+            if (this.cartService?.syncWithKernel) {
+                this.cartService.syncWithKernel();
+            }
         }
         this.showCart();
     }
 
-    /**
-     * Decreases quantity in cart slider
-     */
     decreaseQtyItem(event) {
         const productId = parseInt(event.target.id.replace('decrease_quantity_', ''));
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const index = cart.findIndex(item => item.id === productId);
 
         if (index !== -1) {
-            if (cart[index].cart_quantity > 1) {
-                cart[index].cart_quantity -= 1;
+            const newQuantity = cart[index].cart_quantity - 1;
+            if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
+                this.cartService.updateQuantity(productId, newQuantity);
             } else {
-                cart.splice(index, 1);
+                if (newQuantity > 0) {
+                    cart[index].cart_quantity = newQuantity;
+                } else {
+                    cart.splice(index, 1);
+                }
+                localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+                if (this.cartService?.syncWithKernel) {
+                    this.cartService.syncWithKernel();
+                }
             }
-            
-            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
-            
-            // Notify CartService to sync
-            if (this.cartService?.syncWithKernel) {
-                this.cartService.syncWithKernel();
-            }
-            this.showCart();
         }
+        this.showCart();
     }
 
-    /**
-     * Increases quantity in cart slider
-     */
     async increaseQtyItem(event) {
         const productId = parseInt(event.target.id.replace('increase_quantity_', ''));
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const index = cart.findIndex(item => item.id === productId);
 
         if (index !== -1) {
-            const product = this.products?.find(p => p.id === productId);
-            if (!product) {
-                console.warn('Product not found for quantity increase:', productId);
-                return;
-            }
-            
-            let variant = null;
-            try {
-                variant = this.adapter?.resolveVariant(product, product.variantId);
-            } catch (e) {
-                console.warn('Variant resolution failed:', e.message);
-                variant = { inventory: 10 };
-            }
-            
-            let inventory;
-            try {
-                inventory = await this.adapter?.resolveInventory({
-                    sellable: product,
-                    variant: variant
-                });
-            } catch (e) {
-                console.warn('Inventory resolution failed:', e.message);
-                inventory = { quantity: 10 };
-            }
-            
-            const availableStock = inventory?.quantity || 0;
             const newQuantity = cart[index].cart_quantity + 1;
             
-            if (newQuantity > availableStock) {
-                if (typeof this.showStockAlert === 'function') {
-                    this.showStockAlert(
-                        `Cannot add more. Only ${availableStock} available in total.`
-                    );
+            // Stock check
+            const product = this.products?.find(p => p.id === productId);
+            if (product) {
+                let variant = null;
+                try {
+                    variant = this.adapter?.resolveVariant(product, product.variantId);
+                } catch (e) {
+                    variant = { inventory: 10 };
                 }
-                return;
+                let inventory;
+                try {
+                    inventory = await this.adapter?.resolveInventory({
+                        sellable: product,
+                        variant: variant
+                    });
+                } catch (e) {
+                    inventory = { quantity: 10 };
+                }
+                const availableStock = inventory?.quantity || 0;
+                if (newQuantity > availableStock) {
+                    if (typeof this.showStockAlert === 'function') {
+                        this.showStockAlert(
+                            `Cannot add more. Only ${availableStock} available in total.`
+                        );
+                    }
+                    return;
+                }
             }
             
-            cart[index].cart_quantity = newQuantity;
-            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
-            
-            // Notify CartService to sync
-            if (this.cartService?.syncWithKernel) {
-                this.cartService.syncWithKernel();
+            if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
+                this.cartService.updateQuantity(productId, newQuantity);
+            } else {
+                cart[index].cart_quantity = newQuantity;
+                localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+                if (this.cartService?.syncWithKernel) {
+                    this.cartService.syncWithKernel();
+                }
             }
-            this.showCart();
         }
+        this.showCart();
     }
 
     /**
@@ -924,9 +792,7 @@ export default class CartRenderer {
     showCartPage() {
         console.log('🔍 5. showCartPage() called');
 
-        // Snapshot state before navigating to cart
         this.snapshotState();
-
         this.closeCart();
         
         const productDisplays = document.getElementById('cartique-product-displays');
@@ -997,7 +863,6 @@ export default class CartRenderer {
             this.singleProductViewActive = false;
         }
 
-        // Restore state after cart page is closed
         this.restoreState();
     }
 
@@ -1017,120 +882,260 @@ export default class CartRenderer {
             }
         });
 
+        // Fix: Quantity buttons delegate to CartService
         cartPage.querySelectorAll('.decrease-page-qty').forEach(btn => {
             if (this.addEventListener) {
-                this.addEventListener(btn, 'click', (e) => {
+                this.addEventListener(btn, 'click', async (e) => {
                     const productId = parseInt(e.target.dataset.id);
-                    this.decreasePageQty(productId);
-                    this.renderCartPage();
+                    console.log('[CartRenderer] Decrease page quantity:', productId);
+                    
+                    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+                    const index = cart.findIndex(item => item.id === productId);
+                    if (index !== -1) {
+                        const newQty = cart[index].cart_quantity - 1;
+                        if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
+                            await this.cartService.updateQuantity(productId, newQty);
+                            await this.renderCartPage();
+                        } else {
+                            // Fallback
+                            if (newQty > 0) {
+                                cart[index].cart_quantity = newQty;
+                            } else {
+                                cart.splice(index, 1);
+                            }
+                            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+                            if (this.cartService?.syncWithKernel) {
+                                await this.cartService.syncWithKernel();
+                            }
+                            await this.renderCartPage();
+                        }
+                    }
                 });
             }
         });
 
         cartPage.querySelectorAll('.increase-page-qty').forEach(btn => {
             if (this.addEventListener) {
-                this.addEventListener(btn, 'click', (e) => {
+                this.addEventListener(btn, 'click', async (e) => {
                     const productId = parseInt(e.target.dataset.id);
-                    this.increasePageQty(productId);
-                    this.renderCartPage();
+                    console.log('[CartRenderer] Increase page quantity:', productId);
+                    
+                    let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+                    const index = cart.findIndex(item => item.id === productId);
+                    if (index !== -1) {
+                        const newQty = cart[index].cart_quantity + 1;
+                        
+                        // Stock check
+                        const product = this.products?.find(p => p.id === productId);
+                        if (product) {
+                            let variant = null;
+                            try {
+                                variant = this.adapter?.resolveVariant(product, product.variantId);
+                            } catch (e) {
+                                variant = { inventory: 10 };
+                            }
+                            let inventory;
+                            try {
+                                inventory = await this.adapter?.resolveInventory({
+                                    sellable: product,
+                                    variant: variant
+                                });
+                            } catch (e) {
+                                inventory = { quantity: 10 };
+                            }
+                            const availableStock = inventory?.quantity || 0;
+                            if (newQty > availableStock) {
+                                if (typeof this.showStockAlert === 'function') {
+                                    this.showStockAlert(
+                                        `Cannot add more. Maximum available: ${availableStock}`
+                                    );
+                                }
+                                return;
+                            }
+                        }
+                        
+                        if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
+                            await this.cartService.updateQuantity(productId, newQty);
+                            await this.renderCartPage();
+                        } else {
+                            // Fallback
+                            cart[index].cart_quantity = newQty;
+                            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+                            if (this.cartService?.syncWithKernel) {
+                                await this.cartService.syncWithKernel();
+                            }
+                            await this.renderCartPage();
+                        }
+                    }
                 });
             }
         });
 
         cartPage.querySelectorAll('.cart-page-remove').forEach(btn => {
             if (this.addEventListener) {
-                this.addEventListener(btn, 'click', (e) => {
+                this.addEventListener(btn, 'click', async (e) => {
                     const productId = parseInt(e.target.dataset.id);
-                    this.removePageItem(productId);
-                    this.renderCartPage();
+                    console.log('[CartRenderer] Remove page item:', productId);
+                    
+                    if (this.cartService && typeof this.cartService.removeItem === 'function') {
+                        await this.cartService.removeItem(productId);
+                        await this.renderCartPage();
+                    } else {
+                        // Fallback
+                        let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+                        cart = cart.filter(item => item.id !== productId);
+                        localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+                        if (this.cartService?.syncWithKernel) {
+                            await this.cartService.syncWithKernel();
+                        }
+                        await this.renderCartPage();
+                    }
                 });
             }
         });
 
+        // Fix: Checkout button
         const checkoutBtn = cartPage.querySelector('#cart-page-checkout');
         if (checkoutBtn && this.addEventListener) {
-            this.addEventListener(checkoutBtn, 'click', (e) => {
+            this.addEventListener(checkoutBtn, 'click', async (e) => {
                 e.preventDefault();
-                if (typeof this.checkout === 'function') {
-                    this.checkout();
+                console.log('[CartRenderer] Checkout clicked');
+                if (this.cartService && typeof this.cartService.checkout === 'function') {
+                    await this.cartService.checkout();
+                } else {
+                    console.warn('[CartRenderer] CartService.checkout not available');
                 }
             });
         }
     }
 
     /**
-     * Decreases quantity on cart page
+     * Decreases quantity on cart page — legacy method
+     * @deprecated Use CartService instead
      */
     decreasePageQty(productId) {
-        let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        const index = cart.findIndex(item => item.id === productId);
-
-        if (index !== -1) {
-            if (cart[index].cart_quantity > 1) {
-                cart[index].cart_quantity -= 1;
-            } else {
-                cart.splice(index, 1);
+        console.warn('[CartRenderer] decreasePageQty is deprecated. Use CartService.updateQuantity instead.');
+        // Fallback to CartService if available
+        if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
+            let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            const index = cart.findIndex(item => item.id === productId);
+            if (index !== -1) {
+                const newQty = cart[index].cart_quantity - 1;
+                this.cartService.updateQuantity(productId, newQty);
             }
-            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        } else {
+            // Legacy fallback
+            let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            const index = cart.findIndex(item => item.id === productId);
+            if (index !== -1) {
+                if (cart[index].cart_quantity > 1) {
+                    cart[index].cart_quantity -= 1;
+                } else {
+                    cart.splice(index, 1);
+                }
+                localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+            }
         }
     }
 
     /**
-     * Increases quantity on cart page
+     * Increases quantity on cart page — legacy method
+     * @deprecated Use CartService instead
      */
     async increasePageQty(productId) {
-        let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        const index = cart.findIndex(item => item.id === productId);
-
-        if (index !== -1) {
-            const product = this.products?.find(p => p.id === productId);
-            if (!product) {
-                console.warn('Product not found for quantity increase:', productId);
-                return;
-            }
-            
-            let variant = null;
-            try {
-                variant = this.adapter?.resolveVariant(product, product.variantId);
-            } catch (e) {
-                console.warn('Variant resolution failed:', e.message);
-                variant = { inventory: 10 };
-            }
-            
-            let inventory;
-            try {
-                inventory = await this.adapter?.resolveInventory({
-                    sellable: product,
-                    variant: variant
-                });
-            } catch (e) {
-                console.warn('Inventory resolution failed:', e.message);
-                inventory = { quantity: 10 };
-            }
-            
-            const availableStock = inventory?.quantity || 0;
-            const newQuantity = cart[index].cart_quantity + 1;
-            
-            if (newQuantity > availableStock) {
-                if (typeof this.showStockAlert === 'function') {
-                    this.showStockAlert(
-                        `Cannot add more. Maximum available: ${availableStock}`
-                    );
+        console.warn('[CartRenderer] increasePageQty is deprecated. Use CartService.updateQuantity instead.');
+        // Fallback to CartService if available
+        if (this.cartService && typeof this.cartService.updateQuantity === 'function') {
+            let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            const index = cart.findIndex(item => item.id === productId);
+            if (index !== -1) {
+                const newQty = cart[index].cart_quantity + 1;
+                
+                // Stock check
+                const product = this.products?.find(p => p.id === productId);
+                if (product) {
+                    let variant = null;
+                    try {
+                        variant = this.adapter?.resolveVariant(product, product.variantId);
+                    } catch (e) {
+                        variant = { inventory: 10 };
+                    }
+                    let inventory;
+                    try {
+                        inventory = await this.adapter?.resolveInventory({
+                            sellable: product,
+                            variant: variant
+                        });
+                    } catch (e) {
+                        inventory = { quantity: 10 };
+                    }
+                    const availableStock = inventory?.quantity || 0;
+                    if (newQty > availableStock) {
+                        if (typeof this.showStockAlert === 'function') {
+                            this.showStockAlert(
+                                `Cannot add more. Maximum available: ${availableStock}`
+                            );
+                        }
+                        return;
+                    }
                 }
-                return;
+                
+                this.cartService.updateQuantity(productId, newQty);
             }
-            
-            cart[index].cart_quantity += 1;
-            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        } else {
+            // Legacy fallback
+            let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            const index = cart.findIndex(item => item.id === productId);
+            if (index !== -1) {
+                const product = this.products?.find(p => p.id === productId);
+                if (!product) {
+                    console.warn('Product not found for quantity increase:', productId);
+                    return;
+                }
+                
+                let variant = null;
+                try {
+                    variant = this.adapter?.resolveVariant(product, product.variantId);
+                } catch (e) {
+                    variant = { inventory: 10 };
+                }
+                let inventory;
+                try {
+                    inventory = await this.adapter?.resolveInventory({
+                        sellable: product,
+                        variant: variant
+                    });
+                } catch (e) {
+                    inventory = { quantity: 10 };
+                }
+                const availableStock = inventory?.quantity || 0;
+                const newQuantity = cart[index].cart_quantity + 1;
+                if (newQuantity > availableStock) {
+                    if (typeof this.showStockAlert === 'function') {
+                        this.showStockAlert(
+                            `Cannot add more. Maximum available: ${availableStock}`
+                        );
+                    }
+                    return;
+                }
+                cart[index].cart_quantity += 1;
+                localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+            }
         }
     }
 
     /**
-     * Removes item from cart page
+     * Removes item from cart page — legacy method
+     * @deprecated Use CartService instead
      */
     removePageItem(productId) {
-        let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        cart = cart.filter(product => product.id !== productId);
-        localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        console.warn('[CartRenderer] removePageItem is deprecated. Use CartService.removeItem instead.');
+        if (this.cartService && typeof this.cartService.removeItem === 'function') {
+            this.cartService.removeItem(productId);
+        } else {
+            let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            cart = cart.filter(item => item.id !== productId);
+            localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        }
     }
 }
