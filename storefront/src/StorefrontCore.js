@@ -412,7 +412,7 @@ if (this.services?.cart?.syncWithKernel) {
     }
 
     if (mainContent) {
-        mainContent.classList.remove("cartique-full-width");
+        mainContent.classList.add("cartique-full-width");
     }
 };
 
