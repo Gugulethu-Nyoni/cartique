@@ -100,7 +100,7 @@ export default class CartService {
             const decision = await this.adapter.resolveCart(request);
             this._lastDecision = decision;
             
-            // ✅ Store decision in shared state for renderers
+            //  Store decision in shared state for renderers
             if (this.state) {
                 this.state.cartDecision = decision;
             }
@@ -232,8 +232,9 @@ export default class CartService {
         }
         
         // Use callback instead of direct UI call
+        //  FIX: Pass 'drawer' source — addToCart comes from product pages/drawer context
         if (typeof this.onCartUpdated === 'function') {
-            this.onCartUpdated();
+            this.onCartUpdated('drawer');
         }
         
         // Sync with kernel after cart update
@@ -258,8 +259,9 @@ export default class CartService {
         await this.syncWithKernel();
         
         // Notify UI
+        //  FIX: Pass 'page' source — removeItem comes from cart page context
         if (typeof this.onCartUpdated === 'function') {
-            this.onCartUpdated();
+            this.onCartUpdated('page');
         }
     }
 
@@ -293,8 +295,9 @@ export default class CartService {
         await this.syncWithKernel();
         
         // Notify UI
+        //  FIX: Pass 'page' source — updateQuantity comes from cart page context
         if (typeof this.onCartUpdated === 'function') {
-            this.onCartUpdated();
+            this.onCartUpdated('page');
         }
     }
 
