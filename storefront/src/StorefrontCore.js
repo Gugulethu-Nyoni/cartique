@@ -262,21 +262,31 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
     });
 
     // ==========================================================
-    // 9. ADAPTER (SINGLE INITIALIZATION — REMOVED DUPLICATES)
-    // ==========================================================
-    this.adapter = new CartiqueAdapter(this.kernel, {
-      legacyMode: this.features.kernelMode !== true,
-      debug: this.features.debug || false,
-      onDecision: (decision) => this.recordDecision(decision)
-    });
+// 9. ADAPTER (SINGLE INITIALIZATION — REMOVED DUPLICATES)
+// ==========================================================
+this.adapter = new CartiqueAdapter(this.kernel, {
+  legacyMode: this.features.kernelMode !== true,
+  debug: this.features.debug || false,
+  onDecision: (decision) => this.recordDecision(decision)
+});
 
-    // Pass adapter to services
-    if (this.services?.pricing?.setAdapter) {
-      this.services.pricing.setAdapter(this.adapter);
-    }
-    if (this.services?.cart?.setAdapter) {
-      this.services.cart.setAdapter(this.adapter);
-    }
+// Pass adapter to services
+if (this.services?.pricing?.setAdapter) {
+  this.services.pricing.setAdapter(this.adapter);
+}
+if (this.services?.cart?.setAdapter) {
+  this.services.cart.setAdapter(this.adapter);
+}
+
+//  Trigger initial cart sync after adapter is set
+// Note: The sync method is concurrency-safe, so multiple calls are fine.
+if (this.services?.cart?.syncWithKernel) {
+  // Don't await here - let it run in background
+  // The init() will handle the full initialization
+  this.services.cart.syncWithKernel().catch(err => {
+    console.warn('[StorefrontCore] Initial cart sync failed:', err);
+  });
+}
 
     // ==========================================================
     // 10. RENDERER CONTEXT (WITH SHARED STATE + LEGACY ALIASES)
