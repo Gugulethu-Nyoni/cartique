@@ -287,7 +287,7 @@ export default class CartRenderer {
     // RENDER METHODS
     // ==========================================================
 
-    async renderCartSlider() {
+        async renderCartSlider() {
         const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-slider-component');
         if (!wrapper) {
             console.warn('Cart slider component template not found');
@@ -300,7 +300,7 @@ export default class CartRenderer {
             return;
         }
 
-        // ✅ KEEP: Drawer lives in hidden blocks (original architecture)
+        //  KEEP: Drawer lives in hidden blocks (original architecture)
         let hiddenBlocks = document.getElementById('cartique-hidden-blocks');
         if (!hiddenBlocks) {
             hiddenBlocks = document.createElement('div');
@@ -342,7 +342,26 @@ export default class CartRenderer {
                 }
             });
         }
+
+        //  Click outside drawer (overlay) closes it — bind once
+        const overlay = document.getElementById('cart-slide-overlay');
+        if (overlay && !overlay.dataset.cartBound && this.addEventListener) {
+            overlay.dataset.cartBound = 'true';
+            this.addEventListener(overlay, 'click', () => {
+                if (typeof this.closeCart === 'function') {
+                    this.closeCart();
+                }
+            });
+        }
+        
+        //  Prevent drawer clicks from bubbling to overlay
+        if (this.addEventListener) {
+            this.addEventListener(cartSlider, 'click', (e) => {
+                e.stopPropagation();
+            });
+        }
     }
+
 
     async renderCartItemTemplate() {
         const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-item-component');
@@ -855,23 +874,27 @@ export default class CartRenderer {
         this.navigateToCartPage();
     }
 
-    closeCartPage() {
+     closeCartPage() {
         const cartPage = document.getElementById('cartique-cart-page');
         if (cartPage) cartPage.remove();
 
-        const singleProductView = document.getElementById('single-product-view-container');
-        const wasInSingleView = singleProductView && singleProductView.style.display === 'none' && 
-                                singleProductView.innerHTML !== '';
+        // Let restoreState() be the single authority on UI state
+        this.restoreState();
         
-        if (wasInSingleView) {
-            if (singleProductView) singleProductView.style.display = 'block';
+        const singleProductViewEl = document.getElementById('single-product-view-container');
+        const productDisplays = document.getElementById('cartique-product-displays');
+        const sidebar = document.getElementById('cartique-sidebar');
+        const menuAnchor = document.getElementById('cartique-menu-anchor-top');
+        const controls = document.getElementById('cartique-controls');
+        const footer = document.getElementById('cartique-product-footer');
+        
+        if (this.state.singleProductViewActive) {
+            // Restore single product view exclusively
+            if (singleProductViewEl) singleProductViewEl.style.display = 'block';
+            if (productDisplays) productDisplays.style.display = 'none';
         } else {
-            const productDisplays = document.getElementById('cartique-product-displays');
-            const sidebar = document.getElementById('cartique-sidebar');
-            const menuAnchor = document.getElementById('cartique-menu-anchor-top');
-            const controls = document.getElementById('cartique-controls');
-            const footer = document.getElementById('cartique-product-footer');
-            
+            // Restore product grid exclusively
+            if (singleProductViewEl) singleProductViewEl.style.display = 'none';
             if (productDisplays) productDisplays.style.display = 'block';
             if (sidebar) sidebar.style.display = this.features?.sidebarDisplay;
             if (menuAnchor) menuAnchor.style.display = '';
@@ -881,19 +904,15 @@ export default class CartRenderer {
         
         const mainContent = document.getElementById('cartique-main-content');
         if (mainContent) {
-            if (this.features?.sidebarDisplay === 'none' || wasInSingleView) {
+            if (this.features?.sidebarDisplay === 'none' || this.state.singleProductViewActive) {
                 mainContent.classList.add('cartique-full-width');
             } else {
                 mainContent.classList.remove('cartique-full-width');
             }
         }
-
-        if (!wasInSingleView) {
-            this.singleProductViewActive = false;
-        }
-
-        this.restoreState();
     }
+
+
 
     attachCartPageEvents(cartPage) {
         const backBtn = cartPage.querySelector('#cart-page-back');
