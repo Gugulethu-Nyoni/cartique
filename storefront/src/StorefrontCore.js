@@ -244,7 +244,14 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
         features: this.features,
         callbacks: this.callbacks,
         showCart: this.showCart.bind(this),
-        state: this.state
+        state: this.state,
+        // ✅ FIX: Inject notification methods — CartService depends on these
+        showCheckoutAlert: () => {
+          this.notification.showCheckoutAlert();
+        },
+        showStockAlert: (message) => {
+          this.notification.showStockAlert(message);
+        }
       }),
       locale: new LocaleService({
         currencySymbol: this.currencySymbol,
