@@ -6,12 +6,18 @@
  * Phase 2D: Direct CommercialDecision consumption — no legacy wrapper.
  * Phase 3.6.1: Renderer stabilization — container creation and fallbacks.
  * Phase 3.6.2: Safe context method checks.
- * Phase 3.8: Navigation state restoration.
+ * Phase 3.8: Navigation state restoration and CommercialDecision consumption.
  */
 
 export default class CartRenderer {
     constructor(context = {}) {
         Object.assign(this, context);
+
+        // Verify cartService reference
+        if (this.features?.debug) {
+            console.log("[TRACE] CartRenderer cartService:", this.cartService);
+            console.log("[TRACE] CartRenderer state:", this.state);
+        }
         
         // Ensure eventListeners exists
         if (!this.eventListeners) {
@@ -218,27 +224,175 @@ export default class CartRenderer {
     }
 
     /**
-     * Renders the full cart page
+     * Renders the full cart page using CommercialDecision from CartService
      */
     async renderCartPage() {
         console.log('🔍 6. renderCartPage() called');
 
+        // Get decision from CartService
+        const decision = this.cartService?.getCurrentDecision?.() || null;
+        const cartDecision = this.state?.cartDecision || decision;
+
+        if (this.features?.debug) {
+            console.log('[TRACE] RENDERER USING DECISION', cartDecision);
+        }
+
+        // If we have a decision, render from it
+        if (cartDecision?.items?.length > 0) {
+            await this._renderFromDecision(cartDecision);
+            return;
+        }
+
+        // Fallback: read from localStorage
+        console.warn('[TRACE] No decision available, falling back to localStorage');
         const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        
-        // ✅ TRACE: Log cart read by renderer
-        console.log(
-            '[TRACE] RENDERER READING CART',
-            JSON.parse(JSON.stringify(cart))
-        );
-        
-        // ✅ TRACE: Log last decision from CartService
-        console.log(
-            '[TRACE] LAST DECISION',
-            this.cartService?.getLastDecision()
-        );
-        
+        await this._renderFromLegacyCart(cart);
+    }
+
+    /**
+     * Render cart from CommercialDecision
+     * @param {Object} decision - CommercialDecision from CartService
+     */
+    async _renderFromDecision(decision) {
         const mainContent = document.getElementById('cartique-main-content');
-        
+        if (!mainContent) {
+            console.warn('Main content container not found for cart page');
+            return;
+        }
+
+        // Remove existing cart page if any
+        const existingCartPage = document.getElementById('cartique-cart-page');
+        if (existingCartPage) existingCartPage.remove();
+
+        const cartPage = document.createElement('div');
+        cartPage.id = 'cartique-cart-page';
+        cartPage.className = 'cartique-cart-page';
+
+        const items = decision.items || [];
+        const totals = decision.totals || {};
+
+        if (items.length === 0) {
+            cartPage.innerHTML = `
+                <div class="cart-page-empty">
+                    <div class="cart-page-header">
+                        <button class="cart-page-back" id="cart-page-back">← Back to Shop</button>
+                        <h2>Shopping Cart</h2>
+                    </div>
+                    <div class="cart-page-empty-content">
+                        <p>Your cart is empty.</p>
+                        <button class="cart-page-back-btn" id="cart-page-back-btn">Continue Shopping</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            let subtotal = 0;
+            let itemsHTML = '';
+
+            for (const itemDecision of items) {
+                const line = itemDecision.items?.[0] || {};
+                const adjustments = itemDecision.adjustments || [];
+                
+                const quantity = line.quantity || 1;
+                const unitPrice = line.unitPrice?.amount || 0;
+                const retailPrice = line.comparePrice?.amount || unitPrice;
+                const lineTotal = line.total?.amount || 0;
+                
+                const hasBulk = adjustments.some(a => 
+                    a.type === 'bulk_discount' || 
+                    a.label?.toLowerCase().includes('bulk')
+                );
+                
+                const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
+                const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
+                const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
+                
+                subtotal += lineTotal;
+
+                // Build price HTML with bulk info
+                let priceHTML = '';
+                let bulkStatusHTML = '';
+
+                if (hasBulk) {
+                    priceHTML = `
+                        <span class="original-price-strikethrough">${this.currencySymbol}${this.formatPrice(retailPrice)}</span>
+                        <span class="bulk-price-active">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
+                    `;
+                    bulkStatusHTML = `
+                        <div class="cart-page-bulk-status active">
+                            <span class="bulk-heading-active">✓ Bulk Price Applied</span>
+                            <span class="bulk-min-qty">Minimum ${bulkMinQty || 0} items</span>
+                        </div>
+                    `;
+                } else {
+                    priceHTML = `
+                        <span class="retail-price">${this.currencySymbol}${this.formatPrice(retailPrice)}</span>
+                    `;
+                }
+
+                // Get product info (fallback to sellableId if no title)
+                const productId = line.sellableId || 'unknown';
+                const productTitle = this._findProductTitle(productId) || `Product ${productId}`;
+
+                itemsHTML += `
+                    <div class="cart-page-item" data-product-id="${productId}">
+                        <div class="cart-page-item-image">
+                            <img src="${this._findProductImage(productId) || ''}" alt="${productTitle}">
+                        </div>
+                        <div class="cart-page-item-details">
+                            <h3>${productTitle}</h3>
+                            <p class="cart-page-item-price">
+                                ${priceHTML}
+                            </p>
+                            ${bulkStatusHTML}
+                            <div class="cart-page-item-actions">
+                                <div class="cart-page-quantity">
+                                    <button class="cart-page-qty-btn decrease-page-qty" data-id="${productId}">−</button>
+                                    <input type="text" class="cart-page-qty-input" value="${quantity}" readonly data-id="${productId}">
+                                    <button class="cart-page-qty-btn increase-page-qty" data-id="${productId}">+</button>
+                                </div>
+                                <button class="cart-page-remove" data-id="${productId}">Remove</button>
+                            </div>
+                        </div>
+                        <div class="cart-page-item-total">
+                            ${this.currencySymbol}${this.formatPrice(lineTotal)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            const subtotalAmount = totals.subtotal?.amount || subtotal;
+
+            cartPage.innerHTML = `
+                <div class="cart-page-container">
+                    <div class="cart-page-header">
+                        <button class="cart-page-back" id="cart-page-back">← Back to Shop</button>
+                        <h2>Shopping Cart (${items.length} ${items.length === 1 ? 'item' : 'items'})</h2>
+                    </div>
+                    <div class="cart-page-items">
+                        ${itemsHTML}
+                    </div>
+                    <div class="cart-page-footer">
+                        <div class="cart-page-subtotal">
+                            <span>Subtotal</span>
+                            <span>${this.currencySymbol}${this.formatPrice(subtotalAmount)}</span>
+                        </div>
+                        <button class="cart-page-checkout" id="cart-page-checkout">Proceed to Checkout</button>
+                        <button class="cart-page-continue" id="cart-page-continue">Continue Shopping</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        mainContent.appendChild(cartPage);
+        this.attachCartPageEvents(cartPage);
+    }
+
+    /**
+     * Render cart from legacy localStorage (fallback)
+     * @param {Array} cart - Legacy cart array
+     */
+    async _renderFromLegacyCart(cart) {
+        const mainContent = document.getElementById('cartique-main-content');
         if (!mainContent) {
             console.warn('Main content container not found for cart page');
             return;
@@ -270,106 +424,39 @@ export default class CartRenderer {
             let itemsHTML = '';
             
             for (const product of cart) {
-                // Get variant using adapter
-                let variant = null;
-                try {
-                    variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
-                } catch (e) {
-                    console.warn('Variant resolution failed:', e.message);
-                    variant = { price: product.price || 0 };
-                }
-                
+                const variant = product.variants?.[0] || { price: product.price || 0 };
                 const quantity = product.cart_quantity || 1;
+                const unitPrice = variant.bulkPrice && quantity >= variant.bulkMinimumQty 
+                    ? variant.bulkPrice 
+                    : variant.price;
+                const retailPrice = variant.price || 0;
+                const lineTotal = unitPrice * quantity;
+                const hasBulk = variant.bulkPrice && variant.bulkMinimumQty && quantity >= variant.bulkMinimumQty;
                 
-                // Get CommercialDecision from adapter
-                let decision;
-                try {
-                    decision = await this.adapter?.resolvePricing({
-                        sellable: { variants: [variant] },
-                        variant: variant,
-                        quantity: quantity,
-                        customer: this.customer,
-                        place: this.place
-                    });
-                } catch (e) {
-                    console.warn('Pricing resolution failed for cart item:', e.message);
-                    decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
-                }
+                subtotal += lineTotal;
 
-                // Extract data from CommercialDecision directly
-                const item = decision?.items?.[0] || {};
-                const adjustments = decision?.adjustments || [];
-                const totals = decision?.totals || {};
-                
-                const hasBulk = adjustments.some(a => 
-                    a.type === 'bulk_discount' || 
-                    a.label?.toLowerCase().includes('bulk')
-                );
-                const unitPrice = item.unitPrice?.amount || 0;
-                const retailPrice = item.comparePrice?.amount || variant?.price || 0;
-                const itemTotal = totals.subtotal?.amount || 0;
-                
-                const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
-                const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
-                const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
-                
-                subtotal += itemTotal;
-                
-                // Build bulk display
-                const bulkDisplay = {
-                    hasBulk: hasBulk,
-                    isBulk: hasBulk,
-                    retailPrice: retailPrice,
-                    bulkPrice: bulkPrice,
-                    unitPrice: unitPrice,
-                    minimumQty: bulkMinQty,
-                    heading: hasBulk ? '✓ Bulk Price Applied' : 'BULK PRICE',
-                    message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
-                    displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
-                    bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-                    staticDisplay: {
-                        label: 'BULK PRICE',
-                        price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-                        minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
-                    }
-                };
-                
-                // Build price HTML with bulk info
                 let priceHTML = '';
                 let bulkStatusHTML = '';
-                
-                if (bulkDisplay && bulkDisplay.hasBulk) {
-                    if (bulkDisplay.isBulk) {
-                        priceHTML = `
-                            <span class="original-price-strikethrough">${this.currencySymbol}${this.formatPrice(bulkDisplay.retailPrice)}</span>
-                            <span class="bulk-price-active">${this.currencySymbol}${this.formatPrice(bulkDisplay.unitPrice)}</span>
-                        `;
-                        bulkStatusHTML = `
-                            <div class="cart-page-bulk-status active">
-                                <span class="bulk-heading-active">✓ Bulk Price Applied</span>
-                                <span class="bulk-min-qty">${bulkDisplay.message}</span>
-                            </div>
-                        `;
-                    } else {
-                        priceHTML = `
-                            <span class="retail-price">${this.currencySymbol}${this.formatPrice(bulkDisplay.retailPrice)}</span>
-                        `;
-                        bulkStatusHTML = `
-                            <div class="cart-page-bulk-status">
-                                <span class="bulk-heading">BULK PRICE</span>
-                                <span class="bulk-price-available">${bulkDisplay.bulkDisplayPrice}</span>
-                                <span class="bulk-min-qty">${bulkDisplay.message}</span>
-                            </div>
-                        `;
-                    }
+
+                if (hasBulk) {
+                    priceHTML = `
+                        <span class="original-price-strikethrough">${this.currencySymbol}${this.formatPrice(retailPrice)}</span>
+                        <span class="bulk-price-active">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
+                    `;
+                    bulkStatusHTML = `
+                        <div class="cart-page-bulk-status active">
+                            <span class="bulk-heading-active">✓ Bulk Price Applied</span>
+                            <span class="bulk-min-qty">Minimum ${variant.bulkMinimumQty} items</span>
+                        </div>
+                    `;
                 } else {
                     priceHTML = `
-                        <span class="retail-price">${this.currencySymbol}${this.formatPrice(product.price || variant?.price || 0)}</span>
+                        <span class="retail-price">${this.currencySymbol}${this.formatPrice(unitPrice)}</span>
                     `;
                 }
-                
+
                 itemsHTML += `
-                    <div class="cart-page-item" data-product-id="${product.id}" data-variant-id="${product.variantId || ''}">
+                    <div class="cart-page-item" data-product-id="${product.id}">
                         <div class="cart-page-item-image">
                             <img src="${product.image || ''}" alt="${product.title || ''}">
                         </div>
@@ -389,12 +476,12 @@ export default class CartRenderer {
                             </div>
                         </div>
                         <div class="cart-page-item-total">
-                            ${this.currencySymbol}${this.formatPrice(itemTotal)}
+                            ${this.currencySymbol}${this.formatPrice(lineTotal)}
                         </div>
                     </div>
                 `;
             }
-            
+
             cartPage.innerHTML = `
                 <div class="cart-page-container">
                     <div class="cart-page-header">
@@ -421,19 +508,35 @@ export default class CartRenderer {
     }
 
     /**
+     * Helper: Find product title from products list
+     */
+    _findProductTitle(productId) {
+        if (!productId) return null;
+        const product = this.products?.find(p => String(p.id) === String(productId));
+        return product?.title || null;
+    }
+
+    /**
+     * Helper: Find product image from products list
+     */
+    _findProductImage(productId) {
+        if (!productId) return null;
+        const product = this.products?.find(p => String(p.id) === String(productId));
+        return product?.image || null;
+    }
+
+    /**
      * Shows the cart slider
      */
     async showCart() {
-        const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        
-        // ✅ TRACE: Log cart read by slider
-        console.log(
-            '[TRACE] SLIDER READING CART',
-            JSON.parse(JSON.stringify(cart))
-        );
-        
+        const decision = this.cartService?.getCurrentDecision?.() || null;
+        const cartDecision = this.state?.cartDecision || decision;
+
+        if (this.features?.debug) {
+            console.log('[TRACE] SLIDER USING DECISION', cartDecision);
+        }
+
         const cartContainer = document.getElementById('cart-items-container');
-        
         if (!cartContainer) {
             console.warn('Cart items container not found');
             return;
@@ -441,25 +544,75 @@ export default class CartRenderer {
 
         cartContainer.innerHTML = '';
 
+        // Get cart data from decision or fallback
+        let items = [];
+        let subtotal = 0;
+
+        if (cartDecision?.items?.length > 0) {
+            // Use decision data
+            items = cartDecision.items.map(itemDecision => {
+                const line = itemDecision.items?.[0] || {};
+                const adjustments = itemDecision.adjustments || [];
+                const hasBulk = adjustments.some(a => 
+                    a.type === 'bulk_discount' || 
+                    a.label?.toLowerCase().includes('bulk')
+                );
+                const productId = line.sellableId || 'unknown';
+                return {
+                    id: productId,
+                    title: this._findProductTitle(productId) || `Product ${productId}`,
+                    cart_quantity: line.quantity || 1,
+                    price: line.unitPrice?.amount || 0,
+                    total: line.total?.amount || 0,
+                    hasBulk: hasBulk,
+                    bulkPrice: adjustments.find(a => a.type === 'bulk_discount')?.metadata?.bulkPrice || null,
+                    bulkMinQty: adjustments.find(a => a.type === 'bulk_discount')?.metadata?.minimumQty || null,
+                    retailPrice: line.comparePrice?.amount || line.unitPrice?.amount || 0
+                };
+            });
+            subtotal = cartDecision.totals?.subtotal?.amount || 0;
+        } else {
+            // Fallback to localStorage
+            const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            if (this.features?.debug) {
+                console.log('[TRACE] SLIDER READING CART (fallback)', cart);
+            }
+            
+            for (const product of cart) {
+                const variant = product.variants?.[0] || { price: product.price || 0 };
+                const quantity = product.cart_quantity || 1;
+                const unitPrice = variant.bulkPrice && quantity >= variant.bulkMinimumQty 
+                    ? variant.bulkPrice 
+                    : variant.price;
+                const total = unitPrice * quantity;
+                const hasBulk = variant.bulkPrice && variant.bulkMinimumQty && quantity >= variant.bulkMinimumQty;
+                
+                items.push({
+                    ...product,
+                    price: unitPrice,
+                    total: total,
+                    hasBulk: hasBulk,
+                    bulkPrice: variant.bulkPrice || null,
+                    bulkMinQty: variant.bulkMinimumQty || null,
+                    retailPrice: variant.price || 0
+                });
+                subtotal += total;
+            }
+        }
+
         // Show/hide empty cart message
         const emptyMsg = document.getElementById('shopping-cart-empty');
         const viewBtn = document.getElementById('view-cart-btn');
         const checkoutBtn = document.getElementById('checkout-btn');
         
-        if (emptyMsg) emptyMsg.classList.toggle('show', cart.length === 0);
-        if (viewBtn) viewBtn.style.display = cart.length === 0 ? 'none' : 'block';
-        if (checkoutBtn) checkoutBtn.style.display = cart.length === 0 ? 'none' : 'block';
-
-        // Calculate subtotal with bulk pricing
-        let subtotal = 0;
+        if (emptyMsg) emptyMsg.classList.toggle('show', items.length === 0);
+        if (viewBtn) viewBtn.style.display = items.length === 0 ? 'none' : 'block';
+        if (checkoutBtn) checkoutBtn.style.display = items.length === 0 ? 'none' : 'block';
 
         // Render cart items
-        for (const product of cart) {
+        for (const product of items) {
             const wrapper = this.templateHolder?.content?.getElementById('cartique-cart-item-component');
-            if (!wrapper) {
-                console.warn('Cart item template not found');
-                continue;
-            }
+            if (!wrapper) continue;
 
             const cartItem = wrapper.firstElementChild?.cloneNode(true);
             if (!cartItem) continue;
@@ -469,33 +622,6 @@ export default class CartRenderer {
             
             // Add event listeners
             this.addCartItemEventListeners(cartItem, product.id);
-            
-            // Calculate subtotal with bulk pricing
-            let variant = null;
-            try {
-                variant = this.adapter?.resolveVariant(product, product.variantId || product.id);
-            } catch (e) {
-                console.warn('Variant resolution failed:', e.message);
-                variant = { price: product.price || 0 };
-            }
-            
-            const quantity = product.cart_quantity || 1;
-            let decision;
-            try {
-                decision = await this.adapter?.resolvePricing({
-                    sellable: { variants: [variant] },
-                    variant: variant,
-                    quantity: quantity,
-                    customer: this.customer,
-                    place: this.place
-                });
-            } catch (e) {
-                console.warn('Pricing resolution failed for cart item:', e.message);
-                decision = { totals: { subtotal: { amount: 0 } } };
-            }
-            
-            const totals = decision?.totals || {};
-            subtotal += totals.subtotal?.amount || 0;
             
             cartContainer.appendChild(cartItem);
         }
@@ -554,63 +680,6 @@ export default class CartRenderer {
         const titleEl = cartItem.querySelector('#title');
         if (titleEl) titleEl.textContent = product.title || '';
 
-        // Get variant using adapter
-        let variant = null;
-        try {
-            if (product.variantId) {
-                variant = this.adapter?.resolveVariant(product, product.variantId);
-            }
-            if (!variant && product.variants && product.variants.length > 0) {
-                variant = product.variants[0];
-            }
-        } catch (e) {
-            console.warn('Variant resolution failed:', e.message);
-        }
-        
-        if (!variant) {
-            variant = {
-                id: product.id,
-                price: product.price || 0,
-                bulkPrice: product.bulkPrice,
-                bulkMinimumQty: product.bulkMinimumQty,
-                inventory: product.inventory || 0
-            };
-        }
-        
-        const quantity = product.cart_quantity || 1;
-
-        // Get CommercialDecision from adapter
-        let decision;
-        try {
-            decision = await this.adapter?.resolvePricing({
-                sellable: { variants: [variant] },
-                variant: variant,
-                quantity: quantity,
-                customer: this.customer,
-                place: this.place
-            });
-        } catch (e) {
-            console.warn('Pricing resolution failed for cart item:', e.message);
-            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
-        }
-
-        // Extract data from CommercialDecision directly
-        const item = decision?.items?.[0] || {};
-        const adjustments = decision?.adjustments || [];
-        const totals = decision?.totals || {};
-        
-        const hasBulk = adjustments.some(a => 
-            a.type === 'bulk_discount' || 
-            a.label?.toLowerCase().includes('bulk')
-        );
-        const unitPrice = item.unitPrice?.amount || 0;
-        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
-        const totalPrice = totals.subtotal?.amount || 0;
-        
-        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
-        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
-        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
-
         // Get price elements
         const priceEl = cartItem.querySelector('#price');
         const salePriceEl = cartItem.querySelector('#sale_price');
@@ -619,11 +688,18 @@ export default class CartRenderer {
         // Update currency symbols
         currencyEls.forEach(el => el.textContent = this.currencySymbol || 'R');
 
+        // --- BULK PRICING: Cart Slide-in ---
         // Remove existing bulk status message
         const existingBulkMsg = cartItem.querySelector('.cart-bulk-status');
         if (existingBulkMsg) existingBulkMsg.remove();
 
-        // Build bulk display from CommercialDecision
+        // Use decision data if available
+        const hasBulk = product.hasBulk || false;
+        const unitPrice = product.price || 0;
+        const retailPrice = product.retailPrice || unitPrice;
+        const bulkPrice = product.bulkPrice || null;
+        const bulkMinQty = product.bulkMinQty || null;
+
         const bulkDisplay = {
             hasBulk: hasBulk,
             isBulk: hasBulk,
@@ -696,7 +772,7 @@ export default class CartRenderer {
             }
         } else {
             if (priceEl) {
-                priceEl.textContent = this.formatPrice(product.price || variant?.price || 0);
+                priceEl.textContent = this.formatPrice(product.price || 0);
                 priceEl.style.textDecoration = 'none';
                 priceEl.style.color = '';
                 priceEl.style.fontSize = '';
@@ -710,11 +786,12 @@ export default class CartRenderer {
                 if (parentSpan) parentSpan.style.display = 'none';
             }
         }
+        // --- END BULK PRICING ---
 
         // Set quantity
         const quantityInput = cartItem.querySelector('.quantity');
         if (quantityInput) {
-            quantityInput.value = quantity;
+            quantityInput.value = product.cart_quantity || 1;
             quantityInput.id = `quantity_${product.id}`;
         }
     }
@@ -751,6 +828,11 @@ export default class CartRenderer {
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         cart = cart.filter(product => product.id !== productId);
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+        
+        // Notify CartService to sync
+        if (this.cartService?.syncWithKernel) {
+            this.cartService.syncWithKernel();
+        }
         this.showCart();
     }
 
@@ -770,6 +852,11 @@ export default class CartRenderer {
             }
             
             localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+            
+            // Notify CartService to sync
+            if (this.cartService?.syncWithKernel) {
+                this.cartService.syncWithKernel();
+            }
             this.showCart();
         }
     }
@@ -822,6 +909,11 @@ export default class CartRenderer {
             
             cart[index].cart_quantity = newQuantity;
             localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+            
+            // Notify CartService to sync
+            if (this.cartService?.syncWithKernel) {
+                this.cartService.syncWithKernel();
+            }
             this.showCart();
         }
     }
