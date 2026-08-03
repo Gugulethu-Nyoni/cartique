@@ -1,3 +1,5 @@
+import resolveCategory from '../resolvers/category.resolver.js';
+
 export default {
     name: 'category',
 
@@ -6,9 +8,16 @@ export default {
     },
 
     execute(context, route) {
-        const categoryId = route.params.get('category');
+        const categoryInput = route.params.get('category');
 
-        context.capabilityTrace?.log('CATEGORY', 'URL category extracted', categoryId);
+        context.capabilityTrace?.log('CATEGORY', 'Category input received', categoryInput);
+
+        const categoryId = resolveCategory(
+            context.collectionRenderer?.products || context.products,
+            categoryInput
+        );
+
+        context.capabilityTrace?.log('CATEGORY', 'Resolved category ID', categoryId);
 
         if (!categoryId) {
             return;
