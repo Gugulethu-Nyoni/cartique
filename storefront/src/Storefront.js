@@ -1736,7 +1736,7 @@ renderProducts(layout, data) {
         container.innerHTML = `
             <div class="no-results-msg" style="grid-column: 1 / -1; width: 100%; text-align: center; padding: 4rem 1rem;">
                 <p style="font-size: 1.2rem; color: #555; margin-bottom: 1rem;">No products found matching these criteria.</p>
-                <button onclick="location.reload()" style="cursor: pointer; border-bottom: 1px solid #000; background: none; border: none; font-weight: 600;">
+                <button onclick="window.location.href = window.location.pathname" style="cursor: pointer; border-bottom: 1px solid #000; background: none; border: none; font-weight: 600;">
                     Reset all filters
                 </button>
             </div>`;
