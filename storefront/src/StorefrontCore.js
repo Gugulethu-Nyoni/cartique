@@ -29,6 +29,10 @@ import CollectionRenderer from './renderers/CollectionRenderer.js';
 import CartRenderer from './renderers/CartRenderer.js';
 import CartiqueInspector from './debug/CartiqueInspector.js';
 import ThemeManager from './theme/ThemeManager.js';
+import Router from './navigation/Router.js';
+import RouteRegistry from './navigation/RouteRegistry.js';
+import searchRoute from './navigation/routes/search.route.js';
+import CapabilityTrace from './debug/CapabilityTrace.js';
 
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
@@ -177,6 +181,13 @@ export default class StorefrontCore {
     this.addEventListener = addEventListener.bind(this);
 
     // ==========================================================
+    // 4.5 CAPABILITY TRACE (Debug Layer)
+    // ==========================================================
+    this.capabilityTrace = new CapabilityTrace(
+        this.features?.debug === true
+    );
+
+    // ==========================================================
     // 5. INSPECTOR (Debug Mode)
     // ==========================================================
     this.inspector = new CartiqueInspector({
@@ -188,9 +199,6 @@ export default class StorefrontCore {
     // ==========================================================
     // 6. THEME MANAGER (New theme system)
     // ==========================================================
-    // ==========================================================
-// 6. THEME MANAGER (New theme system)
-// ==========================================================
 this.themeManager = new ThemeManager({
     catalogPath: this.features.catalogPath || '/catalog/',
     themes: this.features.themes || {},
@@ -245,7 +253,6 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
         callbacks: this.callbacks,
         showCart: this.showCart.bind(this),
         state: this.state,
-        // ✅ FIX: Inject notification methods — CartService depends on these
         showCheckoutAlert: () => {
           this.notification.showCheckoutAlert();
         },
@@ -272,8 +279,8 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
     });
 
     // ==========================================================
-// 9. ADAPTER (SINGLE INITIALIZATION — REMOVED DUPLICATES)
-// ==========================================================
+    // 9. ADAPTER (SINGLE INITIALIZATION)
+    // ==========================================================
 this.adapter = new CartiqueAdapter(this.kernel, {
   legacyMode: this.features.kernelMode !== true,
   debug: this.features.debug || false,
@@ -288,15 +295,17 @@ if (this.services?.cart?.setAdapter) {
   this.services.cart.setAdapter(this.adapter);
 }
 
-//  Trigger initial cart sync after adapter is set
-// Note: The sync method is concurrency-safe, so multiple calls are fine.
 if (this.services?.cart?.syncWithKernel) {
-  // Don't await here - let it run in background
-  // The init() will handle the full initialization
   this.services.cart.syncWithKernel().catch(err => {
     console.warn('[StorefrontCore] Initial cart sync failed:', err);
   });
 }
+
+    // ==========================================================
+    // 9.5 NAVIGATION LAYER
+    // ==========================================================
+    this.routeRegistry = new RouteRegistry([searchRoute]);
+    this.router = new Router({ storefront: this });
 
     // ==========================================================
     // 10. RENDERER CONTEXT (WITH SHARED STATE + LEGACY ALIASES)
@@ -309,13 +318,12 @@ if (this.services?.cart?.syncWithKernel) {
       container: this.container,
       eventListeners: this.eventListeners,
       
-      // No fallback — use features.currencySymbol directly
       currencySymbol: this.features?.currencySymbol,
       
       // SHARED STATE (SINGLE SOURCE OF TRUTH)
       state: this.state,
       
-      // LEGACY ALIASES (for backward compatibility, gradually remove)
+      // LEGACY ALIASES
       filteredProducts: this.state.filteredProducts,
       currentLayout: this.state.currentLayout,
       currentSearchQuery: this.state.currentSearchQuery,
@@ -337,7 +345,6 @@ if (this.services?.cart?.syncWithKernel) {
       kernel: this.kernel,
       notification: this.notification,
       
-      // Add to Cart (wired once, passed to all renderers)
       addToCart: this.services.cart.addToCart.bind(this.services.cart),
       
       // Formatting
@@ -350,40 +357,36 @@ if (this.services?.cart?.syncWithKernel) {
     };
 
     // ==========================================================
-    // 11. CREATE RENDERERS (WITH THEMEMANAGER + COMPONENTREGISTRY)
+    // 11. CREATE RENDERERS
     // ==========================================================
     this.productRenderer = new ProductRenderer({
       ...baseRendererContext,
       themeManager: this.themeManager,
       componentRegistry: this.themeManager.componentRegistry,
-      container: this.container  // Pass container reference
+      container: this.container
     });
 
     this.collectionRenderer = new CollectionRenderer({
       ...baseRendererContext,
       themeManager: this.themeManager,
       componentRegistry: this.themeManager.componentRegistry,
-      container: this.container  // Pass container reference
+      container: this.container
     });
 
     this.cartRenderer = new CartRenderer({
       ...baseRendererContext,
       themeManager: this.themeManager,
       componentRegistry: this.themeManager.componentRegistry,
-      container: this.container,  // Pass container reference
-      cartService: this.services.cart  //  ADD THIS
-
+      container: this.container,
+      cartService: this.services.cart
     });
 
     // ==========================================================
     // 12. WIRE CALLBACKS
     // ==========================================================
     
-    // ProductRenderer → CollectionRenderer (search, sort, back)
     this.productRenderer.onSearch = (query) => {
-      if (this.features?.debug) {
-        console.log('[TRACE] onSearch triggered:', query);
-      }
+      this.capabilityTrace?.log('SEARCH', 'ProductRenderer → CollectionRenderer', query);
       this.collectionRenderer.handleSearch(query);
     };
     
@@ -443,7 +446,6 @@ if (this.services?.cart?.syncWithKernel) {
       this.collectionRenderer.clearAllFilters();
     };
     
-    // ProductRenderer → StorefrontCore (layout change)
     this.productRenderer.onLayoutChange = (layout) => {
       if (this.features?.debug) {
         console.log('[TRACE] onLayoutChange triggered:', layout);
@@ -452,7 +454,6 @@ if (this.services?.cart?.syncWithKernel) {
       this.productRenderer.renderProductDisplays();
     };
     
-    // CollectionRenderer → StorefrontCore → ProductRenderer (filter results)
     this.collectionRenderer.onFilterApplied = (filteredProducts) => {
       if (this.features?.debug) {
         console.log('[TRACE] onFilterApplied triggered with', filteredProducts.length, 'products');
@@ -460,27 +461,21 @@ if (this.services?.cart?.syncWithKernel) {
       }
       this.updateState('filteredProducts', filteredProducts);
       this.productRenderer.filteredProducts = filteredProducts;
-      // Single render trigger — ONLY HERE
       this.productRenderer.renderProductDisplays();
     };
     
-    // Updated: onCategorySelect — no render here, onFilterApplied handles it
     this.collectionRenderer.onCategorySelect = () => {
       if (this.features?.debug) {
         console.log('[TRACE] onCategorySelect triggered');
       }
-      // No render here — onFilterApplied handles it
     };
     
-    // CartService → CartRenderer (cart updated) — async with debug
-    // ✅ FIX: Accept source param to control drawer vs page behaviour
     this.services.cart.onCartUpdated = async (source = 'drawer') => {
       if (this.features?.debug) {
         console.log('[TRACE] onCartUpdated triggered from:', source);
         console.trace();
       }
 
-      // ✅ FIX: Only open drawer if update came from drawer context
       if (source === 'drawer') {
         if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
           if (this.features?.debug) {
@@ -492,7 +487,6 @@ if (this.services?.cart?.syncWithKernel) {
           }
         }
       } else if (source === 'page') {
-        // ✅ FIX: Just refresh the cart page, no drawer
         if (this.cartRenderer && typeof this.cartRenderer.renderCartPage === 'function') {
           if (this.features?.debug) {
             console.log('[TRACE] Calling CartRenderer.renderCartPage()');
@@ -503,7 +497,6 @@ if (this.services?.cart?.syncWithKernel) {
           }
         }
       } else {
-        // Default: show cart
         if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
           await this.cartRenderer.showCart();
         }
@@ -515,21 +508,12 @@ if (this.services?.cart?.syncWithKernel) {
     // ==========================================================
     this.registerUrlStateRestorer(this.restoreCartState);
     this.registerUrlStateRestorer(this.restoreSearchState);
-
-    // ==========================================================
-    // 14. NOTE: this.init() is NOT called here.
-    // Caller must call storefront.init() explicitly.
-    // ==========================================================
   }
 
   // ==========================================================
   // HELPERS
   // ==========================================================
 
-  /**
-   * Check if running in browser environment
-   * @returns {boolean}
-   */
   isBrowser() {
     return typeof document !== 'undefined' && typeof window !== 'undefined';
   }
@@ -616,7 +600,13 @@ if (this.services?.cart?.syncWithKernel) {
   // PUBLIC SEARCH API
   // ==========================================================
 
+  search(query) {
+    this.capabilityTrace?.log('SEARCH', 'Public API called', query);
+    return this.setSearchQuery(query);
+  }
+
   async setSearchQuery(query = '') {
+    this.capabilityTrace?.log('SEARCH', 'Delegating to ProductRenderer', query);
     if (this.productRenderer && this.productRenderer.onSearch) {
       this.productRenderer.onSearch(query);
     }
@@ -727,53 +717,26 @@ if (this.services?.cart?.syncWithKernel) {
   // THEME MANAGEMENT API
   // ==========================================================
 
-  /**
-   * Switch to a different theme
-   * @param {string} name - Theme name
-   * @returns {Promise<Object>} Theme object
-   */
   setTheme(name) {
     return this.themeManager.switch(name);
   }
 
-  /**
-   * Get current theme information
-   * @returns {Object} { name, theme }
-   */
   getTheme() {
     return this.themeManager.current();
   }
 
-  /**
-   * List available themes
-   * @returns {Array<string>} Theme names
-   */
   listThemes() {
     return this.themeManager.list();
   }
 
-  /**
-   * Preview a theme without switching
-   * @param {string} name - Theme name
-   * @returns {Promise<Object>} { restore: Function }
-   */
   previewTheme(name) {
     return this.themeManager.preview(name);
   }
 
-  /**
-   * Get theme information
-   * @param {string} name - Theme name
-   * @returns {Object} Theme info
-   */
   getThemeInfo(name) {
     return this.themeManager.getThemeInfo(name);
   }
 
-  /**
-   * Get the ThemeManager instance
-   * @returns {ThemeManager}
-   */
   getThemeManager() {
     return this.themeManager;
   }
@@ -782,10 +745,6 @@ if (this.services?.cart?.syncWithKernel) {
   // INITIALIZATION
   // ==========================================================
 
-  /**
-   * Initializes the Cartique instance
-   * Must be called explicitly after instantiation
-   */
   async init() {
     if (this._initialized) {
       console.warn('Storefront already initialized');
@@ -795,17 +754,14 @@ if (this.services?.cart?.syncWithKernel) {
     this._initialized = true;
 
     try {
-      // 1. Initialize Theme Manager
       const initialTheme = this.features.theme || 'default';
       await this.themeManager.initialize(initialTheme);
       
-      // 2. Sync display states
       const sidebarEnabled = this.features.sidebar &&
         (this.features.sidebarFeatures?.enabled !== false);
       this.features.sidebarDisplay = sidebarEnabled ? 'block' : 'none';
       this.features.footerDisplay = this.features.footer ? 'block' : 'none';
 
-      // 3. DOM setup
       if (this.isBrowser()) {
         this.container = document.querySelector(`#${this.features.containerId}`);
         
@@ -813,7 +769,6 @@ if (this.services?.cart?.syncWithKernel) {
           throw new Error(`Container with ID "${this.features.containerId}" not found`);
         }
         
-        // Bind resolved DOM container to renderers
         this.productRenderer.container = this.container;
         this.collectionRenderer.container = this.container;
         this.cartRenderer.container = this.container;
@@ -821,7 +776,6 @@ if (this.services?.cart?.syncWithKernel) {
         this.notification.container = this.container;
       }
 
-      // 4. Component loading & rendering
       await this.fetchAndExtractComponents();
       await this.renderAllComponents();
       
@@ -830,7 +784,6 @@ if (this.services?.cart?.syncWithKernel) {
       }
       await this.productRenderer.renderProductDisplays();
       
-      // 5. Event listeners & completion
       this.setupEventListeners();
       await this.completeInitialization();
       
@@ -841,7 +794,6 @@ if (this.services?.cart?.syncWithKernel) {
   }
 
   async fetchAndExtractComponents() {
-    // Browser guard for Node/SSR environments
     if (!this.isBrowser()) {
       this.templateHolder = null;
       return;
@@ -873,7 +825,6 @@ if (this.services?.cart?.syncWithKernel) {
     try { await this.cartRenderer.renderCartSlider(); } catch (e) { console.warn('renderCartSlider failed:', e.message); }
     try { await this.cartRenderer.renderCartItemTemplate(); } catch (e) { console.warn('renderCartItemTemplate failed:', e.message); }
 
-    // Only run DOM operations in browser
     if (this.isBrowser()) {
       const sidebar = document.getElementById('cartique-sidebar');
       if (sidebar) {
@@ -901,7 +852,6 @@ if (this.services?.cart?.syncWithKernel) {
   }
 
   setupEventListeners() {
-    // Browser guard for Node/SSR environments
     if (!this.isBrowser()) return;
 
     const gridButton = document.querySelector('.cartique-grid-view');
@@ -916,7 +866,7 @@ if (this.services?.cart?.syncWithKernel) {
     }
   }
 
-    async completeInitialization() {
+  async completeInitialization() {
     const container = document.getElementById(this.features.containerId);
     if (container) {
       container.style.visibility = 'visible';
@@ -932,16 +882,19 @@ if (this.services?.cart?.syncWithKernel) {
   }
 
   initializeNavigation() {
+    this.capabilityTrace?.log('ROUTER', 'Navigation bootstrap started');
+
     if (!this.router) {
-      if (this.features?.debug) {
-        console.warn('[StorefrontCore] Router unavailable');
-      }
+      this.capabilityTrace?.error(
+        'ROUTER',
+        'Router unavailable',
+        new Error('Router not initialized')
+      );
       return;
     }
 
     this.router.handle();
   }
-  
 
   destroy() {
     cleanupEventListeners.call(this);

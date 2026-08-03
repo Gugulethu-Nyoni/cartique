@@ -18,13 +18,10 @@ export default class Router {
     handle() {
         const route = this.getCurrentRoute();
 
-        if (this.storefront.features?.debug) {
-            console.log('[Router] Handling route:', {
-                pathname: route.pathname,
-                hash: route.hash,
-                search: route.params.toString()
-            });
-        }
+        this.storefront.capabilityTrace?.log('ROUTER', 'Route resolved', {
+            pathname: route.pathname,
+            search: route.params.toString()
+        });
 
         return this.storefront.routeRegistry.resolve(route, this.storefront);
     }

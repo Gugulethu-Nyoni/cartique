@@ -8,12 +8,10 @@ export default {
     execute(context, route) {
         const query = route.params.get('search');
 
+        context.capabilityTrace?.log('SEARCH', 'URL search extracted', query);
+
         if (!query) {
             return;
-        }
-
-        if (context.features?.debug) {
-            console.log(`[SearchRoute] Executing: "${query}"`);
         }
 
         context.search(query);

@@ -10,13 +10,13 @@ export default class RouteRegistry {
     resolve(route, context) {
         for (const handler of this.routes) {
             if (handler.match(route)) {
-                if (context.features?.debug) {
-                    console.log(`[RouteRegistry] Matched: ${handler.name}`);
-                }
+                context.capabilityTrace?.log('ROUTER', `Matched route: ${handler.name}`);
                 handler.execute(context, route);
                 return handler.name;
             }
         }
+
+        context.capabilityTrace?.log('ROUTER', 'No route matched');
         return null;
     }
 }
