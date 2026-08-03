@@ -33,6 +33,7 @@ import Router from './navigation/Router.js';
 import RouteRegistry from './navigation/RouteRegistry.js';
 import searchRoute from './navigation/routes/search.route.js';
 import categoryRoute from './navigation/routes/category.route.js';
+import cartRoute from './navigation/routes/cart.route.js';
 import productRoute from './navigation/routes/product.route.js';
 import CapabilityTrace from './debug/CapabilityTrace.js';
 import Logger from './debug/Logger.js';
@@ -308,7 +309,7 @@ if (this.services?.cart?.syncWithKernel) {
     // ==========================================================
     // 9.5 NAVIGATION LAYER
     // ==========================================================
-    this.routeRegistry = new RouteRegistry([productRoute, categoryRoute, searchRoute]);
+    this.routeRegistry = new RouteRegistry([cartRoute, productRoute, categoryRoute, searchRoute]);
     this.router = new Router({ storefront: this });
 
     // ==========================================================
@@ -611,12 +612,55 @@ if (this.services?.cart?.syncWithKernel) {
 
 
 
-  category(categoryId) {
-    this.capabilityTrace?.log('CATEGORY', 'Public API called', categoryId);
-    if (this.collectionRenderer && typeof this.collectionRenderer.handleCategorySelect === 'function') {
-      return this.collectionRenderer.handleCategorySelect(categoryId);
+    category(input) {
+    this.capabilityTrace?.log('CATEGORY', 'Public API called', input);
+    const id = this.findCategoryId(input);
+    this.capabilityTrace?.log('CATEGORY', 'Resolved category ID', id);
+    if (id && this.collectionRenderer && typeof this.collectionRenderer.handleCategorySelect === 'function') {
+      return this.collectionRenderer.handleCategorySelect(id);
     }
   }
+
+  findCategoryId(input) {
+    if (input == null) return null;
+
+    if (!Number.isNaN(Number(input))) {
+      return Number(input);
+    }
+
+
+    const slugify = (value) =>
+      String(value)
+        .toLowerCase()
+        .trim()
+        .replace(/&/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+
+    const inputSlug = slugify(input);
+
+
+    const category = (this.categories || []).find(cat => {
+
+      const nameSlug = slugify(cat.name);
+
+      const explicitSlug = cat.slug
+        ? slugify(cat.slug)
+        : null;
+
+
+      return (
+        nameSlug === inputSlug ||
+        explicitSlug === inputSlug
+      );
+
+    });
+
+
+    return category ? category.id : null;
+  }
+  
 
   findProductBySlug(slug) {
     return this.products.find(product => product.slug === slug);
