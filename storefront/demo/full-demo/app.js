@@ -1,53 +1,145 @@
 /**
  * Full Cartique Demo
+ * Complete storefront configuration with all features
  */
 
 import Cartique from '../../../cartique.js';
 import products from './products.js';
 
-const storefront = new Cartique(products, {
+// ==========================================================
+// 1. CURRENCY & HELPERS
+// ==========================================================
+
+const currencySymbol = 'R';
+
+/**
+ * Extract variant filters from products
+ * Creates price range and attribute filters
+ */
+function extractVariantFilters(products, currencySymbol = 'R') {
+    const filters = {};
+    const prices = [];
+    
+    products.forEach(p => p.variants?.forEach(v => {
+        const priceNum = parseFloat(v.price);
+        if (!isNaN(priceNum)) prices.push(priceNum);
+        v.attributes?.forEach(a => {
+            (filters[a.key] = filters[a.key] || new Set()).add(a.value);
+        });
+    }));
+    
+    if (prices.length) {
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        const step = (max - min) / 6;
+        filters.priceRange = new Set([
+            `Under ${currencySymbol}${Math.floor(min + step)}`,
+            `${currencySymbol}${Math.floor(min + step) + 1}-${currencySymbol}${Math.floor(min + step * 2)}`,
+            `${currencySymbol}${Math.floor(min + step * 2) + 1}-${currencySymbol}${Math.floor(min + step * 3)}`,
+            `${currencySymbol}${Math.floor(min + step * 3) + 1}-${currencySymbol}${Math.floor(min + step * 4)}`,
+            `${currencySymbol}${Math.floor(min + step * 4) + 1}-${currencySymbol}${Math.floor(min + step * 5)}`,
+            `Over ${currencySymbol}${Math.floor(min + step * 5)}`
+        ]);
+    }
+    
+    return Object.fromEntries(
+        Object.entries(filters).map(([k, v]) => [k, Array.from(v).sort()])
+    );
+}
+
+const productFilters = extractVariantFilters(products, currencySymbol);
+
+// ==========================================================
+// 2. COMPLETE FEATURES CONFIGURATION
+// ==========================================================
+
+const features = {
+    // ----- Kernel & Debug -----
     kernelMode: true,
     debug: true,
     diagnostics: true,
     resolutionJournal: true,
-    theme: 'default',
-    currencySymbol: 'R',
+    
+    // ----- Theme -----
+    theme: 'light',
+    themeColor: '#655793',
+    catalogPath: '/storefront/src/theme/catalog/',
+    
+    // ----- Layout & Display -----
     grid: true,
+    pagination: false,
     columns: 2,
+    rows: 6,
     itemsPerPage: 4,
     containerId: 'cartique',
-    sidebar: false,
-    footer: true,
+    currencySymbol: currencySymbol,
+    
+    // ----- Features -----
+    sale: true,
     search: true,
     sorting: true,
-    sale: true,
-    catalogPath: '/storefront/src/theme/catalog/',
+    sidebar: false,
+    footer: false,
+    
+    // ----- Checkout & Navigation -----
+    checkoutUrl: '/auth/dashboard',
+    checkoutUrlMode: '_blank',
+    
+    // ----- Catalog Menu -----
     menu: {
         enabled: true,
-        type: 'inline',
+        type: 'mega',
         position: 'top',
+        containerId: 'cartique-catalogue-menu',
         label: 'Shop Categories',
-        showCounts: true
+        maxVisibleItems: 5,
+        showCounts: true,
+        collapseOnMobile: true,
+        megaMenuColumns: 3
     },
+    
+    // ----- Sidebar Filters -----
     sidebarFeatures: {
-        enabled: false,
+        enabled: true,
         priceRange: true,
-        search: true
+        search: true,
+        filters: productFilters
+    },
+    
+    // ----- Reviews -----
+    reviews: {
+        enabled: true,
+        allowGuestReviews: false,
+        requireApproval: false,
+        apiEndpoint: 'productreview/productReviews',
+        ratingsScale: 5,
+        showRatingDistribution: true,
+        sortOrder: 'newest'
     }
-});
+};
 
-// Initialize the storefront
+// ==========================================================
+// 3. INITIALIZE STOREFRONT
+// ==========================================================
+
+const storefront = new Cartique(products, features);
+
+// Initialize
 await storefront.init();
+
+// ==========================================================
+// 4. EXPOSE TO GLOBAL
+// ==========================================================
 
 window.__storefront = storefront;
 window.__cartique = window.__cartique || {};
 window.__cartique.storefront = storefront;
 
 // ==========================================================
-// THEME DEMO — Visual Testing
+// 5. THEME DEMO — Visual Testing
 // ==========================================================
 
-// ✅ Theme indicator — log when theme changes
+// Theme indicator — log when theme changes
 storefront.themeManager.on('theme:switched', ({ from, to }) => {
     console.log(
         `%c🔄 Theme changed: ${from} → ${to}`,
@@ -56,16 +148,16 @@ storefront.themeManager.on('theme:switched', ({ from, to }) => {
     document.body.dataset.theme = to;
 });
 
-// ✅ Set initial theme
-document.body.dataset.theme = 'default';
+// Set initial theme
+document.body.dataset.theme = 'light';
 
-// ✅ Theme information
+// Theme information
 console.log('📦 Available themes:', storefront.listThemes());
 console.log('🎨 Current theme:', storefront.getTheme());
 console.log('ℹ️ Theme info (fashion):', storefront.getThemeInfo('fashion'));
 
 // ==========================================================
-// DEMO API — Console Testing
+// 6. DEMO API — Console Testing
 // ==========================================================
 
 window.__demo = {
@@ -112,11 +204,28 @@ window.__demo = {
         localStorage.removeItem('cartiqueCart');
         console.log('🗑️ Cart cleared');
         storefront.cartRenderer.showCart();
+    },
+    
+    // Feature info
+    getFeatures: () => {
+        console.log('⚙️ Features:', storefront.features);
+        return storefront.features;
+    },
+    getCheckoutUrl: () => {
+        console.log('🔗 Checkout URL:', storefront.features?.checkoutUrl);
+        return storefront.features?.checkoutUrl;
     }
 };
 
+// ==========================================================
+// 7. STARTUP LOG
+// ==========================================================
+
 console.log('🛍️ Full Cartique Demo Started');
 console.log(`📦 ${products.length} products loaded`);
+console.log(`💰 Currency: ${currencySymbol}`);
+console.log(`🔗 Checkout URL: ${features.checkoutUrl}`);
+console.log(`📐 Layout: ${features.columns} columns, ${features.itemsPerPage} items per page`);
 console.log('🔧 Debug: window.__storefront, window.__cartique, window.__demo');
 console.log('🎨 Theme commands:');
 console.log('  __demo.listThemes()        - List all themes');
@@ -127,3 +236,5 @@ console.log('  __demo.restoreTheme()      - Restore default theme');
 console.log('  __demo.getThemeInfo("fashion") - Get theme info');
 console.log('  __demo.getCart()           - View cart');
 console.log('  __demo.clearCart()         - Clear cart');
+console.log('  __demo.getFeatures()       - View all features');
+console.log('  __demo.getCheckoutUrl()    - Get checkout URL');

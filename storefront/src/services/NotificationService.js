@@ -53,10 +53,30 @@ export default class NotificationService {
             return;
         }
 
-        const toast = document.querySelector('.toast');
-        const closeIcon = document.querySelector('.toast .close');
+        // ✅ FIX 1: Create toast if missing — remove DOM dependency
+        let toast = document.querySelector('.toast');
 
-        if (!toast || !closeIcon) return;
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <span class="svg"></span>
+                    <div class="message">
+                        <span class="text text-1">
+                            Checkout
+                        </span>
+                        <span class="text text-2">
+                            You will now be redirected to complete your checkout.
+                        </span>
+                    </div>
+                </div>
+                <button class="close">&times;</button>
+            `;
+            document.body.appendChild(toast);
+        }
+
+        const closeIcon = toast.querySelector('.close');
 
         this.clearToastTimeouts();
 
@@ -83,34 +103,58 @@ export default class NotificationService {
 
         toast.classList.add('active');
 
+        // ✅ FIX 2: Log redirect scheduling immediately after toast activation
+        console.log(
+            '[NotificationService] Checkout redirect scheduled',
+            {
+                url: this.features?.checkoutUrl,
+                mode: this.features?.checkoutUrlMode
+            }
+        );
+
         const closeHandler = () => {
             toast.classList.remove('active');
             this.clearToastTimeouts();
         };
         
-        if (this.addEventListener) {
-            this.addEventListener(closeIcon, 'click', closeHandler, { once: true });
-        } else {
-            closeIcon.addEventListener('click', closeHandler);
+        if (closeIcon) {
+            if (this.addEventListener) {
+                this.addEventListener(closeIcon, 'click', closeHandler, { once: true });
+            } else {
+                closeIcon.addEventListener('click', closeHandler);
+            }
         }
 
         this.toastTimer1 = setTimeout(() => {
             toast.classList.remove('active');
         }, 5000);
 
+        // ✅ FIX 2: Redirect logic — decoupled from toast, with proper mode handling
         this.redirectTimer = setTimeout(() => {
-            const cart = JSON.parse(localStorage.getItem('cartiqueCart'));
-            console.log('Checkout cart:', JSON.stringify(cart, null, 2));
-            
-            if (this.features?.checkoutUrl && this.features.checkoutUrl !== '#') {
-                const mode = this.features.checkoutUrlMode || 'self';
-                if (mode === '_blank') {
-                    window.open(this.features.checkoutUrl, '_blank');
-                } else {
-                    window.location.href = this.features.checkoutUrl;
+            const url = this.features?.checkoutUrl;
+            const mode = this.features?.checkoutUrlMode || 'self';
+
+            console.log(
+                '[NotificationService] Redirecting checkout',
+                {
+                    url,
+                    mode
                 }
+            );
+
+            if (!url || url === '#') {
+                console.warn(
+                    '[NotificationService] No checkout URL configured'
+                );
+                return;
             }
-        }, 5000);
+
+            if (mode === '_blank') {
+                window.open(url, '_blank');
+            } else {
+                window.location.href = url;
+            }
+        }, 3000);
     }
 
     /**

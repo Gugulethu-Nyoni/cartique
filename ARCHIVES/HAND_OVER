@@ -1,0 +1,897 @@
+# Cartique Commerce Kernel & Storefront Architecture Report
+
+## Purpose of This Document
+
+This document captures the current architectural state of Cartique, the reasoning behind the major refactors completed so far, the relationship between the Commerce Kernel and Storefront layers, and the roadmap for future capability expansion.
+
+The goal is that a developer, architect, or AI coding agent taking over Cartique can understand:
+
+* What Cartique is becoming
+* Why the architecture exists in its current form
+* What problems the refactors solved
+* Where capabilities belong
+* How future features must be added without destabilising existing commerce flows
+
+This document represents the architectural contract.
+
+---
+
+# 1. Cartique Vision
+
+Cartique is not intended to be another ecommerce frontend or another Shopify clone.
+
+The core vision is:
+
+> Cartique is a Commerce Decision Kernel that transforms commercial intent into deterministic commercial truth.
+
+Traditional ecommerce platforms typically combine:
+
+* Product catalogue
+* Pricing
+* Promotions
+* Cart logic
+* Checkout rules
+* Inventory logic
+
+inside a tightly coupled application layer.
+
+This creates limitations:
+
+* New pricing models require rewrites
+* Promotions become scattered conditions
+* Cart calculations become difficult to audit
+* Merchants are locked into platform assumptions
+* Frontend UI becomes responsible for business decisions
+
+Cartique takes a different approach.
+
+The system separates:
+
+## Commercial Intelligence
+
+"What should happen?"
+
+from
+
+## Presentation
+
+"How should it appear?"
+
+The Kernel decides.
+
+The Storefront displays.
+
+---
+
+# 2. High-Level Architecture
+
+Current architecture:
+
+```
+Cartique
+│
+├── Commerce Kernel
+│
+│   ├── commerce/
+│   │
+│   ├── core/
+│   │
+│   ├── engine/
+│   │
+│   ├── rules/
+│   │
+│   └── persistence/
+│
+├── Storefront Runtime
+│
+│   ├── services/
+│   │
+│   ├── renderers/
+│   │
+│   ├── adapters/
+│   │
+│   ├── themes/
+│   │
+│   └── UI state
+│
+└── Theme Development System
+```
+
+The Kernel should never know about:
+
+* HTML
+* DOM
+* Buttons
+* Product cards
+* CSS
+* UI state
+
+The Storefront should never calculate:
+
+* Discounts
+* Bulk pricing
+* Promotions
+* Tax rules
+* Commercial eligibility
+
+---
+
+# 3. Commerce Kernel Overview
+
+Location:
+
+```
+src/
+├── commerce/
+├── core/
+├── engine/
+├── rules/
+└── persistence/
+```
+
+The Kernel is the business intelligence layer.
+
+---
+
+# 4. Core Domain Objects
+
+## CommercialDecision
+
+Location:
+
+```
+src/core/CommercialDecision.js
+```
+
+This is the central output of the Kernel.
+
+Everything commercial resolves into a CommercialDecision.
+
+Example:
+
+A customer adds:
+
+```
+Chia Seeds
+Quantity: 5
+```
+
+The Kernel determines:
+
+```
+Commercial Decision
+
+Item:
+Chia Seeds
+
+Base Price:
+R100
+
+Quantity:
+5
+
+Applicable Rules:
+- Bulk discount eligible
+
+Adjustment:
+- Bulk pricing -R20
+
+Final Unit Price:
+R80
+
+Total:
+R400
+```
+
+The frontend does not calculate this.
+
+It receives the truth.
+
+---
+
+# 5. Resolution Engine
+
+Location:
+
+```
+src/engine/
+```
+
+The ResolutionEngine is responsible for executing commercial rules.
+
+Current resolvers:
+
+```
+engine/resolvers/
+
+PricingResolver.js
+PromotionResolver.js
+ShippingResolver.js
+TaxResolver.js
+VariantResolver.js
+```
+
+The engine follows a pipeline approach.
+
+Conceptually:
+
+```
+Cart Input
+
+↓
+
+Resolution Engine
+
+↓
+
+Resolvers
+
+↓
+
+Rules Evaluation
+
+↓
+
+Commercial Decision
+
+↓
+
+Storefront Rendering
+```
+
+---
+
+# 6. Current Bulk Pricing Flow
+
+Bulk pricing is the first real capability implemented.
+
+Current flow:
+
+## Step 1: Product Data
+
+Product fixture:
+
+```
+persistence/fixtures/
+```
+
+contains pricing information.
+
+Example:
+
+```
+Product:
+T-Shirt
+
+Pricing Rule:
+
+Buy 10+
+Price = R80
+```
+
+---
+
+## Step 2: Cart Service
+
+Storefront:
+
+```
+storefront/src/services/CartService.js
+```
+
+handles cart actions:
+
+* add item
+* remove item
+* update quantity
+* synchronize with kernel
+
+The cart itself does not decide pricing.
+
+---
+
+## Step 3: Kernel Resolution
+
+The cart state is passed into the Kernel.
+
+The PricingResolver evaluates:
+
+```
+Quantity
++
+Product Rules
++
+Customer Context
++
+Eligibility Rules
+```
+
+and produces adjustments.
+
+Example:
+
+```
+Adjustment:
+
+{
+ type:
+ "bulk_discount",
+
+ metadata:
+ {
+    minimumQty:10,
+    bulkPrice:80
+ }
+}
+```
+
+---
+
+## Step 4: Commercial Decision
+
+The result becomes:
+
+```
+CommercialDecision
+
+items:
+
+[
+ {
+   product:
+   T-Shirt,
+
+   quantity:
+   12,
+
+   unitPrice:
+   80,
+
+   adjustments:
+   [
+     bulk_discount
+   ]
+ }
+]
+```
+
+---
+
+## Step 5: Storefront Rendering
+
+Location:
+
+```
+storefront/src/renderers/CartRenderer.js
+```
+
+The renderer consumes:
+
+```
+CommercialDecision
+```
+
+and displays:
+
+```
+Original:
+R100
+
+Bulk:
+R80
+
+Savings:
+R20
+```
+
+The renderer does not know why.
+
+It only displays the decision.
+
+---
+
+# 7. Storefront Refactor Completed
+
+The Storefront originally contained too much commerce responsibility.
+
+The major refactor moved towards:
+
+```
+Decision → Renderer
+```
+
+instead of:
+
+```
+Renderer → Calculate Commerce
+```
+
+---
+
+# 8. CartRenderer Stabilisation Work Completed
+
+Major fixes completed:
+
+## Single View Ownership
+
+Problem:
+
+The system had competing UI assumptions:
+
+* product grid
+* single product view
+* cart page
+
+The renderer attempted to infer state from the DOM.
+
+Example:
+
+```
+Is this element hidden?
+Does this container have HTML?
+```
+
+This created unreliable restoration.
+
+---
+
+New rule:
+
+State owns state.
+
+The source of truth:
+
+```
+this.state.singleProductViewActive
+```
+
+The DOM is only a projection.
+
+---
+
+## Navigation Contract
+
+Cart navigation now follows:
+
+```
+Product Grid
+
+↓
+
+Single Product
+
+↓
+
+Cart Page
+
+↓
+
+Continue Shopping
+
+↓
+
+Product Grid
+```
+
+The cart page is a route/state change.
+
+It is NOT an overlay.
+
+---
+
+## Drawer Behaviour
+
+Completed:
+
+* Close button closes drawer
+* Overlay click closes drawer
+* Clicking inside drawer does not close drawer
+
+The drawer now has predictable ownership.
+
+---
+
+# 9. Storefront Structure
+
+Current:
+
+```
+storefront/src/
+
+├── services/
+
+CartService.js
+PricingService.js
+CouponService.js
+WishlistService.js
+
+
+├── renderers/
+
+CartRenderer.js
+ProductRenderer.js
+CollectionRenderer.js
+
+
+├── adapters/
+
+CartiqueAdapter.js
+
+
+├── theme/
+
+ComponentRegistry.js
+ThemeManager.js
+ThemeRegistry.js
+
+
+└── state/
+```
+
+---
+
+# 10. Capability Expansion Strategy
+
+Future capabilities must NOT be added as random conditions.
+
+Wrong:
+
+```
+if coupon then discount
+if bundle then price change
+if sale then show badge
+```
+
+This creates the same problems Cartique is designed to solve.
+
+Instead:
+
+Every commercial capability must become a Kernel capability.
+
+Example future structure:
+
+```
+src/
+
+capabilities/
+
+pricing/
+    SalePriceCapability.js
+    BulkPricingCapability.js
+
+variants/
+    VariantCapability.js
+
+bundles/
+    BundleCapability.js
+
+coupons/
+    CouponCapability.js
+
+wishlist/
+    WishlistCapability.js
+```
+
+Capabilities register with the Kernel.
+
+The engine executes them.
+
+---
+
+# 11. Recommended Capability Development Order
+
+## Phase 1 — Product Variants (First Priority)
+
+This is foundational.
+
+Example:
+
+Chia Seeds:
+
+```
+100g  R100
+
+200g  R160
+
+500g  R230
+```
+
+Currently products are too flat.
+
+Variants must become first-class commercial entities.
+
+Required:
+
+```
+Product
+
+↓
+
+Variant
+
+↓
+
+Sellable Item
+
+↓
+
+Cart Line
+```
+
+The cart must store:
+
+```
+Product ID
+
+Variant ID
+
+Quantity
+
+Resolved Price
+```
+
+This capability unlocks:
+
+* clothing sizes
+* colours
+* weights
+* subscription options
+* packaging
+
+---
+
+## Phase 2 — Sale Pricing
+
+Example:
+
+Normal:
+
+```
+R100
+```
+
+Sale:
+
+```
+R80
+```
+
+Decision:
+
+```
+originalPrice:100
+
+sellingPrice:80
+
+adjustment:
+sale_discount
+```
+
+Storefront displays:
+
+```
+R100 crossed out
+
+R80
+
+SALE badge
+```
+
+---
+
+## Phase 3 — Coupons
+
+Coupons belong in the Kernel.
+
+Example:
+
+Customer enters:
+
+```
+WELCOME10
+```
+
+The storefront passes:
+
+```
+Coupon Code
+
+↓
+
+Kernel
+
+↓
+
+Eligibility
+
+↓
+
+Adjustment
+
+↓
+
+Commercial Decision
+```
+
+The coupon should never directly modify cart totals.
+
+---
+
+## Phase 4 — Bundles
+
+Example:
+
+Bundle:
+
+```
+Shampoo
++
+Conditioner
++
+Hair Oil
+```
+
+The Kernel decides:
+
+```
+Individual total:
+R300
+
+Bundle price:
+R250
+```
+
+The Storefront only displays the decision.
+
+---
+
+## Phase 5 — Wishlist
+
+Wishlist is less commercial.
+
+It belongs mostly in:
+
+```
+storefront/services
+```
+
+but should integrate with:
+
+* customer identity
+* product availability
+* variants
+
+---
+
+# 12. Rules for Future Development
+
+Every new capability must answer:
+
+## Question 1
+
+Is this a commercial decision?
+
+If yes:
+
+It belongs in Kernel.
+
+---
+
+## Question 2
+
+Does it change price, eligibility, totals, or fulfilment?
+
+If yes:
+
+It must produce:
+
+```
+Adjustment
+```
+
+or
+
+```
+CommercialDecision change
+```
+
+---
+
+## Question 3
+
+Can another commerce channel use it?
+
+Examples:
+
+* POS
+* Mobile app
+* Marketplace
+* API
+
+If yes:
+
+It cannot live in Storefront.
+
+---
+
+# 13. Avoiding Another Major Refactor
+
+The previous instability came from mixing:
+
+```
+Business Logic
++
+Rendering Logic
++
+State Management
+```
+
+Future rule:
+
+```
+Kernel decides
+
+Service coordinates
+
+Renderer displays
+
+Theme styles
+```
+
+---
+
+# 14. Long-Term Vision
+
+Cartique can eventually power:
+
+## Traditional ecommerce
+
+Shopify alternative.
+
+## Headless commerce
+
+API-first commerce engine.
+
+## POS
+
+Same Kernel.
+
+Different UI.
+
+## Marketplaces
+
+Multiple sellers.
+
+Same decision engine.
+
+## B2B Commerce
+
+Tier pricing.
+
+Contracts.
+
+Customer-specific pricing.
+
+## AI Commerce
+
+AI agents can ask:
+
+"Why is this price shown?"
+
+The Kernel can answer:
+
+"Because customer purchased quantity 20 and qualifies for tier 3 pricing."
+
+---
+
+# Final Architectural Principle
+
+Cartique must remain:
+
+> A deterministic commercial intelligence layer with replaceable interfaces.
+
+Features should be plugged into the decision engine, not bolted onto the storefront.
+
+The goal is not to build more ecommerce features faster.
+
+The goal is to build an architecture where adding the next 100 ecommerce features does not require rebuilding the first 10.
