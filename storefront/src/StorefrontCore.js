@@ -32,7 +32,10 @@ import ThemeManager from './theme/ThemeManager.js';
 import Router from './navigation/Router.js';
 import RouteRegistry from './navigation/RouteRegistry.js';
 import searchRoute from './navigation/routes/search.route.js';
+import categoryRoute from './navigation/routes/category.route.js';
 import CapabilityTrace from './debug/CapabilityTrace.js';
+import Logger from './debug/Logger.js';
+
 
 export default class StorefrontCore {
   constructor(products, features = {}, callbacks = {}, kernel = null) {
@@ -304,7 +307,7 @@ if (this.services?.cart?.syncWithKernel) {
     // ==========================================================
     // 9.5 NAVIGATION LAYER
     // ==========================================================
-    this.routeRegistry = new RouteRegistry([searchRoute]);
+    this.routeRegistry = new RouteRegistry([searchRoute, categoryRoute]);
     this.router = new Router({ storefront: this });
 
     // ==========================================================
@@ -605,6 +608,13 @@ if (this.services?.cart?.syncWithKernel) {
     return this.setSearchQuery(query);
   }
 
+
+  category(categoryId) {
+    this.capabilityTrace?.log('CATEGORY', 'Public API called', categoryId);
+    if (this.collectionRenderer && typeof this.collectionRenderer.handleCategorySelect === 'function') {
+      return this.collectionRenderer.handleCategorySelect(categoryId);
+    }
+  }
   async setSearchQuery(query = '') {
     this.capabilityTrace?.log('SEARCH', 'Delegating to ProductRenderer', query);
     if (this.productRenderer && this.productRenderer.onSearch) {
