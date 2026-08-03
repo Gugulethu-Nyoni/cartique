@@ -33,6 +33,7 @@ import Router from './navigation/Router.js';
 import RouteRegistry from './navigation/RouteRegistry.js';
 import searchRoute from './navigation/routes/search.route.js';
 import categoryRoute from './navigation/routes/category.route.js';
+import productRoute from './navigation/routes/product.route.js';
 import CapabilityTrace from './debug/CapabilityTrace.js';
 import Logger from './debug/Logger.js';
 
@@ -307,7 +308,7 @@ if (this.services?.cart?.syncWithKernel) {
     // ==========================================================
     // 9.5 NAVIGATION LAYER
     // ==========================================================
-    this.routeRegistry = new RouteRegistry([searchRoute, categoryRoute]);
+    this.routeRegistry = new RouteRegistry([productRoute, categoryRoute, searchRoute]);
     this.router = new Router({ storefront: this });
 
     // ==========================================================
@@ -609,11 +610,26 @@ if (this.services?.cart?.syncWithKernel) {
   }
 
 
+
   category(categoryId) {
     this.capabilityTrace?.log('CATEGORY', 'Public API called', categoryId);
     if (this.collectionRenderer && typeof this.collectionRenderer.handleCategorySelect === 'function') {
       return this.collectionRenderer.handleCategorySelect(categoryId);
     }
+  }
+
+  findProductBySlug(slug) {
+    return this.products.find(product => product.slug === slug);
+  }
+
+  product(slug) {
+    this.capabilityTrace?.log('PRODUCT', 'Public API called', slug);
+    const product = this.findProductBySlug(slug);
+    if (!product) {
+      this.capabilityTrace?.log('PRODUCT', 'Product not found', slug);
+      return;
+    }
+    return this.showSingleProductView(product.id);
   }
   async setSearchQuery(query = '') {
     this.capabilityTrace?.log('SEARCH', 'Delegating to ProductRenderer', query);
