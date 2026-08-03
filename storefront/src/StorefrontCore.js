@@ -916,14 +916,32 @@ if (this.services?.cart?.syncWithKernel) {
     }
   }
 
-  async completeInitialization() {
+    async completeInitialization() {
     const container = document.getElementById(this.features.containerId);
     if (container) {
       container.style.visibility = 'visible';
       container.style.opacity = '1';
     }
+
+    // Legacy URL restoration
+    // TODO: remove once all URL restorers become navigation routes
     await this.restoreStateFromUrl();
+
+    // New navigation infrastructure
+    this.initializeNavigation();
   }
+
+  initializeNavigation() {
+    if (!this.router) {
+      if (this.features?.debug) {
+        console.warn('[StorefrontCore] Router unavailable');
+      }
+      return;
+    }
+
+    this.router.handle();
+  }
+  
 
   destroy() {
     cleanupEventListeners.call(this);
