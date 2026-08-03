@@ -133,10 +133,65 @@ export default class ProductRenderer {
         };
     }
 
+
+    renderEmptyState({
+        title = 'No products found',
+        message = '',
+        action = 'Return to shop',
+        containerId = null
+    } = {}) {
+
+        let container;
+
+        if (containerId) {
+            container = document.getElementById(containerId);
+        }
+
+        if (!container) {
+            container =
+                document.getElementById('single-product-view-container') ||
+                document.getElementById('cartique-product-displays') ||
+                document.getElementById('cartique-main-content');
+        }
+
+        if (!container) {
+            console.warn('[ProductRenderer] Empty state container missing');
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="no-results-msg"
+                 style="width:100%; text-align:center; padding:4rem 1rem;">
+
+                <h2>${title}</h2>
+
+                <p style="font-size:1.2rem;color:#555;margin:1rem 0;">
+                    ${message}
+                </p>
+
+                <button
+                    onclick="window.location.href=document.querySelector('base')?.href || '/'"
+                    style="
+                        cursor:pointer;
+                        background:none;
+                        border:none;
+                        border-bottom:1px solid #000;
+                        font-weight:600;
+                    ">
+                    ${action}
+                </button>
+
+            </div>
+        `;
+    }
+
     async renderSingleProduct(product) {
         if (!product) {
             console.error('Product not found');
-            return;
+            return this.renderEmptyState({
+                title: 'Product not found',
+                message: 'The product you are looking for does not exist.'
+            });
         }
 
         // Save current state

@@ -671,7 +671,10 @@ if (this.services?.cart?.syncWithKernel) {
     const product = this.findProductBySlug(slug);
     if (!product) {
       this.capabilityTrace?.log('PRODUCT', 'Product not found', slug);
-      return;
+      return this.productRenderer?.renderEmptyState({
+        title: 'Product not found',
+        message: `We could not find: "${slug}"`
+      });
     }
     return this.showSingleProductView(product.id);
   }
