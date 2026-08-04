@@ -48,6 +48,51 @@ export default class CollectionRenderer {
         this.onCategorySelect = null;
     }
 
+
+
+        renderEmptyState({
+        title = 'No products found',
+        message = '',
+        action = 'Return to shop'
+    } = {}) {
+
+        const container =
+            document.getElementById('cartique-product-grid') ||
+            document.getElementById('cartique-product-displays') ||
+            document.getElementById('cartique-main-content');
+
+        if (!container) {
+            console.warn('[CollectionRenderer] Empty state container missing');
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="no-results-msg"
+                 style="grid-column:1/-1;width:100%;text-align:center;padding:4rem 1rem;">
+
+                <h2>${title}</h2>
+
+                <p style="font-size:1.2rem;color:#555;margin:1rem 0;">
+                    ${message}
+                </p>
+
+                <button
+                    onclick="window.location.href=document.querySelector('base')?.href || '/shop/'"
+                    style="
+                        cursor:pointer;
+                        background:none;
+                        border:none;
+                        border-bottom:1px solid #000;
+                        font-weight:600;
+                    ">
+                    ${action}
+                </button>
+
+            </div>
+        `;
+    }
+    
+
     /**
      * Handles search query from ProductRenderer
      * @param {string} query - The search query
@@ -384,7 +429,7 @@ if (result.length === 0) {
     const searchQuery = this.state.currentSearchQuery;
 
     if (searchQuery) {
-        this.productRenderer?.renderEmptyState({
+        this.renderEmptyState({
             title: 'No products found',
             message: `We could not find any products matching "${searchQuery}".`
         });
@@ -392,7 +437,7 @@ if (result.length === 0) {
     }
 
     if (this.state.activeCategoryId) {
-        this.productRenderer?.renderEmptyState({
+        this.renderEmptyState({
             title: 'No products found',
             message: 'This category currently has no products.'
         });
