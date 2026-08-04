@@ -374,17 +374,43 @@ export default class CollectionRenderer {
         }
 
         // Update state
-        this.state.filteredProducts = result;
-        this.filteredProducts = result;
+this.state.filteredProducts = result;
+this.filteredProducts = result;
 
-        // Single render trigger
-        if (typeof this.onFilterApplied === 'function') {
-            if (this.features?.debug) {
-                console.log('[TRACE] calling onFilterApplied with', result.length, 'products');
-                console.trace();
-            }
-            this.onFilterApplied(result);
-        }
+
+// Empty result handling
+if (result.length === 0) {
+
+    const searchQuery = this.state.currentSearchQuery;
+
+    if (searchQuery) {
+        this.productRenderer?.renderEmptyState({
+            title: 'No products found',
+            message: `We could not find any products matching "${searchQuery}".`
+        });
+        return;
+    }
+
+    if (this.state.activeCategoryId) {
+        this.productRenderer?.renderEmptyState({
+            title: 'No products found',
+            message: 'This category currently has no products.'
+        });
+        return;
+    }
+}
+
+
+// Single render trigger
+if (typeof this.onFilterApplied === 'function') {
+    if (this.features?.debug) {
+        console.log('[TRACE] calling onFilterApplied with', result.length, 'products');
+        console.trace();
+    }
+
+    this.onFilterApplied(result);
+}
+
     }
 
     /**
