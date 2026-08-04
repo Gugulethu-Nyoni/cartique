@@ -1,29 +1,21 @@
 export default class Router {
-
-    constructor({ storefront }) {
+    constructor({ storefront, basePath = '/shop' }) {
         this.storefront = storefront;
+        this.basePath = basePath;
     }
 
-
     getCurrentRoute() {
-
         if (typeof window === 'undefined') {
-            return {
-                pathname: '',
-                hash: '',
-                params: new URLSearchParams(),
-                segments: []
-            };
+            return { pathname: '', hash: '', params: new URLSearchParams(), segments: [] };
         }
 
+        let pathname = window.location.pathname;
 
-        const pathname = window.location.pathname;
+        if (pathname.startsWith(this.basePath)) {
+            pathname = pathname.slice(this.basePath.length) || '/';
+        }
 
-        const segments = pathname
-            .replace(/^\/+|\/+$/g, '')
-            .split('/')
-            .filter(Boolean);
-
+        const segments = pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
 
         return {
             pathname,
@@ -33,26 +25,15 @@ export default class Router {
         };
     }
 
-
     handle() {
-
         const route = this.getCurrentRoute();
 
+        this.storefront.capabilityTrace?.log('ROUTER', 'Route resolved', {
+            pathname: route.pathname,
+            segments: route.segments,
+            search: route.params.toString()
+        });
 
-        this.storefront.capabilityTrace?.log(
-            'ROUTER',
-            'Route resolved',
-            {
-                pathname: route.pathname,
-                segments: route.segments,
-                search: route.params.toString()
-            }
-        );
-
-
-        return this.storefront.routeRegistry.resolve(
-            route,
-            this.storefront
-        );
+        return this.storefront.routeRegistry.resolve(route, this.storefront);
     }
 }
