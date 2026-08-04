@@ -546,9 +546,9 @@ if (this.services?.cart?.syncWithKernel) {
   // PUBLIC API
   // ==========================================================
 
-  openCart() {
+  async openCart() {
     console.log('openCart() called');
-    this.showCartPage();
+    await this.showCartPage();
   }
 
   // ==========================================================
@@ -573,14 +573,16 @@ if (this.services?.cart?.syncWithKernel) {
 
   async restoreStateFromUrl() {
     console.log('restoreStateFromUrl() called');
-    await this.restoreCartState();
+    for (const restorer of this.urlStateRestorers) {
+      await restorer.call(this);
+    }
   }
 
-  restoreCartState() {
+  async restoreCartState() {
     console.log('restoreCartState() called');
     const route = this.getCurrentRoute();
     if (route.hash === '#cart' || route.params.get('ui') === 'cart') {
-      this.openCart();
+      await this.openCart();
     }
   }
 
