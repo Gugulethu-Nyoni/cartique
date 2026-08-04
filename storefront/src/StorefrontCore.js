@@ -551,6 +551,23 @@ if (this.services?.cart?.syncWithKernel) {
     await this.showCartPage();
   }
 
+
+
+    setupUrlStateListeners() {
+    if (!this.isBrowser()) return;
+
+    window.addEventListener('hashchange', async () => {
+      console.log('hashchange detected:', window.location.hash);
+
+      if (this.router && typeof this.router.handle === 'function') {
+        this.router.handle();
+      } else {
+        await this.restoreStateFromUrl();
+      }
+    });
+  }
+
+
   // ==========================================================
   // URL STATE RESTORATION
   // ==========================================================
@@ -951,20 +968,20 @@ if (this.services?.cart?.syncWithKernel) {
     }
   }
 
-  async completeInitialization() {
+   async completeInitialization() {
     const container = document.getElementById(this.features.containerId);
     if (container) {
       container.style.visibility = 'visible';
       container.style.opacity = '1';
     }
 
-    // Legacy URL restoration
-    // TODO: remove once all URL restorers become navigation routes
     await this.restoreStateFromUrl();
 
-    // New navigation infrastructure
+    this.setupUrlStateListeners();
+
     this.initializeNavigation();
   }
+  
 
   initializeNavigation() {
     this.capabilityTrace?.log('ROUTER', 'Navigation bootstrap started');
