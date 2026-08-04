@@ -612,14 +612,24 @@ if (this.services?.cart?.syncWithKernel) {
 
 
 
-    category(input) {
+      category(input) {
     this.capabilityTrace?.log('CATEGORY', 'Public API called', input);
     const id = this.findCategoryId(input);
     this.capabilityTrace?.log('CATEGORY', 'Resolved category ID', id);
-    if (id && this.collectionRenderer && typeof this.collectionRenderer.handleCategorySelect === 'function') {
+
+    if (!id) {
+      this.capabilityTrace?.log('CATEGORY', 'Category not found', input);
+      return this.productRenderer?.renderEmptyState({
+        title: 'Category not found',
+        message: `We could not find category: "${input}"`
+      });
+    }
+
+    if (this.collectionRenderer && typeof this.collectionRenderer.handleCategorySelect === 'function') {
       return this.collectionRenderer.handleCategorySelect(id);
     }
   }
+  
 
   findCategoryId(input) {
     if (input == null) return null;
