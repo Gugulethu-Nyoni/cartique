@@ -883,6 +883,9 @@ export default class CartRenderer {
     }
 
          closeCartPage() {
+        // Clear #cart hash from URL — sync URL state with UI state
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
         const cartPage = document.getElementById('cartique-cart-page');
         if (cartPage) cartPage.remove();
 
