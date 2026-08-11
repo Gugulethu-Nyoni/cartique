@@ -429,6 +429,17 @@ export default class CartRenderer {
             `;
             mainContent.appendChild(cartPage);
             this.attachCartPageEvents(cartPage);
+
+            if (this.behavior) {
+                this.behavior.cartView({
+                    metadata: {
+                        source: 'cart_page',
+                        itemCount: 0,
+                        subtotal: 0
+                    }
+                });
+            }
+
             return;
         }
 
@@ -510,6 +521,16 @@ export default class CartRenderer {
 
         mainContent.appendChild(cartPage);
         this.attachCartPageEvents(cartPage);
+
+        if (this.behavior) {
+            this.behavior.cartView({
+                metadata: {
+                    source: 'cart_page',
+                    itemCount: items.length,
+                    subtotal: subtotalAmount || 0
+                }
+            });
+        }
     }
 
     async showCart() {
