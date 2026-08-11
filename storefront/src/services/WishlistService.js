@@ -210,6 +210,12 @@ export default class WishlistService {
     this.items.splice(index, 1);
     this._save();
     this._notify();
+
+    if (this.behavior) {
+      this.behavior.wishlistRemove(normalized, {
+        metadata: { source: 'wishlist_service' }
+      });
+    }
     
     if (this.features?.debug) {
       console.log('[TRACE] Wishlist removed:', normalized);
