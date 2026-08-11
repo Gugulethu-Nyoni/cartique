@@ -169,7 +169,7 @@ export default class WishlistRenderer {
             countEl.textContent = '0 items';
         }
 
-        this._attachEmptyStateEvents(page);
+        this._attachEvents(page);
     }
 
     _updateCount(count) {
@@ -322,12 +322,21 @@ export default class WishlistRenderer {
         }
     }
 
-    _attachEmptyStateEvents(page) {
+    _attachEvents(page) {
+        if (this.features?.debug) {
+            console.log('[Wishlist] Attaching page events');
+        }
+
         const backBtn = page.querySelector('#wishlist-back-btn');
 
         if (backBtn) {
+            if (this.features?.debug) {
+                console.log('[Wishlist] Back button found, attaching listener');
+            }
+
             backBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
+                e.stopPropagation();
 
                 if (this.features?.debug) {
                     console.log('[TRACE] Wishlist back button clicked');
@@ -340,13 +349,20 @@ export default class WishlistRenderer {
                     console.warn('[Wishlist] onBackToShop is not available');
                 }
             });
+        } else if (this.features?.debug) {
+            console.warn('[Wishlist] Back button not found');
         }
 
         const continueBtn = page.querySelector('#wishlist-continue-btn');
 
         if (continueBtn) {
+            if (this.features?.debug) {
+                console.log('[Wishlist] Continue Shopping button found');
+            }
+
             continueBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
+                e.stopPropagation();
 
                 if (typeof this.onBackToShop === 'function') {
                     await this.onBackToShop();
