@@ -59,6 +59,14 @@ const features = {
     debug: true,
     diagnostics: true,
     resolutionJournal: true,
+
+    // ----- Behavior Tracking (Stage A) -----
+    behavior: {
+        enabled: true,
+        transport: 'mock',
+        batchSize: 10,
+        batchInterval: 5000
+    },
     
     // ----- Theme -----
     theme: 'light',
@@ -132,6 +140,7 @@ await storefront.init();
 // ==========================================================
 
 window.__storefront = storefront;
+window.__behavior = storefront.services.behavior;
 window.__cartique = window.__cartique || {};
 window.__cartique.storefront = storefront;
 
