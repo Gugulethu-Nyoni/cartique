@@ -39,6 +39,7 @@ import cartRoute from './navigation/routes/cart.route.js';
 import productRoute from './navigation/routes/product.route.js';
 import wishlistRoute from './navigation/routes/wishlist.route.js';
 import CapabilityTrace from './debug/CapabilityTrace.js';
+import { BehaviorTracker } from './behavior/index.js';
 import Logger from './debug/Logger.js';
 
 
@@ -244,6 +245,20 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
 });
 
     // ==========================================================
+    // 6.5 BEHAVIOR TRACKER
+    // ==========================================================
+    const behavior = new BehaviorTracker({
+        enabled: this.features?.behavior?.enabled !== false,
+        transport: this.features?.behavior?.transport || 'fetch',
+        baseUrl: this.features?.behavior?.baseUrl || '/api',
+        endpoint: this.features?.behavior?.endpoint || '/storefront/events',
+        apiHandler: this.features?.behavior?.apiHandler || null,
+        batchSize: this.features?.behavior?.batchSize || 10,
+        batchInterval: this.features?.behavior?.batchInterval || 5000,
+        debug: this.features?.debug || false
+    });
+
+    // ==========================================================
     // 7. SERVICES
     // ==========================================================
     this.services = {
@@ -266,14 +281,17 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
         },
         showStockAlert: (message) => {
           this.notification.showStockAlert(message);
-        }
+        },
+        behavior: behavior
       }),
       wishlist: new WishlistService({
         products: this.products,
         features: this.features,
         callbacks: this.callbacks,
-        state: this.state
+        state: this.state,
+        behavior: behavior
       }),
+      behavior: behavior,
       locale: new LocaleService({
         currencySymbol: this.currencySymbol,
         features: this.features,
@@ -360,6 +378,7 @@ if (this.services?.cart?.syncWithKernel) {
       notification: this.notification,
       
       addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      behavior: this.services.behavior,
       wishlist: this.services.wishlist,
       
       // Formatting
@@ -396,6 +415,7 @@ if (this.services?.cart?.syncWithKernel) {
       adapter: this.adapter,
       currencySymbol: this.currencySymbol,
       addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      behavior: this.services.behavior,
       container: this.container,
       features: this.features,
       formatPrice: this.formatPrice.bind(this)
