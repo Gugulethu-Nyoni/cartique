@@ -28,6 +28,7 @@ import LocaleService from './services/LocaleService.js';
 import ProductRenderer from './renderers/ProductRenderer.js';
 import CollectionRenderer from './renderers/CollectionRenderer.js';
 import CartRenderer from './renderers/CartRenderer.js';
+import WishlistRenderer from './renderers/WishlistRenderer.js';
 import CartiqueInspector from './debug/CartiqueInspector.js';
 import ThemeManager from './theme/ThemeManager.js';
 import Router from './navigation/Router.js';
@@ -36,6 +37,7 @@ import searchRoute from './navigation/routes/search.route.js';
 import categoryRoute from './navigation/routes/category.route.js';
 import cartRoute from './navigation/routes/cart.route.js';
 import productRoute from './navigation/routes/product.route.js';
+import wishlistRoute from './navigation/routes/wishlist.route.js';
 import CapabilityTrace from './debug/CapabilityTrace.js';
 import Logger from './debug/Logger.js';
 
@@ -316,7 +318,7 @@ if (this.services?.cart?.syncWithKernel) {
     // ==========================================================
     // 9.5 NAVIGATION LAYER
     // ==========================================================
-    this.routeRegistry = new RouteRegistry([cartRoute, productRoute, categoryRoute, searchRoute]);
+    this.routeRegistry = new RouteRegistry([cartRoute, productRoute, categoryRoute, searchRoute, wishlistRoute]);
     this.router = new Router({ storefront: this });
 
     // ==========================================================
@@ -384,6 +386,19 @@ if (this.services?.cart?.syncWithKernel) {
       themeManager: this.themeManager,
       componentRegistry: this.themeManager.componentRegistry,
       container: this.container
+    });
+
+    this.wishlistRenderer = new WishlistRenderer({
+      ...baseRendererContext,
+      productRenderer: this.productRenderer,
+      wishlist: this.services.wishlist,
+      products: this.products,
+      adapter: this.adapter,
+      currencySymbol: this.currencySymbol,
+      addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      container: this.container,
+      features: this.features,
+      formatPrice: this.formatPrice.bind(this)
     });
 
     this.cartRenderer = new CartRenderer({
