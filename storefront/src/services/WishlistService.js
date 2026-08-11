@@ -174,6 +174,12 @@ export default class WishlistService {
     this.items.push(normalized);
     this._save();
     this._notify();
+
+    if (this.behavior) {
+      this.behavior.wishlistAdd(normalized, {
+        metadata: { source: 'wishlist_service' }
+      });
+    }
     
     if (this.features?.debug) {
       console.log('[TRACE] Wishlist added:', normalized);
