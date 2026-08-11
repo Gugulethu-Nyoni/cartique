@@ -1,0 +1,293 @@
+// ============================================================
+// STOREFRONT INTELLIGENCE
+// ============================================================
+//
+// Stage A:
+// - Receive behavioral facts
+// - Persist behavioral facts
+// - Maintain storefront sessions
+//
+// No:
+// - scoring
+// - recommendations
+// - abandonment detection
+// - analytics calculations
+// - merchant interventions
+//
+// This schema is designed to integrate with the existing
+// ecommerce core models later.
+// ============================================================
+
+
+// ============================================================
+// STOREFRONT SESSION
+// ============================================================
+
+model StorefrontSession {
+  id                String   @id @default(uuid())
+
+  // Browser identity
+  visitorId         String   @map("visitor_id")
+  customerId        Int?     @map("customer_id")
+
+  // Client-generated browsing session
+  sessionId         String   @unique @map("session_id")
+
+  // Session context
+  ipAddress         String?  @map("ip_address")
+  userAgent         String?  @db.Text
+  deviceType        String?  @map("device_type")
+  browser           String?
+  operatingSystem   String?
+
+  // Attribution
+  referrer          String?  @db.Text
+  landingPage       String?  @map("landing_page")
+  campaignSource    String?  @map("campaign_source")
+  campaignMedium    String?  @map("campaign_medium")
+  campaignName      String?  @map("campaign_name")
+
+  // Lifecycle
+  startedAt         DateTime  @default(now()) @map("started_at")
+  lastActivityAt    DateTime  @default(now()) @map("last_activity_at")
+  endedAt           DateTime? @map("ended_at")
+
+  // Relations
+  events            StorefrontEvent[]
+  productViews      ProductViewEvent[]
+  categoryViews     CategoryViewEvent[]
+  searches          ProductSearchEvent[]
+
+  // Existing ecommerce core relation
+  customer          Customer? @relation(
+    fields: [customerId],
+    references: [id]
+  )
+
+  @@index([visitorId])
+  @@index([customerId])
+  @@index([startedAt])
+
+  @@map("storefront_sessions")
+}
+
+
+// ============================================================
+// GENERIC STOREFRONT EVENT STREAM
+// ============================================================
+//
+// The generic event stream is the raw behavioral ledger.
+//
+// Every Stage A event is stored here.
+//
+// Specialized event tables are projections of this stream.
+// ============================================================
+
+model StorefrontEvent {
+  id          String   @id @default(uuid())
+
+  sessionId   String   @map("session_id")
+  customerId  Int?     @map("customer_id")
+
+  eventType   StorefrontEventType
+
+  // Commercial context
+  productId   Int?     @map("product_id")
+  categoryId  Int?     @map("category_id")
+
+  // URL / navigation context
+  pathname    String?
+  searchTerm  String?  @map("search_term")
+
+  // Flexible event-specific data
+  metadata    Json?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  session     StorefrontSession @relation(
+    fields: [sessionId],
+    references: [sessionId]
+  )
+
+  // Existing ecommerce core relations
+  product     Product? @relation(
+    fields: [productId],
+    references: [id]
+  )
+
+  category    ProductCategory? @relation(
+    fields: [categoryId],
+    references: [id]
+  )
+
+  customer    Customer? @relation(
+    fields: [customerId],
+    references: [id]
+  )
+
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([productId])
+  @@index([categoryId])
+  @@index([customerId])
+  @@index([createdAt])
+
+  @@map("storefront_events")
+}
+
+
+// ============================================================
+// PRODUCT VIEW EVENT
+// ============================================================
+//
+// Specialized projection for product engagement.
+//
+// Stage A stores the fact only.
+// ============================================================
+
+model ProductViewEvent {
+  id              String   @id @default(uuid())
+
+  sessionId       String   @map("session_id")
+  customerId      Int?     @map("customer_id")
+
+  productId       Int      @map("product_id")
+
+  // Engagement facts
+  durationSeconds Int?     @map("duration_seconds")
+  scrollDepth     Float?
+
+  viewedAt        DateTime @default(now()) @map("viewed_at")
+
+  // Relations
+  session         StorefrontSession @relation(
+    fields: [sessionId],
+    references: [sessionId]
+  )
+
+  product         Product @relation(
+    fields: [productId],
+    references: [id]
+  )
+
+  customer        Customer? @relation(
+    fields: [customerId],
+    references: [id]
+  )
+
+  @@index([productId])
+  @@index([sessionId])
+  @@index([customerId])
+  @@index([viewedAt])
+
+  @@map("product_view_events")
+}
+
+
+// ============================================================
+// PRODUCT SEARCH EVENT
+// ============================================================
+//
+// Defined now so the intelligence layer has a stable model,
+// but ingestion can remain Stage A / future-stage scoped.
+// ============================================================
+
+model ProductSearchEvent {
+  id                String   @id @default(uuid())
+
+  sessionId         String   @map("session_id")
+  customerId        Int?     @map("customer_id")
+
+  searchTerm        String   @map("search_term")
+  normalizedTerm    String?  @map("normalized_term")
+
+  resultCount       Int      @default(0) @map("result_count")
+
+  clickedProductId  Int?     @map("clicked_product_id")
+
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  session           StorefrontSession @relation(
+    fields: [sessionId],
+    references: [sessionId]
+  )
+
+  customer          Customer? @relation(
+    fields: [customerId],
+    references: [id]
+  )
+
+  clickedProduct    Product? @relation(
+    fields: [clickedProductId],
+    references: [id]
+  )
+
+  @@index([searchTerm])
+  @@index([normalizedTerm])
+  @@index([createdAt])
+  @@index([sessionId])
+  @@index([customerId])
+
+  @@map("product_search_events")
+}
+
+
+// ============================================================
+// CATEGORY VIEW EVENT
+// ============================================================
+
+model CategoryViewEvent {
+  id          String   @id @default(uuid())
+
+  sessionId   String   @map("session_id")
+  customerId  Int?     @map("customer_id")
+
+  categoryId  Int      @map("category_id")
+
+  viewedAt    DateTime @default(now()) @map("viewed_at")
+
+  // Relations
+  session     StorefrontSession @relation(
+    fields: [sessionId],
+    references: [sessionId]
+  )
+
+  category    ProductCategory @relation(
+    fields: [categoryId],
+    references: [id]
+  )
+
+  customer    Customer? @relation(
+    fields: [customerId],
+    references: [id]
+  )
+
+  @@index([categoryId])
+  @@index([sessionId])
+  @@index([customerId])
+  @@index([viewedAt])
+
+  @@map("category_view_events")
+}
+
+
+// ============================================================
+// ENUM
+// ============================================================
+
+enum StorefrontEventType {
+  page_view
+  product_view
+  category_view
+  search
+  add_to_cart
+  remove_from_cart
+  checkout_started
+  checkout_completed
+  wishlist_add
+  wishlist_remove
+  filter_applied
+  view_cart
+}
