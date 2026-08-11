@@ -863,6 +863,15 @@ export default class CartRenderer {
             mainContent.classList.add('cartique-full-width');
         }
         
+        // Remove any active wishlist page — cart owns the viewport
+        const wishlistPage = document.getElementById('cartique-wishlist-page');
+        if (wishlistPage) {
+            if (this.features?.debug) {
+                console.log('[TRACE][CART] Removing active wishlist page');
+            }
+            wishlistPage.remove();
+        }
+        
         this.renderCartPage();
         
         // Scroll to top
