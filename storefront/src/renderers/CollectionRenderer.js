@@ -106,6 +106,12 @@ export default class CollectionRenderer {
         this.state.currentSearchQuery = query || '';
         this.currentSearchQuery = this.state.currentSearchQuery; // Legacy alias
         this.applyAllFilters();
+
+        if (this.behavior && query) {
+            this.behavior.searchPerformed(query, {
+                metadata: { source: 'search_bar' }
+            });
+        }
     }
 
     /**
@@ -153,6 +159,13 @@ export default class CollectionRenderer {
 
         // Apply filters — triggers onFilterApplied → render (ONLY ONE)
         await this.applyAllFilters();
+
+        // Track category view
+        if (this.behavior && this.activeCategoryId) {
+            this.behavior.categoryView(this.activeCategoryId, {
+                metadata: { source: 'category_menu' }
+            });
+        }
         
         // Trigger callback if set
         if (typeof this.onCategorySelect === 'function') {
