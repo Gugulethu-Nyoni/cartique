@@ -402,15 +402,24 @@ if (this.services?.cart?.syncWithKernel) {
     });
 
     this.wishlistRenderer.onBackToShop = async () => {
-      if (this.features?.debug) {
-        console.log('[TRACE] Wishlist → existing onBackToList');
-      }
+      console.log('[TRACE][STOREFRONT] Wishlist onBackToShop() START');
+      console.log('[TRACE][STOREFRONT] productRenderer:', this.productRenderer);
+      console.log('[TRACE][STOREFRONT] productRenderer.onBackToList:', this.productRenderer?.onBackToList);
 
       if (typeof this.productRenderer?.onBackToList === 'function') {
-        await this.productRenderer.onBackToList();
+        console.log('[TRACE][STOREFRONT] Delegating to productRenderer.onBackToList()');
+
+        try {
+          await this.productRenderer.onBackToList();
+          console.log('[TRACE][STOREFRONT] productRenderer.onBackToList() completed');
+        } catch (error) {
+          console.error('[TRACE][STOREFRONT] onBackToList() failed:', error);
+        }
       } else {
-        console.warn('[Wishlist] productRenderer.onBackToList is not available');
+        console.warn('[TRACE][STOREFRONT] productRenderer.onBackToList is NOT available');
       }
+
+      console.log('[TRACE][STOREFRONT] Wishlist onBackToShop() END');
     };
 
     this.cartRenderer = new CartRenderer({
@@ -438,6 +447,7 @@ if (this.services?.cart?.syncWithKernel) {
     };
     
     this.productRenderer.onBackToList = async () => {
+      console.log('[TRACE][PRODUCT] onBackToList() START');
     if (this.features?.debug) {
         console.trace("[TRACE] onBackToList triggered");
     }
