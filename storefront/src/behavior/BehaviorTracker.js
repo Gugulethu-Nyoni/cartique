@@ -75,9 +75,14 @@ export default class BehaviorTracker {
     }
 
     _createTransport(config) {
+        if (config.transport === 'mock') {
+            return new MockTransport({ debug: this.debug });
+        }
+
         if (config.transport === 'semantq' && config.apiHandler) {
             return new SemantqTransport({ apiHandler: config.apiHandler, debug: this.debug });
         }
+
         return new FetchTransport({
             baseUrl: config.baseUrl || '/api',
             endpoint: config.endpoint || '/storefront/events',
