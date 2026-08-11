@@ -247,6 +247,9 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
     // ==========================================================
     // 6.5 BEHAVIOR TRACKER
     // ==========================================================
+
+    console.log('[StorefrontCore] Behavior config:', this.features?.behavior);
+
     const behavior = new BehaviorTracker({
         enabled: this.features?.behavior?.enabled !== false,
         transport: this.features?.behavior?.transport || 'fetch',
