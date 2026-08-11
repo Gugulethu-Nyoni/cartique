@@ -401,6 +401,18 @@ if (this.services?.cart?.syncWithKernel) {
       formatPrice: this.formatPrice.bind(this)
     });
 
+    this.wishlistRenderer.onBackToShop = async () => {
+      if (this.features?.debug) {
+        console.log('[TRACE] Wishlist → existing onBackToList');
+      }
+
+      if (typeof this.productRenderer?.onBackToList === 'function') {
+        await this.productRenderer.onBackToList();
+      } else {
+        console.warn('[Wishlist] productRenderer.onBackToList is not available');
+      }
+    };
+
     this.cartRenderer = new CartRenderer({
       ...baseRendererContext,
       themeManager: this.themeManager,
