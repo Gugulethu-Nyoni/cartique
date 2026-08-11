@@ -2580,3 +2580,105 @@
 .cartique-quantity-input:focus {
   outline: none;
 }
+
+/* ==========================================================
+   WISHLIST HEART - Cartique Native SVG
+   ========================================================== */
+
+.cartique-wishlist-heart-wrapper {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+}
+
+.cartique-wishlist-heart {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  color: #6b7280;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.cartique-wishlist-heart:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  background: rgba(255, 255, 255, 1);
+}
+
+.cartique-wishlist-heart:active {
+  transform: scale(0.94);
+}
+
+.cartique-wishlist-heart:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.cartique-wishlist-heart.is-saved {
+  color: #e63946;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 10px rgba(230, 57, 70, 0.18);
+}
+
+.cartique-wishlist-heart.is-saved:hover {
+  box-shadow: 0 4px 16px rgba(230, 57, 70, 0.28);
+}
+
+.cartique-heart-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  transition: transform 0.18s ease;
+}
+
+.cartique-wishlist-heart.is-saved .cartique-heart-icon {
+  transform: scale(1.05);
+}
+
+.cartique-wishlist-heart.heart-pop {
+  animation: heartPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartique-wishlist-heart,
+  .cartique-wishlist-heart.heart-pop,
+  .cartique-heart-icon {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .cartique-wishlist-heart-wrapper {
+    top: 8px;
+    right: 8px;
+  }
+  .cartique-wishlist-heart {
+    width: 44px;
+    height: 44px;
+  }
+  .cartique-heart-icon {
+    width: 22px;
+    height: 22px;
+  }
+}

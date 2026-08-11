@@ -140,15 +140,14 @@ export default class ProductRenderer {
      */
     updateWishlistStates() {
       if (!this.wishlist) return;
-      
+
       const hearts = document.querySelectorAll('.cartique-wishlist-heart');
-      hearts.forEach(btn => {
-        const productId = btn.dataset.productId;
-        if (productId) {
-          const isSaved = this.wishlist.has(productId);
-          btn.innerHTML = isSaved ? '♥' : '♡';
-          btn.setAttribute('aria-label', isSaved ? 'Remove from wishlist' : 'Add to wishlist');
-        }
+      hearts.forEach((button) => {
+        const productId = button.dataset.productId;
+        if (!productId) return;
+
+        const isSaved = this.wishlist.has(productId);
+        this._updateWishlistHeart(button, isSaved);
       });
     }
 
@@ -157,34 +156,94 @@ export default class ProductRenderer {
      * @param {Object} product - Product with .id property
      * @returns {HTMLElement|null} Heart button element
      */
+    /**
+     * Create Cartique-native SVG heart icon
+     * @param {boolean} isSaved - Whether heart should be filled
+     * @returns {SVGElement} SVG heart icon
+     */
+    _createWishlistHeartIcon(isSaved = false) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('width', '20');
+      svg.setAttribute('height', '20');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('focusable', 'false');
+      svg.classList.add('cartique-heart-icon');
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute(
+        'd',
+        'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z'
+      );
+      path.setAttribute('stroke', 'currentColor');
+      path.setAttribute('stroke-width', '1.8');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+
+      if (isSaved) {
+        path.setAttribute('fill', 'currentColor');
+      } else {
+        path.setAttribute('fill', 'none');
+      }
+
+      svg.appendChild(path);
+      return svg;
+    }
+
+    /**
+     * Update an existing wishlist heart button
+     * @param {HTMLElement} button - The heart button element
+     * @param {boolean} isSaved - Whether heart should be filled
+     */
+    _updateWishlistHeart(button, isSaved) {
+      if (!button) return;
+
+      button.setAttribute('aria-label', isSaved ? 'Remove from wishlist' : 'Add to wishlist');
+      button.setAttribute('aria-pressed', isSaved ? 'true' : 'false');
+      button.classList.toggle('is-saved', isSaved);
+
+      const existingIcon = button.querySelector('.cartique-heart-icon');
+      if (existingIcon) existingIcon.remove();
+
+      button.appendChild(this._createWishlistHeartIcon(isSaved));
+    }
+
     _createWishlistHeart(product) {
       if (!this.wishlist) return null;
-      
+
       const productId = product.id;
       const isSaved = this.wishlist.has(productId);
-      
+
       const heart = document.createElement('button');
       heart.className = 'cartique-wishlist-heart';
       heart.dataset.productId = productId;
       heart.type = 'button';
-      heart.innerHTML = isSaved ? '♥' : '♡';
       heart.setAttribute('aria-label', isSaved ? 'Remove from wishlist' : 'Add to wishlist');
-      heart.style.cssText = 'cursor: pointer; background: none; border: none; font-size: 1.2rem; padding: 4px; line-height: 1;';
-      
+      heart.setAttribute('aria-pressed', isSaved ? 'true' : 'false');
+
+      heart.appendChild(this._createWishlistHeartIcon(isSaved));
+
+      if (isSaved) {
+        heart.classList.add('is-saved');
+      }
+
       heart.addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         if (!this.wishlist) return;
-        
+
         const result = this.wishlist.toggle(productId);
         if (result.success) {
           const nowSaved = this.wishlist.has(productId);
-          heart.innerHTML = nowSaved ? '♥' : '♡';
-          heart.setAttribute('aria-label', nowSaved ? 'Remove from wishlist' : 'Add to wishlist');
+          this._updateWishlistHeart(heart, nowSaved);
+
+          heart.classList.remove('heart-pop');
+          void heart.offsetWidth;
+          heart.classList.add('heart-pop');
         }
       });
-      
+
       return heart;
     }
 
@@ -862,15 +921,15 @@ export default class ProductRenderer {
         }
 
         // Add wishlist heart to product card
-        const heartContainer = document.createElement('div');
-        heartContainer.style.cssText = 'position: absolute; top: 8px; right: 8px; z-index: 2;';
+        const heartWrapper = document.createElement('div');
+        heartWrapper.className = 'cartique-wishlist-heart-wrapper';
         const heart = this._createWishlistHeart(product);
         if (heart) {
-          heartContainer.appendChild(heart);
+          heartWrapper.appendChild(heart);
           const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
           if (imgContainer) {
             imgContainer.style.position = 'relative';
-            imgContainer.appendChild(heartContainer);
+            imgContainer.appendChild(heartWrapper);
           }
         }
 
