@@ -402,24 +402,49 @@ if (this.services?.cart?.syncWithKernel) {
     });
 
     this.wishlistRenderer.onBackToShop = async () => {
-      console.log('[TRACE][STOREFRONT] Wishlist onBackToShop() START');
-      console.log('[TRACE][STOREFRONT] productRenderer:', this.productRenderer);
-      console.log('[TRACE][STOREFRONT] productRenderer.onBackToList:', this.productRenderer?.onBackToList);
+      if (this.features?.debug) {
+        console.log('[TRACE][STOREFRONT] Wishlist onBackToShop() START');
+        console.trace();
+      }
 
+      // 1. Remove wishlist page from the DOM
+      const wishlistPage = document.getElementById('cartique-wishlist-page');
+      if (wishlistPage) {
+        if (this.features?.debug) {
+          console.log('[TRACE][STOREFRONT] Removing wishlist page');
+        }
+        wishlistPage.remove();
+      } else if (this.features?.debug) {
+        console.warn('[TRACE][STOREFRONT] Wishlist page not found');
+      }
+
+      // 2. Update browser URL without reloading the page
+      if (this.features?.debug) {
+        console.log('[TRACE][STOREFRONT] Navigating URL to /shop');
+      }
+      window.history.pushState({}, '', '/shop');
+
+      // 3. Restore the existing product UI lifecycle
       if (typeof this.productRenderer?.onBackToList === 'function') {
-        console.log('[TRACE][STOREFRONT] Delegating to productRenderer.onBackToList()');
+        if (this.features?.debug) {
+          console.log('[TRACE][STOREFRONT] Delegating to productRenderer.onBackToList()');
+        }
 
         try {
           await this.productRenderer.onBackToList();
-          console.log('[TRACE][STOREFRONT] productRenderer.onBackToList() completed');
+          if (this.features?.debug) {
+            console.log('[TRACE][STOREFRONT] productRenderer.onBackToList() completed');
+          }
         } catch (error) {
           console.error('[TRACE][STOREFRONT] onBackToList() failed:', error);
         }
       } else {
-        console.warn('[TRACE][STOREFRONT] productRenderer.onBackToList is NOT available');
+        console.warn('[TRACE][STOREFRONT] productRenderer.onBackToList() is not available');
       }
 
-      console.log('[TRACE][STOREFRONT] Wishlist onBackToShop() END');
+      if (this.features?.debug) {
+        console.log('[TRACE][STOREFRONT] Wishlist onBackToShop() COMPLETE');
+      }
     };
 
     this.cartRenderer = new CartRenderer({
