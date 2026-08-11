@@ -134,6 +134,60 @@ export default class ProductRenderer {
     }
 
 
+    /**
+     * Synchronize all wishlist heart buttons with current state
+     * Called after wishlist changes via StorefrontCore callback
+     */
+    updateWishlistStates() {
+      if (!this.wishlist) return;
+      
+      const hearts = document.querySelectorAll('.cartique-wishlist-heart');
+      hearts.forEach(btn => {
+        const productId = btn.dataset.productId;
+        if (productId) {
+          const isSaved = this.wishlist.has(productId);
+          btn.innerHTML = isSaved ? '♥' : '♡';
+          btn.setAttribute('aria-label', isSaved ? 'Remove from wishlist' : 'Add to wishlist');
+        }
+      });
+    }
+
+    /**
+     * Create a wishlist heart button for a product
+     * @param {Object} product - Product with .id property
+     * @returns {HTMLElement|null} Heart button element
+     */
+    _createWishlistHeart(product) {
+      if (!this.wishlist) return null;
+      
+      const productId = product.id;
+      const isSaved = this.wishlist.has(productId);
+      
+      const heart = document.createElement('button');
+      heart.className = 'cartique-wishlist-heart';
+      heart.dataset.productId = productId;
+      heart.type = 'button';
+      heart.innerHTML = isSaved ? '♥' : '♡';
+      heart.setAttribute('aria-label', isSaved ? 'Remove from wishlist' : 'Add to wishlist');
+      heart.style.cssText = 'cursor: pointer; background: none; border: none; font-size: 1.2rem; padding: 4px; line-height: 1;';
+      
+      heart.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!this.wishlist) return;
+        
+        const result = this.wishlist.toggle(productId);
+        if (result.success) {
+          const nowSaved = this.wishlist.has(productId);
+          heart.innerHTML = nowSaved ? '♥' : '♡';
+          heart.setAttribute('aria-label', nowSaved ? 'Remove from wishlist' : 'Add to wishlist');
+        }
+      });
+      
+      return heart;
+    }
+
     renderEmptyState({
         title = 'No products found',
         message = '',
@@ -436,6 +490,21 @@ export default class ProductRenderer {
         });
 
         // Append to DOM first
+        // Add wishlist heart to product page
+        const wishlistContainer = document.createElement('div');
+        wishlistContainer.className = 'cartique-wishlist-container';
+        wishlistContainer.style.cssText = 'margin: 8px 0;';
+        const spvHeart = this._createWishlistHeart(product);
+        if (spvHeart) {
+          wishlistContainer.appendChild(spvHeart);
+          const infoColumn = productView.querySelector('.product-info-column .product-meta');
+          if (infoColumn) {
+            infoColumn.appendChild(wishlistContainer);
+          } else {
+            productView.querySelector('.product-details-animate')?.appendChild(wishlistContainer);
+          }
+        }
+
         container.appendChild(productView);
         container.style.display = 'block';
         
@@ -790,6 +859,19 @@ export default class ProductRenderer {
                     console.warn('[TRACE] this.addToCart is not a function');
                 }
             };
+        }
+
+        // Add wishlist heart to product card
+        const heartContainer = document.createElement('div');
+        heartContainer.style.cssText = 'position: absolute; top: 8px; right: 8px; z-index: 2;';
+        const heart = this._createWishlistHeart(product);
+        if (heart) {
+          heartContainer.appendChild(heart);
+          const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
+          if (imgContainer) {
+            imgContainer.style.position = 'relative';
+            imgContainer.appendChild(heartContainer);
+          }
         }
 
         return productCardTemplate;
