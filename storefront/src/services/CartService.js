@@ -247,7 +247,7 @@ export default class CartService {
         // Use callback instead of direct UI call
         // FIX: Pass 'drawer' source — addToCart comes from product pages/drawer context
         if (typeof this.onCartUpdated === 'function') {
-            this.onCartUpdated('drawer');
+            await this.onCartUpdated('drawer');
         }
         
         // Sync with kernel after cart update
@@ -280,7 +280,7 @@ export default class CartService {
         // Notify UI
         // FIX: Pass 'page' source — removeItem comes from cart page context
         if (typeof this.onCartUpdated === 'function') {
-            this.onCartUpdated('page');
+            await this.onCartUpdated('page');
         }
     }
 
@@ -328,7 +328,7 @@ export default class CartService {
         // Notify UI
         // FIX: Pass 'page' source — updateQuantity comes from cart page context
         if (typeof this.onCartUpdated === 'function') {
-            this.onCartUpdated('page');
+            await this.onCartUpdated('page');
         }
     }
 
