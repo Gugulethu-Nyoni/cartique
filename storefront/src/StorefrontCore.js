@@ -23,6 +23,7 @@ import NotificationService from './services/NotificationService.js';
 import CartiqueAdapter from './adapters/CartiqueAdapter.js';
 import PricingService from './services/PricingService.js';
 import CartService from './services/CartService.js';
+import WishlistService from './services/WishlistService.js';
 import LocaleService from './services/LocaleService.js';
 import ProductRenderer from './renderers/ProductRenderer.js';
 import CollectionRenderer from './renderers/CollectionRenderer.js';
@@ -265,6 +266,12 @@ this.themeManager.on('theme:switched', async ({ from, to }) => {
           this.notification.showStockAlert(message);
         }
       }),
+      wishlist: new WishlistService({
+        products: this.products,
+        features: this.features,
+        callbacks: this.callbacks,
+        state: this.state
+      }),
       locale: new LocaleService({
         currencySymbol: this.currencySymbol,
         features: this.features,
@@ -351,6 +358,7 @@ if (this.services?.cart?.syncWithKernel) {
       notification: this.notification,
       
       addToCart: this.services.cart.addToCart.bind(this.services.cart),
+      wishlist: this.services.wishlist,
       
       // Formatting
       formatPrice: this.formatPrice.bind(this),
@@ -511,6 +519,14 @@ if (this.services?.cart?.syncWithKernel) {
     // ==========================================================
     // 13. URL STATE RESTORERS
     // ==========================================================
+    this.services.wishlist.onWishlistUpdated = () => {
+      if (this.features?.debug) {
+        console.log('[TRACE] Wishlist updated');
+      }
+      this.productRenderer?.updateWishlistStates?.();
+      this.collectionRenderer?.updateWishlistStates?.();
+    };
+
     this.registerUrlStateRestorer(this.restoreCartState);
     this.registerUrlStateRestorer(this.restoreSearchState);
   }
