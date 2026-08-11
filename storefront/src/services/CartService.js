@@ -244,14 +244,14 @@ export default class CartService {
             console.trace();
         }
         
+        // Sync with kernel after cart update
+        await this.syncWithKernel();
+        
         // Use callback instead of direct UI call
         // FIX: Pass 'drawer' source — addToCart comes from product pages/drawer context
         if (typeof this.onCartUpdated === 'function') {
             await this.onCartUpdated('drawer');
         }
-        
-        // Sync with kernel after cart update
-        await this.syncWithKernel();
     }
 
     /**
