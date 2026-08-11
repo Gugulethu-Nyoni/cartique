@@ -94,8 +94,16 @@ export default class BehaviorTracker {
         if (!this.enabled) return;
 
         const allowedEvents = [
-            'page_view', 'category_view', 'search', 'product_view',
-            'add_to_cart', 'wishlist_add'
+            'page_view',
+            'category_view',
+            'search_performed',
+            'product_view',
+            'add_to_cart',
+            'wishlist_add',
+            'wishlist_view',
+            'cart_view',
+            'remove_from_cart',
+            'checkout_started'
         ];
         if (!allowedEvents.includes(eventType)) return;
 
@@ -108,6 +116,7 @@ export default class BehaviorTracker {
             productId: data.productId || null,
             categoryId: data.categoryId || null,
             searchTerm: data.searchTerm || null,
+            quantity: data.quantity || null,
             metadata: data.metadata || {},
             timestamp: new Date().toISOString()
         };
@@ -118,7 +127,9 @@ export default class BehaviorTracker {
             console.log('[Behavior] Event:', eventType, event);
         }
 
-        if (eventType === 'add_to_cart') {
+        if (eventType === 'add_to_cart' ||
+            eventType === 'remove_from_cart' ||
+            eventType === 'checkout_started') {
             this._flush();
         }
 
@@ -133,10 +144,15 @@ export default class BehaviorTracker {
 
     pageView(data = {}) { this.track('page_view', data); }
     categoryView(categoryId, data = {}) { this.track('category_view', { categoryId, ...data }); }
-    search(searchTerm, data = {}) { this.track('search', { searchTerm, ...data }); }
+    searchPerformed(searchTerm, data = {}) { this.track('search_performed', { searchTerm, ...data }); }
     productView(productId, data = {}) { this.track('product_view', { productId, ...data }); }
     addToCart(productId, data = {}) { this.track('add_to_cart', { productId, ...data }); }
     wishlistAdd(productId, data = {}) { this.track('wishlist_add', { productId, ...data }); }
+
+    wishlistView(data = {}) { this.track('wishlist_view', data); }
+    cartView(data = {}) { this.track('cart_view', data); }
+    removeFromCart(productId, data = {}) { this.track('remove_from_cart', { productId, ...data }); }
+    checkoutStarted(data = {}) { this.track('checkout_started', data); }
 
     _flush() {
         if (this.isSending || this.queue.length === 0) return;
