@@ -1,0 +1,52 @@
+Shop Base
+http://localhost:8080/shop/
+works
+
+Navigate to product
+http://localhost:8080/shop/product/chia-seeds
+works
+
+Invalid Product (does not exist)
+http://localhost:8080/shop/product/not-real
+works
+
+Regression
+http://localhost:8080/shop/product/soursop-leaves
+works
+
+
+Category Naigation
+http://localhost:8080/shop/category/immune-boosters
+works
+
+
+Category Regression
+http://localhost:8080/shop/category/seeds-grains
+works
+
+Invalid Category
+http://localhost:8080/shop/category/not-real 
+works
+
+
+Search Route
+http://localhost:8080/shop/search/chia
+works
+
+
+Search Regression
+http://localhost:8080/shop/search/soursop
+works
+
+
+Invalid Search
+http://localhost:8080/shop/search/not-real
+works
+
+Cart Drawer
+http://localhost:8080/shop/#cart
+works beautifully 
+
+
+http://localhost:8080/shop/?search=chia
+Works beautifully - shows chia seeds 

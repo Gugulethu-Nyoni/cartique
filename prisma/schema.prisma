@@ -1,0 +1,1011 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                            Int        @id @default(autoincrement())
+  access_level                  Int        @default(1)
+  name                          String?
+  surname                       String?
+  email                         String     @unique
+  mobile                        String?
+  password_hash                 String
+  is_verified                   Boolean    @default(false)
+  verification_token            String?    @db.VarChar(512)
+  verification_token_expires_at DateTime?
+  reset_token                   String?    @db.VarChar(512)
+  reset_token_expires_at        DateTime?
+  last_login_at                 DateTime?
+  failed_login_attempts         Int        @default(0)
+  status                        UserStatus @default(active)
+  createdAt                     DateTime   @default(now()) @map("created_at")
+  updatedAt                     DateTime   @default(now()) @updatedAt @map("updated_at")
+  Customer                      Customer?
+  deliveries                    Delivery[] @relation("DriverDeliveries")
+  authLogs                      AuthLog[]
+  sessions                      Session[]
+  sentNotifications             Notification[]    @relation("NotificationSender")
+  receivedNotifications         Notification[]    @relation("NotificationRecipient")
+  sentMessages                  InternalMessage[] @relation("MessageSender")
+  receivedMessages              InternalMessage[] @relation("MessageRecipient")
+  @@map("users")
+}
+
+model Session {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  token       String    @unique
+  device_info String?   @map("device_info")
+  ip_address  String?   @map("ip_address")
+  is_revoked  Boolean   @default(false) @map("is_revoked")
+  revoked_at  DateTime? @map("revoked_at")
+  expires_at  DateTime  @map("expires_at")
+  created_at  DateTime  @default(now()) @map("created_at")
+  updated_at  DateTime  @updatedAt @map("updated_at")
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
+  @@index([expires_at])
+  @@index([userId, is_revoked, expires_at], map: "idx_active_sessions")
+  @@map("sessions")
+}
+
+model AuthLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  ip        String?  @map("ip_address")
+  userAgent String?  @map("user_agent") @db.Text
+  event     String   @map("action")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("auth_logs")
+}
+
+model CustomerAddress {
+  id                Int      @id @default(autoincrement())
+  company           String?
+  city              String?
+  state             String?
+  country           String?
+  phone             String?
+  addressLine1      String?
+  addressLine2      String?
+  createdAt         DateTime @default(now())
+  customerId        Int
+  isDefaultBilling  Boolean  @default(true)
+  isDefaultShipping Boolean  @default(true)
+  postalCode        String?
+  updatedAt         DateTime @default(now()) @updatedAt
+  local_area        String?
+  customer          Customer @relation("CustomerAddresses", fields: [customerId], references: [id])
+
+  @@index([customerId])
+}
+
+// Remove inventory/dimensions from Product
+model Product {
+  id                Int               @id @default(autoincrement())
+  sku               String?           @unique
+  slug              String            @unique
+  short_description String?           @db.Text
+  description       String?           @db.Text
+  status            Product_status    @default(draft)
+  attributes        Json?
+  metadata          Json?
+  createdAt         DateTime          @default(now()) @map("created_at")  
+  updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at")
+  currency          String            @default("ZAR")
+  image             String?
+  title             String
+  product_images    Json?
+  orderItems        OrderItem[]
+  media             ProductMedia[]
+  reviews           ProductReview[]
+  variants          ProductVariant[]
+  categories        ProductCategory[] @relation("ProductToProductCategory")
+
+  @@index([slug])
+  @@index([status])
+  @@map("Product")  // Maps to Product table
+}
+
+// Add inventory/dimensions to ProductVariant
+// Product variants (retail packs, sizes, wholesale packs, etc.)
+model ProductVariant {
+  id                    Int             @id @default(autoincrement())
+  productId             Int             @map("product_id")
+
+  // Identification
+  sku                   String?         @unique
+  barcode               String?
+  attributes            Json?
+  variant_image         String?         @map("variant_image") // Optional image override
+
+  // Pricing
+  price                 Float
+  compareAtPrice        Float?          @map("compare_at_price")
+  costPrice             Float?          @map("cost_price")
+
+  // Bulk / Wholesale Pricing
+  bulkPrice             Float?
+  bulkMinimumQty        Int?
+
+  // Inventory
+  inventory             Int             @default(0)
+  inventoryPolicy       InventoryPolicy @default(deny) @map("inventory_policy")
+  low_stock_threshold   Int?            @default(5) @map("low_stock_threshold")
+
+  // Physical Properties
+  length_cm             Float?          @map("length_cm")
+  width_cm              Float?          @map("width_cm")
+  height_cm             Float?          @map("height_cm")
+  weight_kg             Float?          @map("weight_kg")
+
+  // Metadata
+  isDefault             Boolean         @default(false) @map("is_default")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  product               Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems            OrderItem[]
+
+  @@unique([productId, isDefault])
+  @@index([productId])
+  @@index([sku])
+  @@index([inventory]) // Low-stock and inventory queries
+}
+
+
+
+model ProductCategory {
+  id          Int               @id @default(autoincrement())
+  name        String
+  slug        String            @unique
+  description String?
+  parent_id   Int?
+  metadata    Json?
+  sortOrder   Int               @default(0) @map("sort_order")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at")
+  parent      ProductCategory?  @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  children    ProductCategory[] @relation("CategoryHierarchy")
+  products    Product[]         @relation("ProductToProductCategory")
+
+  @@index([slug])
+  @@index([parent_id])
+}
+
+model ProductMedia {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  url       String
+  type      String
+  altText   String?  @map("alt_text")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+}
+
+model ProductReview {
+  id         Int      @id @default(autoincrement())
+  productId  Int      @map("product_id")
+  customerId Int      @map("customer_id")
+  rating     Int
+  comment    String?  @db.Text
+  status     String   @default("pending")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  customer   Customer @relation(fields: [customerId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  orderNumber     String      @unique @map("order_number")
+  customerId      Int?        @map("customer_id")
+  status          OrderStatus @default(pending)
+  currency        String
+  subtotal        Float
+  totalTax        Float       @default(0) @map("total_tax")
+  totalShipping   Float       @default(0) @map("total_shipping")
+  totalDiscounts  Float       @default(0) @map("total_discounts")
+  total           Float
+  billingAddress  Json        @map("billing_address")
+  shippingAddress Json        @map("shipping_address")
+  metadata        Json?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at")
+  hash            String?     @unique
+  deliveries      Delivery[]
+  customer        Customer?   @relation(fields: [customerId], references: [id])
+  items           OrderItem[]
+  payments        Payment[]
+
+  @@index([orderNumber])
+  @@index([customerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id                  Int             @id @default(autoincrement())
+  orderId             Int             @map("order_id")
+  productId           Int             @map("product_id")
+  variantId           Int?            @map("variant_id")
+  quantity            Int
+  price               Float
+  taxLines            Json?           @map("tax_lines")
+  discountAllocations Json?           @map("discount_allocations")
+  metadata            Json?
+  createdAt           DateTime        @default(now()) @map("created_at")
+  order               Order           @relation(fields: [orderId], references: [id])
+  product             Product         @relation(fields: [productId], references: [id])
+  variant             ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([productId], map: "OrderItem_product_id_fkey")
+  @@index([variantId], map: "OrderItem_variant_id_fkey")
+}
+
+model Checkout {
+  id        String   @id @default(uuid())
+  orderId   Int?
+  status    String   @default("pending")
+  sessionId String?
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Delivery {
+  id                 Int            @id @default(autoincrement())
+  orderId            Int            @map("order_id")
+  customerId         Int?           @map("customer_id")
+  trackingNumber     String?        @map("tracking_number")
+  carrier            String?        @map("carrier")
+  status             DeliveryStatus @default(pending)
+  estimatedDate      DateTime?      @map("estimated_date")
+  actualDate         DateTime?      @map("actual_date")
+  deliveryAddress    Json           @map("delivery_address")
+  notes              String?
+  driverId           Int?           @map("driver_id")
+  proofOfDelivery    String?        @map("proof_of_delivery")
+  metadata           Json?
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at")
+  quoteExpiresAt     DateTime?      @map("quote_expires_at")
+  quotedShippingCost Float?         @map("quoted_shipping_cost")
+  shippingCost       Float?         @map("shipping_cost")
+  shippingMethod     String?        @map("shipping_method")
+  shippingQuoteId    String?        @map("shipping_quote_id")
+  shippingService    String?        @map("shipping_service")
+  customer           Customer?      @relation(fields: [customerId], references: [id])
+  driver             User?          @relation("DriverDeliveries", fields: [driverId], references: [id])
+  order              Order          @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+  @@index([driverId])
+  @@index([shippingQuoteId])
+}
+
+model Payment {
+  id             Int           @id @default(autoincrement())
+  orderId        Int           @map("order_id")
+  amount         Float
+  currency       String
+  paymentMethod  String        @map("payment_method")
+  paymentGateway String        @map("payment_gateway")
+  status         PaymentStatus @default(pending)
+  transactionId  String?       @map("transaction_id")
+  metadata       Json?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  order          Order         @relation(fields: [orderId], references: [id])
+  refunds        Refund[]
+
+  @@index([orderId])
+  @@index([status])
+  @@index([transactionId])
+}
+
+model Refund {
+  id        Int      @id @default(autoincrement())
+  paymentId Int      @map("payment_id")
+  amount    Float
+  reason    String?
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+}
+
+model DriverLocation {
+  id        Int      @id @default(autoincrement())
+  driverId  Int
+  latitude  Float
+  longitude Float
+  timestamp DateTime @default(now())
+}
+
+model StoreSetting {
+  id                    Int      @id @default(autoincrement())
+  storeName             String   @default("My Store") @map("store_name")
+  storeEmail            String?  @map("store_email")
+  storePhone            String?  @map("store_phone")
+  storeLogoUrl          String?  @map("store_logo_url")
+  
+  // Contact Information
+  contactName           String?  @map("contact_name")
+  contactSurname        String?  @map("contact_surname")
+  contactEmail          String?  @map("contact_email")
+  contactMobile         String?  @map("contact_mobile")
+  landline              String?  @map("landline")
+  websiteUrl            String?  @map("website_url")
+  physicalAddress       String?  @map("physical_address") @db.Text
+  
+  // Store Configuration
+  defaultCurrency       String   @default("ZAR") @map("default_currency")
+  availableCurrencies   Json?    @map("available_currencies")
+  timezone              String?  @default("Africa/Johannesburg") @map("timezone")
+  locale                String?  @default("en-ZA") @map("locale")
+  siteMode              String?  @default("test") @map("site_mode")
+  checkoutMode          String?  @default("test") @map("checkout_mode")
+  
+  // Payment
+  paymentGateway        String?  @default("yoco") @map("payment_gateway")
+  isPaymentActive       Boolean? @default(true) @map("is_payment_active")
+  paymentConfig         Json?    @map("payment_config")
+  
+  // Shipping
+  shippingService       String?  @default("courier_guy") @map("shipping_service")
+  isShippingActive      Boolean? @default(true) @map("is_shipping_active")
+  shippingConfig        Json?    @map("shipping_config")
+  defaultShippingRate   Float?   @default(0) @map("default_shipping_rate")
+  freeShippingThreshold Float?   @map("free_shipping_threshold")
+  
+  // POPIA Compliance
+  popiaConsent          Boolean? @default(false) @map("popia_consent")
+  popiaConsentDate      DateTime? @map("popia_consent_date")
+  marketingConsent      Boolean? @default(false) @map("marketing_consent")
+  marketingConsentDate  DateTime? @map("marketing_consent_date")
+  
+  metadata              Json?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relation
+  kyc                   StoreKyc?
+
+  @@map("store_settings")
+}
+
+model StoreKyc {
+  id                  Int      @id @default(autoincrement())
+  storeSettingsId      Int      @unique @map("store_settings_id")
+  
+  // Business Information
+  businessName        String?  @map("business_name")
+  registrationNumber  String?  @map("registration_number")
+  taxId               String?  @map("tax_id")
+  businessType        String?  @map("business_type")
+  countryCode         String?  @map("country_code")
+  
+  // Legal Representative
+  legalRepName        String?  @map("legal_rep_name")
+  legalRepSurname     String?  @map("legal_rep_surname")
+  legalRepIdNumber    String?  @map("legal_rep_id_number")
+  legalRepEmail       String?  @map("legal_rep_email")
+  legalRepPhone       String?  @map("legal_rep_phone")
+  
+  // Business Address
+  businessAddress     String?  @map("business_address") @db.Text
+  businessCity        String?  @map("business_city")
+  businessPostalCode  String?  @map("business_postal_code")
+  businessState       String?  @map("business_state")
+  
+  // Documents
+  registrationDoc     String?  @map("registration_doc")
+  taxDoc              String?  @map("tax_doc")
+  legalRepIdDoc       String?  @map("legal_rep_id_doc")
+  
+  // Status
+  kycStatus           String   @default("pending") @map("kyc_status")
+  verifiedAt          DateTime? @map("verified_at")
+  rejectionReason     String?  @map("rejection_reason") @db.Text
+  
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relation
+  storeSettings       StoreSetting @relation(fields: [storeSettingsId], references: [id])
+
+  @@map("store_kyc")
+}
+
+
+model Customer {
+  id            Int               @id @default(autoincrement())
+  phone         String?
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+  loyaltyPoints Int?              @default(0)
+  updatedAt     DateTime          @default(now())
+  userId        Int               @unique
+  users         User              @relation(fields: [userId], references: [id])
+  addresses     CustomerAddress[] @relation("CustomerAddresses")
+  deliveries    Delivery[]
+  orders        Order[]
+  reviews       ProductReview[]
+}
+
+
+model Notification {
+  id           Int      @id @default(autoincrement())
+  senderId     Int?     @map("sender_id")
+  recipientId  Int      @map("recipient_id")
+  type         String   @default("system") // system, purchase, shipping, promotion
+  title        String
+  content      String   @db.Text
+  isCustomerRead       Boolean  @default(false) @map("is_customer_read")
+  isAdminRead          Boolean  @default(false) @map("is_admin_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+  sender       User?    @relation("NotificationSender", fields: [senderId], references: [id])
+  recipient    User     @relation("NotificationRecipient", fields: [recipientId], references: [id])
+
+  @@index([recipientId, isCustomerRead])
+  @@index([type])
+  @@map("notifications")
+}
+
+
+model InternalMessage {
+  id          Int      @id @default(autoincrement())
+  senderId    Int      @map("sender_id")
+  recipientId Int      @map("recipient_id")
+  subject     String?
+  body        String   @db.Text
+  status      String   @default("open")
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+  parentId    Int?     @map("parent_id")
+  orderNumber String?  @map("order_number")
+
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id])
+  recipient   User     @relation("MessageRecipient", fields: [recipientId], references: [id])
+  parent      InternalMessage?  @relation("MessageThreads", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     InternalMessage[] @relation("MessageThreads")
+
+  @@index([senderId])
+  @@index([recipientId, isRead])
+  @@index([parentId])
+  @@index([status])
+  @@index([orderNumber])
+  @@map("internal_messages")
+}
+
+
+// ==========================================================
+// STOREFRONT BEHAVIOUR INTELLIGENCE
+// Cartique Commerce Intelligence Layer
+// ==========================================================
+
+
+model StorefrontSession {
+  id              String   @id @default(uuid())
+
+  // Visitor identity
+  visitorId       String   @map("visitor_id")
+  customerId      Int?     @map("customer_id")
+
+  // Session context
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @db.Text
+  deviceType      String?  @map("device_type")
+  browser         String?
+  operatingSystem String?  @map("operating_system")
+
+  // Attribution
+  referrer        String?  @db.Text
+  landingPage     String?  @map("landing_page")
+  campaignSource  String?  @map("campaign_source")
+  campaignMedium  String?  @map("campaign_medium")
+  campaignName    String?  @map("campaign_name")
+
+  // Lifecycle
+  startedAt       DateTime @default(now()) @map("started_at")
+  lastActivityAt  DateTime @default(now()) @map("last_activity_at")
+  endedAt         DateTime? @map("ended_at")
+
+  events          StorefrontEvent[]
+  carts           CartBehaviour[]
+
+  customer        Customer? @relation(fields: [customerId], references: [id])
+
+
+  @@index([visitorId])
+  @@index([customerId])
+  @@index([startedAt])
+  @@map("storefront_sessions")
+}
+
+
+
+// ==========================================================
+// EVENT STREAM
+// Every meaningful storefront action
+// ==========================================================
+
+model StorefrontEvent {
+
+  id              String   @id @default(uuid())
+
+  sessionId       String   @map("session_id")
+  customerId      Int?     @map("customer_id")
+
+  eventType       StorefrontEventType
+
+  // Commercial entity context
+  productId       Int?     @map("product_id")
+  categoryId      Int?     @map("category_id")
+
+
+  // URL context
+  pathname        String?
+  searchTerm      String?  @map("search_term")
+
+
+  // Flexible metadata
+  metadata        Json?
+
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+
+  session         StorefrontSession 
+                    @relation(fields:[sessionId], references:[id])
+
+  product         Product? 
+                    @relation(fields:[productId], references:[id])
+
+  category        ProductCategory?
+                    @relation(fields:[categoryId], references:[id])
+
+
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([productId])
+  @@index([categoryId])
+  @@index([createdAt])
+
+  @@map("storefront_events")
+}
+
+
+
+
+// ==========================================================
+// PRODUCT DISCOVERY INTELLIGENCE
+// Search behaviour
+// ==========================================================
+
+model ProductSearchEvent {
+
+  id             String @id @default(uuid())
+
+
+  sessionId      String @map("session_id")
+  customerId     Int?   @map("customer_id")
+
+
+  searchTerm     String
+
+  normalizedTerm String? @map("normalized_term")
+
+
+  resultCount    Int @default(0)
+
+
+  clickedProductId Int?
+                      @map("clicked_product_id")
+
+
+  createdAt      DateTime @default(now())
+                      @map("created_at")
+
+
+  session        StorefrontSession
+                      @relation(fields:[sessionId], references:[id])
+
+  customer       Customer?
+                      @relation(fields:[customerId], references:[id])
+
+  clickedProduct Product?
+                      @relation(fields:[clickedProductId], references:[id])
+
+
+  @@index([searchTerm])
+  @@index([createdAt])
+  @@index([sessionId])
+
+
+  @@map("product_search_events")
+}
+
+
+
+
+
+// ==========================================================
+// PRODUCT VIEW INTELLIGENCE
+// ==========================================================
+
+model ProductViewEvent {
+
+  id             String @id @default(uuid())
+
+
+  sessionId      String @map("session_id")
+  customerId     Int?   @map("customer_id")
+
+  productId      Int @map("product_id")
+
+
+  // Engagement
+  durationSeconds Int?
+  scrollDepth     Float?
+
+
+  viewedAt       DateTime @default(now())
+                   @map("viewed_at")
+
+
+  session        StorefrontSession
+                   @relation(fields:[sessionId], references:[id])
+
+
+  product        Product
+                   @relation(fields:[productId], references:[id])
+
+
+  @@index([productId])
+  @@index([sessionId])
+  @@index([viewedAt])
+
+
+  @@map("product_view_events")
+}
+
+
+
+
+
+// ==========================================================
+// CATEGORY / COLLECTION INTELLIGENCE
+// ==========================================================
+
+model CategoryViewEvent {
+
+  id          String @id @default(uuid())
+
+
+  sessionId   String @map("session_id")
+
+  categoryId  Int @map("category_id")
+
+
+  viewedAt    DateTime @default(now())
+                  @map("viewed_at")
+
+
+  session     StorefrontSession
+                  @relation(fields:[sessionId], references:[id])
+
+
+  category    ProductCategory
+                  @relation(fields:[categoryId], references:[id])
+
+
+  @@index([categoryId])
+  @@index([viewedAt])
+
+
+  @@map("category_view_events")
+}
+
+
+
+
+
+// ==========================================================
+// CART BEHAVIOUR INTELLIGENCE
+// ==========================================================
+
+model CartBehaviour {
+
+
+  id             String @id @default(uuid())
+
+
+  sessionId      String @map("session_id")
+
+  customerId     Int? @map("customer_id")
+
+
+  cartValue      Float @default(0)
+
+  itemCount      Int @default(0)
+
+
+
+  status         CartStatus @default(active)
+
+
+  firstAddedAt   DateTime?
+                  @map("first_added_at")
+
+
+  lastUpdatedAt  DateTime?
+                  @map("last_updated_at")
+
+
+  abandonedAt    DateTime?
+                  @map("abandoned_at")
+
+
+  recoveredAt    DateTime?
+                  @map("recovered_at")
+
+
+
+  recoveryMethod String?
+                  @map("recovery_method")
+
+
+
+  session        StorefrontSession
+                  @relation(fields:[sessionId], references:[id])
+
+
+  customer       Customer?
+                  @relation(fields:[customerId], references:[id])
+
+
+  items          CartBehaviourItem[]
+
+
+
+  @@index([status])
+  @@index([customerId])
+  @@index([abandonedAt])
+
+
+  @@map("cart_behaviour")
+}
+
+
+
+
+
+model CartBehaviourItem {
+
+
+  id          String @id @default(uuid())
+
+
+  cartId      String @map("cart_id")
+
+  productId   Int @map("product_id")
+
+  variantId   Int? @map("variant_id")
+
+
+  quantity    Int
+
+
+  priceAtAdd  Float @map("price_at_add")
+
+
+  addedAt     DateTime @default(now())
+              @map("added_at")
+
+
+  cart        CartBehaviour
+              @relation(fields:[cartId], references:[id])
+
+
+  product     Product
+              @relation(fields:[productId], references:[id])
+
+
+  variant     ProductVariant?
+              @relation(fields:[variantId], references:[id])
+
+
+  @@index([cartId])
+  @@index([productId])
+
+
+  @@map("cart_behaviour_items")
+}
+
+
+
+
+// ==========================================================
+// MERCHANT INTERVENTION LOG
+// Recovery actions
+// ==========================================================
+
+model CartRecoveryAction {
+
+
+  id          String @id @default(uuid())
+
+
+  cartId      String @map("cart_id")
+
+
+  actionType  CartRecoveryActionType
+
+
+  channel     String
+  // email, sms, whatsapp, push
+
+
+  metadata    Json?
+
+
+  executedAt  DateTime @default(now())
+               @map("executed_at")
+
+
+  cart        CartBehaviour
+               @relation(fields:[cartId], references:[id])
+
+
+  @@index([cartId])
+  @@index([actionType])
+
+
+  @@map("cart_recovery_actions")
+}
+
+
+
+
+
+// ==========================================================
+// ENUMS
+// ==========================================================
+
+
+enum StorefrontEventType {
+
+  page_view
+
+  product_view
+
+  category_view
+
+  search
+
+  add_to_cart
+
+  remove_from_cart
+
+  checkout_started
+
+  checkout_completed
+
+  wishlist_add
+
+  filter_applied
+
+}
+
+
+
+enum CartStatus {
+
+  active
+
+  abandoned
+
+  recovered
+
+  converted
+
+}
+
+
+
+enum CartRecoveryActionType {
+
+  email
+
+  sms
+
+  whatsapp
+
+  push_notification
+
+  discount_offer
+
+  personal_sales_contact
+
+}
+
+
+
+enum UserStatus {
+  active
+  locked
+  suspended
+}
+
+enum SiteMode {
+  test
+  live
+  maintenance
+}
+
+enum CheckoutMode {
+  test
+  live
+}
+
+enum InventoryPolicy {
+  deny
+  continue
+}
+
+enum OrderStatus {
+  pending
+  processing
+  completed
+  cancelled
+  refunded
+}
+
+enum PaymentStatus {
+  pending
+  authorized
+  paid
+  failed
+  refunded
+}
+
+enum Product_status {
+  draft
+  active
+  archived
+}
+
+enum DeliveryStatus {
+  pending
+  processing
+  ready_for_pickup
+  in_transit
+  out_for_delivery
+  delivered
+  failed
+  returned
+}
