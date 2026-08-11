@@ -103,7 +103,9 @@ export default class BehaviorTracker {
             'wishlist_view',
             'cart_view',
             'remove_from_cart',
-            'checkout_started'
+            'checkout_started',
+            'wishlist_remove',
+            'cart_quantity_change'
         ];
         if (!allowedEvents.includes(eventType)) return;
 
@@ -153,6 +155,9 @@ export default class BehaviorTracker {
     cartView(data = {}) { this.track('cart_view', data); }
     removeFromCart(productId, data = {}) { this.track('remove_from_cart', { productId, ...data }); }
     checkoutStarted(data = {}) { this.track('checkout_started', data); }
+
+    wishlistRemove(productId, data = {}) { this.track('wishlist_remove', { productId, ...data }); }
+    cartQuantityChange(productId, data = {}) { this.track('cart_quantity_change', { productId, ...data }); }
 
     _flush() {
         if (this.isSending || this.queue.length === 0) return;
