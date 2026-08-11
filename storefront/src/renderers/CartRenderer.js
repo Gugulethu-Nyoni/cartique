@@ -246,15 +246,20 @@ export default class CartRenderer {
     }
 
     _getEnrichedCart() {
-        const decision = this.cartService?.getCurrentDecision?.() || null;
-        const cartDecision = this.state?.cartDecision || decision;
+        const serviceDecision = this.cartService?.getCurrentDecision?.() || null;
+        const stateDecision = this.state?.cartDecision || null;
+
+        // Prefer the latest kernel decision stored in shared state
+        const cartDecision = stateDecision || serviceDecision;
 
         if (this.features?.debug) {
             console.log('[TRACE] Enriching cart from decision:', cartDecision);
+            console.log('[TRACE] Service decision:', serviceDecision);
+            console.log('[TRACE] State decision:', stateDecision);
         }
 
-        // Only fallback when decision is genuinely missing
-        if (decision == null) {
+        // Only fallback when there is genuinely no kernel decision
+        if (cartDecision == null) {
             console.warn('[TRACE] No decision available, falling back to localStorage');
             const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
             const items = cart.map(item => this._enrichLegacyCartItem(item));
