@@ -74,6 +74,7 @@ export default class WishlistRenderer {
 
         this._renderProductRows(page, resolvedItems);
         this._updateCount(resolvedItems.length);
+        this._attachEvents(page);
     }
 
     // ==========================================================
