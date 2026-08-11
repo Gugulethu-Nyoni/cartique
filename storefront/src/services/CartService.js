@@ -24,6 +24,7 @@ export default class CartService {
         // Sync promise guard for concurrency
         this._syncPromise = null;
         this._lastDecision = null;
+        this._checkoutInProgress = false;
     }
 
     // ==========================================================
@@ -296,18 +297,30 @@ export default class CartService {
         
         if (quantity < 0) return;
         
+        // Delegate removal to removeItem (owns remove_from_cart event)
+        if (quantity === 0) {
+            await this.removeItem(productId);
+            return;
+        }
+        
         let cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
         const index = cart.findIndex(item => item.id === productId);
         
         if (index === -1) return;
         
-        if (quantity === 0) {
-            cart.splice(index, 1);
-        } else {
-            cart[index].cart_quantity = quantity;
-        }
+        cart[index].cart_quantity = quantity;
         
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
+
+        // Emit cart_quantity_change event
+        if (this.behavior) {
+            this.behavior.cartQuantityChange(productId, {
+                metadata: {
+                    source: 'cart_page',
+                    quantity: quantity
+                }
+            });
+        }
         
         // Sync with kernel after update
         await this.syncWithKernel();
@@ -327,73 +340,88 @@ export default class CartService {
             console.log('[TRACE] CartService.checkout called');
             console.trace();
         }
-        
-        // Sync with kernel before checkout
-        await this.syncWithKernel();
 
-        if (this.behavior) {
-            const cart = JSON.parse(localStorage.getItem('cartiqueCart') || '[]');
-            const cartDecision = this.state?.cartDecision || null;
-            this.behavior.checkoutStarted({
-                metadata: {
-                    source: 'checkout_button',
-                    itemCount: cart.length,
-                    subtotal: cartDecision?.totals?.subtotal?.amount || 0
-                }
-            });
-        }
-        
-        // Check if cart page is open
-        const cartPage = document.getElementById('cartique-cart-page');
-        if (cartPage) {
-            // We're on the cart page - remove it first
-            cartPage.remove();
-            
-            // Restore the main view
-            const productDisplays = document.getElementById('cartique-product-displays');
-            const sidebar = document.getElementById('cartique-sidebar');
-            const menuAnchor = document.getElementById('cartique-menu-anchor-top');
-            const controls = document.getElementById('cartique-controls');
-            const footer = document.getElementById('cartique-product-footer');
-            
-            if (productDisplays) productDisplays.style.display = 'block';
-            if (sidebar) sidebar.style.display = this.features?.sidebarDisplay;
-            if (menuAnchor) menuAnchor.style.display = '';
-            if (controls) controls.style.display = '';
-            if (footer) footer.style.display = this.features?.footerDisplay;
-            
-            const mainContent = document.getElementById('cartique-main-content');
-            if (mainContent) {
-                if (this.features?.sidebarDisplay === 'none') {
-                    mainContent.classList.add('cartique-full-width');
-                } else {
-                    mainContent.classList.remove('cartique-full-width');
-                }
+        // Prevent duplicate checkout events
+        if (this._checkoutInProgress) {
+            if (this.features?.debug) {
+                console.log('[TRACE] Checkout already in progress, skipping duplicate');
             }
-            
-            this.state.singleProductViewActive = false;
-            this.singleProductViewActive = false; // Legacy alias
-        } else {
-            // Use callback instead of direct UI call
-            if (typeof this.onCartUpdated === 'function') {
-                this.onCartUpdated();
-            }
+            return;
         }
-        
-        // Show the checkout alert with fallback
-        // FIX: try/catch ensures checkout redirect happens even if notification fails
+        this._checkoutInProgress = true;
+
         try {
-            if (typeof this.showCheckoutAlert === 'function') {
-                this.showCheckoutAlert();
+            // Sync with kernel before checkout
+            await this.syncWithKernel();
+
+            if (this.behavior) {
+                const cart = JSON.parse(localStorage.getItem('cartiqueCart') || '[]');
+                const cartDecision = this.state?.cartDecision || null;
+                this.behavior.checkoutStarted({
+                    metadata: {
+                        source: 'checkout_button',
+                        itemCount: cart.length,
+                        subtotal: cartDecision?.totals?.subtotal?.amount || 0
+                    }
+                });
             }
-        } catch (error) {
-            console.error(
-                '[CartService] Checkout notification failed',
-                error
-            );
-            if (this.features?.checkoutUrl) {
-                window.location.href = this.features.checkoutUrl;
+            
+            // Check if cart page is open
+            const cartPage = document.getElementById('cartique-cart-page');
+            if (cartPage) {
+                // We're on the cart page - remove it first
+                cartPage.remove();
+                
+                // Restore the main view
+                const productDisplays = document.getElementById('cartique-product-displays');
+                const sidebar = document.getElementById('cartique-sidebar');
+                const menuAnchor = document.getElementById('cartique-menu-anchor-top');
+                const controls = document.getElementById('cartique-controls');
+                const footer = document.getElementById('cartique-product-footer');
+                
+                if (productDisplays) productDisplays.style.display = 'block';
+                if (sidebar) sidebar.style.display = this.features?.sidebarDisplay;
+                if (menuAnchor) menuAnchor.style.display = '';
+                if (controls) controls.style.display = '';
+                if (footer) footer.style.display = this.features?.footerDisplay;
+                
+                const mainContent = document.getElementById('cartique-main-content');
+                if (mainContent) {
+                    if (this.features?.sidebarDisplay === 'none') {
+                        mainContent.classList.add('cartique-full-width');
+                    } else {
+                        mainContent.classList.remove('cartique-full-width');
+                    }
+                }
+                
+                this.state.singleProductViewActive = false;
+                this.singleProductViewActive = false; // Legacy alias
+            } else {
+                // Use callback instead of direct UI call
+                if (typeof this.onCartUpdated === 'function') {
+                    this.onCartUpdated();
+                }
             }
+            
+            // Show the checkout alert with fallback
+            // FIX: try/catch ensures checkout redirect happens even if notification fails
+            try {
+                if (typeof this.showCheckoutAlert === 'function') {
+                    this.showCheckoutAlert();
+                }
+            } catch (error) {
+                console.error(
+                    '[CartService] Checkout notification failed',
+                    error
+                );
+                if (this.features?.checkoutUrl) {
+                    window.location.href = this.features.checkoutUrl;
+                }
+            }
+        } finally {
+            setTimeout(() => {
+                this._checkoutInProgress = false;
+            }, 1000);
         }
     }
 
