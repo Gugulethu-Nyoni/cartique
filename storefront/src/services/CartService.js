@@ -269,6 +269,12 @@ export default class CartService {
         
         // Sync with kernel after removal
         await this.syncWithKernel();
+
+        if (this.behavior) {
+            this.behavior.removeFromCart(productId, {
+                metadata: { source: 'cart_page' }
+            });
+        }
         
         // Notify UI
         // FIX: Pass 'page' source — removeItem comes from cart page context
@@ -324,6 +330,18 @@ export default class CartService {
         
         // Sync with kernel before checkout
         await this.syncWithKernel();
+
+        if (this.behavior) {
+            const cart = JSON.parse(localStorage.getItem('cartiqueCart') || '[]');
+            const cartDecision = this.state?.cartDecision || null;
+            this.behavior.checkoutStarted({
+                metadata: {
+                    source: 'checkout_button',
+                    itemCount: cart.length,
+                    subtotal: cartDecision?.totals?.subtotal?.amount || 0
+                }
+            });
+        }
         
         // Check if cart page is open
         const cartPage = document.getElementById('cartique-cart-page');
