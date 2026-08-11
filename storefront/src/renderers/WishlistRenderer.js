@@ -56,6 +56,15 @@ export default class WishlistRenderer {
 
         mainContent.appendChild(page);
 
+        if (this.behavior) {
+            this.behavior.wishlistView({
+                metadata: {
+                    source: 'wishlist_page',
+                    itemCount: items.length
+                }
+            });
+        }
+
         if (items.length === 0) {
             this._showEmptyState(page);
             return;
