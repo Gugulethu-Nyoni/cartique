@@ -253,33 +253,35 @@ export default class CartRenderer {
             console.log('[TRACE] Enriching cart from decision:', cartDecision);
         }
 
-        if (cartDecision?.items?.length > 0) {
-            const items = cartDecision.items.map(item => this._enrichCartDecisionItem(item));
-            const subtotal = cartDecision.totals?.subtotal?.amount || 0;
+        // Only fallback when decision is genuinely missing
+        if (decision == null) {
+            console.warn('[TRACE] No decision available, falling back to localStorage');
+            const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
+            const items = cart.map(item => this._enrichLegacyCartItem(item));
+            const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+            const currency = this.currencySymbol || 'R';
+            
             return {
                 items: items,
                 subtotal: subtotal,
-                totals: cartDecision.totals || {},
-                from: 'decision'
+                totals: {
+                    subtotal: { amount: subtotal, currency: currency },
+                    total: { amount: subtotal, currency: currency },
+                    tax: { amount: 0, currency: currency },
+                    shipping: { amount: 0, currency: currency }
+                },
+                from: 'legacy'
             };
         }
 
-        console.warn('[TRACE] No decision available, falling back to localStorage');
-        const cart = JSON.parse(localStorage.getItem('cartiqueCart')) || [];
-        const items = cart.map(item => this._enrichLegacyCartItem(item));
-        const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-        const currency = this.currencySymbol || 'R';
-        
+        // Empty decision with items: [] is valid
+        const items = (cartDecision?.items || []).map(item => this._enrichCartDecisionItem(item));
+        const subtotal = cartDecision?.totals?.subtotal?.amount || 0;
         return {
             items: items,
             subtotal: subtotal,
-            totals: {
-                subtotal: { amount: subtotal, currency: currency },
-                total: { amount: subtotal, currency: currency },
-                tax: { amount: 0, currency: currency },
-                shipping: { amount: 0, currency: currency }
-            },
-            from: 'legacy'
+            totals: cartDecision?.totals || {},
+            from: 'decision'
         };
     }
 
