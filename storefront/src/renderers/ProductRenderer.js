@@ -307,6 +307,13 @@ export default class ProductRenderer {
             });
         }
 
+        // Track product view
+        if (this.behavior) {
+            this.behavior.productView(product.id, {
+                metadata: { source: 'single_product' }
+            });
+        }
+
         // Save current state
         this.previousViewState = {
             layout: this.state.currentLayout,
