@@ -1,5 +1,6 @@
 import FetchTransport from './transports/FetchTransport.js';
 import SemantqTransport from './transports/SemantqTransport.js';
+import MockTransport from './transports/MockTransport.js';
 
 export default class BehaviorTracker {
     constructor(config = {}) {
