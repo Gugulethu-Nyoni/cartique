@@ -214,6 +214,18 @@ export default class CartService {
             cart[existingIndex].cart_quantity = newQuantity;
         }
 
+        // Track add to cart
+        if (this.behavior) {
+            this.behavior.addToCart(productId, {
+                metadata: {
+                    source: 'cart_service',
+                    variantId: variant?.id || null,
+                    quantity: quantity,
+                    price: product?.price || null
+                }
+            });
+        }
+
         // Save to localStorage
         localStorage.setItem('cartiqueCart', JSON.stringify(cart));
         
