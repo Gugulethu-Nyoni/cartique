@@ -1,4 +1,4 @@
-import products from '../fixtures/botaniq/products.js';
+import { products } from '../../../storefront/demo/shop/products.js';
 
 export class ProductRepository {
     constructor(dataSource = products) {
