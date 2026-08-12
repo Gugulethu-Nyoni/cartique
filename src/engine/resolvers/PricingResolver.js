@@ -40,62 +40,43 @@ export class PricingResolver {
    * Resolve pricing from a selected variant
    */
   _resolveFromVariant(state, variant, quantity, customer = null) {
-    let unitPrice = variant.basePrice || 0;
+    // Use canonical contract: price, bulkPrice, bulkMinimumQty
+    let unitPrice = variant.price ?? 0;
     const appliedRules = [];
 
-    // Customer-group pricing
-    const customerGroup = customer?.group || 'retail';
+    // Bulk pricing
+    const bulkPrice = variant.bulkPrice ?? null;
+    const bulkMinimumQty = variant.bulkMinimumQty ?? null;
 
-    if (customerGroup === 'wholesale' && variant.wholesalePrice !== null) {
-        unitPrice = variant.wholesalePrice;
+    const isBulk =
+        bulkPrice !== null &&
+        bulkMinimumQty !== null &&
+        quantity >= bulkMinimumQty;
 
-        appliedRules.push({
-            type: 'customer_group',
-            group: 'wholesale'
-        });
-    }
-
-    // Bulk pricing — highest applicable tier wins
-    const bulkPricing = variant.bulkPricing || [];
-
-    const matchingTier = [...bulkPricing]
-        .sort((a, b) => b.minQuantity - a.minQuantity)
-        .find(tier => quantity >= tier.minQuantity);
-
-    if (matchingTier) {
-        unitPrice = matchingTier.price;
-
+    if (isBulk) {
+        unitPrice = bulkPrice;
         appliedRules.push({
             type: 'bulk',
-            minQuantity: matchingTier.minQuantity
+            minQuantity: bulkMinimumQty
         });
     }
 
-    // Money uses decimal currency values
-    const unitPriceMoney = Money.fromDecimal(unitPrice, 'ZAR', 2);
-    const subtotal = Money.fromDecimal(
-        unitPrice * quantity,
-        'ZAR',
-        2
-    );
+    const currency = state.sellable?.currency || 'ZAR';
 
-    const isBulk = Boolean(matchingTier);
-    const bulkPrice = matchingTier?.price ?? null;
-    const bulkMinQty = matchingTier?.minQuantity ?? null;
+    const unitPriceMoney = Money.fromDecimal(unitPrice, currency, 2);
+    const subtotal = Money.fromDecimal(unitPrice * quantity, currency, 2);
 
     const item = new ResolutionItem({
         sellable: state.sellable,
-        variant: variant,
-        quantity: quantity,
+        variant,
+        quantity,
         unitPrice: unitPriceMoney,
         origin: { type: 'direct' },
         metadata: {
             appliedRules,
             bulkPrice,
-            bulkMinimumQty: bulkMinQty,
+            bulkMinimumQty,
             isBulk,
-            basePrice: variant.basePrice,
-            wholesalePrice: variant.wholesalePrice,
             selectedPrice: unitPrice
         }
     });
@@ -107,7 +88,7 @@ export class PricingResolver {
             subtotal,
             appliedRules,
             bulkPrice,
-            bulkMinimumQty: bulkMinQty,
+            bulkMinimumQty,
             isBulk
         }
     };
@@ -120,7 +101,7 @@ export class PricingResolver {
             capability: 'pricing',
             decision: isBulk ? 'bulk-applied' : 'retail-applied',
             reason: isBulk
-                ? `Bulk pricing applied: ${unitPrice} each (min: ${bulkMinQty})`
+                ? `Bulk pricing applied: ${unitPrice} each (min: ${bulkMinimumQty})`
                 : `Retail pricing applied: ${unitPrice} each`,
             confidence: 100
         }]
