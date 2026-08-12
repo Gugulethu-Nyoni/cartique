@@ -248,9 +248,9 @@ export default class CartService {
         await this.syncWithKernel();
         
         // Use callback instead of direct UI call
-        // FIX: Pass 'drawer' source — addToCart comes from product pages/drawer context
+        // Notify UI
         if (typeof this.onCartUpdated === 'function') {
-            await this.onCartUpdated('drawer');
+            await this.onCartUpdated();
         }
     }
 
@@ -278,9 +278,9 @@ export default class CartService {
         }
         
         // Notify UI
-        // FIX: Pass 'page' source — removeItem comes from cart page context
+        // Notify UI
         if (typeof this.onCartUpdated === 'function') {
-            await this.onCartUpdated('page');
+            await this.onCartUpdated();
         }
     }
 
@@ -326,9 +326,9 @@ export default class CartService {
         await this.syncWithKernel();
         
         // Notify UI
-        // FIX: Pass 'page' source — updateQuantity comes from cart page context
+        // Notify UI
         if (typeof this.onCartUpdated === 'function') {
-            await this.onCartUpdated('page');
+            await this.onCartUpdated();
         }
     }
 
