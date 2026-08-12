@@ -113,64 +113,70 @@ export class PricingResolver {
    */
   _resolveFromItems(state, items, quantity, customer) {
     const pricedItems = items.map(item => {
-      const variant = item.variant;
-      if (!variant) {
-        return item;
-      }
+        const variant = item.variant;
 
-      let unitPrice = variant.price || variant.basePrice || 0;
-      const appliedRules = [];
-
-      const customerGroup = customer.group;
-      if (customerGroup === 'wholesale' && variant.wholesalePrice) {
-        unitPrice = variant.wholesalePrice;
-        appliedRules.push({ type: 'customer_group', group: 'wholesale' });
-      }
-
-      const bulkPricing = variant.bulkPricing || [];
-      if (bulkPricing.length > 0) {
-        const matchingTier = [...bulkPricing]
-          .sort((a, b) => b.minQuantity - a.minQuantity)
-          .find(t => quantity >= t.minQuantity);
-
-        if (matchingTier) {
-          unitPrice = matchingTier.price;
-          appliedRules.push({ type: 'bulk', minQuantity: matchingTier.minQuantity });
+        if (!variant) {
+            return item;
         }
-      }
 
-      const money = new Money(unitPrice, 'ZAR', 2);
-      return item.withUnitPrice(money);
+        // Use canonical pricing contract
+        let unitPrice = variant.price ?? 0;
+        const appliedRules = [];
+
+        // Bulk pricing
+        const bulkPrice = variant.bulkPrice ?? null;
+        const bulkMinimumQty = variant.bulkMinimumQty ?? null;
+
+        const isBulk =
+            bulkPrice !== null &&
+            bulkMinimumQty !== null &&
+            quantity >= bulkMinimumQty;
+
+        if (isBulk) {
+            unitPrice = bulkPrice;
+            appliedRules.push({
+                type: 'bulk',
+                minQuantity: bulkMinimumQty
+            });
+        }
+
+        const currency = state.sellable?.currency || 'ZAR';
+        const money = Money.fromDecimal(unitPrice, currency, 2);
+
+        return item.withUnitPrice(money);
     });
 
     let totalCents = 0;
+
     pricedItems.forEach(item => {
-      const sub = item.subtotal;
-      if (sub) {
-        totalCents += sub.amount;
-      }
+        const sub = item.subtotal;
+
+        if (sub) {
+            totalCents += sub.amount;
+        }
     });
+
     const subtotalMoney = new Money(totalCents, 'ZAR', 2);
 
     const resolvedData = {
-      pricing: {
-        unitPrice: pricedItems[0]?.unitPrice?.amount || 0,
-        quantity: quantity,
-        subtotal: subtotalMoney,
-        appliedRules: []
-      }
+        pricing: {
+            unitPrice: pricedItems[0]?.unitPrice?.amount || 0,
+            quantity,
+            subtotal: subtotalMoney,
+            appliedRules: []
+        }
     };
 
     return ResolutionPatch.success({
-      items: pricedItems,
-      resolved: resolvedData,
-      journalEntries: [{
-        resolver: 'PricingResolver',
-        capability: 'pricing',
-        decision: 'applied',
-        reason: `Pricing applied: ${pricedItems[0]?.unitPrice?.toFormatted?.() || 'R0.00'}`,
-        confidence: 100
-      }]
+        items: pricedItems,
+        resolved: resolvedData,
+        journalEntries: [{
+            resolver: 'PricingResolver',
+            capability: 'pricing',
+            decision: 'applied',
+            reason: `Pricing applied: ${pricedItems[0]?.unitPrice?.toFormatted?.() || 'R0.00'}`,
+            confidence: 100
+        }]
     });
   }
 }
