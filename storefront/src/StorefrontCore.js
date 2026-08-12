@@ -568,33 +568,26 @@ if (this.services?.cart?.syncWithKernel) {
       }
     };
     
-    this.services.cart.onCartUpdated = async (source = 'drawer') => {
+    this.services.cart.onCartUpdated = async () => {
       if (this.features?.debug) {
-        console.log('[TRACE] onCartUpdated triggered from:', source);
+        console.log('[TRACE] Cart updated');
         console.trace();
       }
 
-      if (source === 'drawer') {
-        if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
-          if (this.features?.debug) {
-            console.log('[TRACE] Calling CartRenderer.showCart()');
-          }
-          await this.cartRenderer.showCart();
-          if (this.features?.debug) {
-            console.log('[TRACE] CartRenderer.showCart completed');
-          }
+      // Determine the active cart surface
+      const cartPage = document.getElementById('cartique-cart-page');
+
+      if (cartPage) {
+        if (this.features?.debug) {
+          console.log('[TRACE] Cart page is active, refreshing');
         }
-      } else if (source === 'page') {
         if (this.cartRenderer && typeof this.cartRenderer.renderCartPage === 'function') {
-          if (this.features?.debug) {
-            console.log('[TRACE] Calling CartRenderer.renderCartPage()');
-          }
           await this.cartRenderer.renderCartPage();
-          if (this.features?.debug) {
-            console.log('[TRACE] CartRenderer.renderCartPage completed');
-          }
         }
       } else {
+        if (this.features?.debug) {
+          console.log('[TRACE] Cart page not active, showing/refreshing drawer');
+        }
         if (this.cartRenderer && typeof this.cartRenderer.showCart === 'function') {
           await this.cartRenderer.showCart();
         }
