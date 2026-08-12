@@ -369,7 +369,7 @@ export default class ProductRenderer {
             variant = this.adapter?.getSelectedVariant(product);
         } catch (e) {
             console.warn('Failed to get variant:', e.message);
-            variant = { price: product.price || 0 };
+            variant = product.variants?.[0] || { price: 0 };
         }
         
         // Get bulk pricing display for product UI
@@ -432,10 +432,10 @@ export default class ProductRenderer {
                     <span class="original-price">${this.currencySymbol}${this.formatPrice(product.original_price)}</span>
                     <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
                 ` : product.sale_price ? `
-                    <span class="original-price">${this.currencySymbol}${this.formatPrice(product.price)}</span>
+                    <span class="original-price">${this.currencySymbol}${this.formatPrice(variant.price || product.variants?.[0]?.price || 0)}</span>
                     <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
                 ` : `
-                    <span class="price">${this.currencySymbol}${this.formatPrice(product.price)}</span>
+                    <span class="price">${this.currencySymbol}${this.formatPrice(variant.price || product.variants?.[0]?.price || 0)}</span>
                 `}
                 ${hasBulk && savings > 0 ? `<span class="savings-badge">Save ${this.currencySymbol}${this.formatPrice(savings)}</span>` : ''}
             </div>
@@ -735,7 +735,7 @@ export default class ProductRenderer {
             variant = this.adapter?.getSelectedVariant(product);
         } catch (e) {
             console.warn('Failed to get variant:', e.message);
-            variant = { price: product.price || 0 };
+            variant = product.variants?.[0] || { price: 0 };
         }
         
         // Get bulk pricing display for product UI
@@ -1010,7 +1010,7 @@ export default class ProductRenderer {
             variant = this.adapter?.getSelectedVariant(product);
         } catch (e) {
             console.warn('Failed to get variant:', e.message);
-            variant = { price: product.price || 0 };
+            variant = product.variants?.[0] || { price: 0 };
         }
         
         const bulkDisplayUI = this._getBulkPricingDisplay(variant);
@@ -1181,14 +1181,14 @@ export default class ProductRenderer {
 
         if (product?.sale_price && product?.original_price) {
             if (priceEl) {
-                priceEl.textContent = this.formatPrice(product.original_price);
+                priceEl.textContent = this.formatPrice(product.variants?.[0]?.price || 0);
                 priceEl.style.textDecoration = 'line-through';
                 priceEl.style.color = '#666';
                 priceEl.style.opacity = '0.7';
                 priceEl.style.fontWeight = '';
             }
             if (salePriceEl) {
-                salePriceEl.textContent = this.formatPrice(product.sale_price);
+                // sale price not in canonical data
                 salePriceEl.style.display = 'block';
                 salePriceEl.style.color = 'red';
                 salePriceEl.style.fontWeight = 'bold';
@@ -1203,14 +1203,14 @@ export default class ProductRenderer {
             }
         } else if (product?.sale_price) {
             if (priceEl) {
-                priceEl.textContent = this.formatPrice(product.price);
+                priceEl.textContent = this.formatPrice(product.variants?.[0]?.price || 0);
                 priceEl.style.textDecoration = 'line-through';
                 priceEl.style.color = '#666';
                 priceEl.style.opacity = '0.7';
                 priceEl.style.fontWeight = '';
             }
             if (salePriceEl) {
-                salePriceEl.textContent = this.formatPrice(product.sale_price);
+                // sale price not in canonical data
                 salePriceEl.style.display = 'block';
                 salePriceEl.style.color = 'red';
                 salePriceEl.style.fontWeight = 'bold';
