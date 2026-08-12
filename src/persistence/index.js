@@ -8,7 +8,6 @@
  */
 
 // Fixtures
-export * from './fixtures/botaniq/index.js';
 
 // Repositories
 export * from './repositories/index.js';
