@@ -1,5 +1,4 @@
 export * from './botaniq/products.js';
-export * from './botaniq/variants.js';
 export * from './botaniq/pricingRules.js';
 export * from './botaniq/inventory.js';
 export * from './botaniq/reviews.js';
