@@ -363,112 +363,38 @@ export default class ProductRenderer {
         const productView = document.createElement('div');
         productView.className = 'single-product-view';
         
-        // --- BULK PRICING: Single Product View ---
-        let variant = null;
-        try {
-            variant = this.adapter?.getSelectedVariant(product);
-        } catch (e) {
-            console.warn('Failed to get variant:', e.message);
-            variant = product.variants?.[0] || { price: 0 };
-        }
+        // --- Get pricing from canonical variant data ---
+        const selectedVariant = this.adapter?.getSelectedVariant(product)
+            || product.variants?.[0]
+            || {};
+
+        const displayPrice = selectedVariant.price || 0;
+        const bulkPrice = selectedVariant.bulkPrice || null;
+        const bulkMinimumQty = selectedVariant.bulkMinimumQty || null;
         
         // Get bulk pricing display for product UI
-        const bulkDisplayUI = this._getBulkPricingDisplay(variant);
+        const bulkDisplayUI = this._getBulkPricingDisplay(selectedVariant);
         
-        let decision;
-        try {
-            decision = await this.adapter?.resolvePricing({
-                sellable: product,
-                variant: variant,
-                quantity: 1,
-                customer: this.customer,
-                place: this.place
-            });
-        } catch (e) {
-            console.warn('Pricing resolution failed:', e.message);
-            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
-        }
-
-        // Extract data from CommercialDecision directly
-        const item = decision?.items?.[0] || {};
-        const adjustments = decision?.adjustments || [];
-        const totals = decision?.totals || {};
-        
-        const hasBulk = adjustments.some(a => 
-            a.type === 'bulk_discount' || 
-            a.label?.toLowerCase().includes('bulk')
-        );
-        const unitPrice = item.unitPrice?.amount || 0;
-        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
-        const totalPrice = totals.subtotal?.amount || 0;
-        
-        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
-        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
-        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
-        const savings = bulkAdjustment?.metadata?.savings || 0;
-
-        const bulkDisplay = {
-            hasBulk: hasBulk,
-            isBulk: hasBulk,
-            retailPrice: retailPrice,
-            bulkPrice: bulkPrice,
-            unitPrice: unitPrice,
-            minimumQty: bulkMinQty,
-            heading: hasBulk ? 'Bulk Price Applied' : 'BULK PRICE',
-            message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
-            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
-            bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-            staticDisplay: {
-                label: 'BULK PRICE',
-                price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-                minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
-            }
-        };
-        
-        // Build price HTML with bulk section
+        // Build price HTML with canonical pricing
         let priceHTML = `
             <div class="price-container">
-                ${product.sale_price && product.original_price ? `
-                    <span class="original-price">${this.currencySymbol}${this.formatPrice(product.original_price)}</span>
-                    <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
-                ` : product.sale_price ? `
-                    <span class="original-price">${this.currencySymbol}${this.formatPrice(variant.price || product.variants?.[0]?.price || 0)}</span>
-                    <span class="sale-price">${this.currencySymbol}${this.formatPrice(product.sale_price)}</span>
-                ` : `
-                    <span class="price">${this.currencySymbol}${this.formatPrice(variant.price || product.variants?.[0]?.price || 0)}</span>
-                `}
-                ${hasBulk && savings > 0 ? `<span class="savings-badge">Save ${this.currencySymbol}${this.formatPrice(savings)}</span>` : ''}
+                <span class="price">${this.currencySymbol}${this.formatPrice(displayPrice)}</span>
             </div>
         `;
-        
-        // Add bulk pricing section if available (from cart decision)
-        if (bulkDisplay && bulkDisplay.hasBulk && bulkDisplay.staticDisplay) {
-            priceHTML += `
-                <div class="cartique-bulk-pricing single-product">
-                    <div class="bulk-header">${bulkDisplay.heading || 'BULK PRICE'}</div>
-                    <div class="bulk-price-row">
-                        <span class="bulk-price">${bulkDisplay.bulkDisplayPrice || ''}</span>
-                    </div>
-                    <div class="bulk-min-row">
-                        <span class="bulk-min-qty">${bulkDisplay.message || ''}</span>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Add bulk pricing display from product variant (shown before purchase)
-        if (bulkDisplayUI && bulkDisplayUI.hasBulk) {
+
+        // Add bulk pricing section if available
+        if (bulkPrice && bulkMinimumQty) {
             priceHTML += `
                 <div class="cartique-bulk-pricing product-display single-product">
                     <div class="bulk-info">
                         <span class="bulk-label">Bulk Price Available</span>
-                        <span class="bulk-price">${bulkDisplayUI.bulkDisplayPrice}</span>
-                        <span class="bulk-min-qty">${bulkDisplayUI.message}</span>
+                        <span class="bulk-price">${this.currencySymbol}${this.formatPrice(bulkPrice)} each</span>
+                        <span class="bulk-min-qty">Minimum ${bulkMinimumQty} items</span>
                     </div>
                 </div>
             `;
         }
-        // --- END BULK PRICING ---
+        // --- END PRICING ---
         
         productView.innerHTML = `
             <button class="back-to-products">← Back to Products</button>
@@ -729,31 +655,13 @@ export default class ProductRenderer {
      * @returns {Promise<HTMLElement|null>}
      */
     async createProductCard(product) {
-        // Get variant and decision first (needed for both theme and default)
-        let variant = null;
-        try {
-            variant = this.adapter?.getSelectedVariant(product);
-        } catch (e) {
-            console.warn('Failed to get variant:', e.message);
-            variant = product.variants?.[0] || { price: 0 };
-        }
+        // Get variant using canonical contract
+        const selectedVariant = this.adapter?.getSelectedVariant(product)
+            || product.variants?.[0]
+            || {};
         
         // Get bulk pricing display for product UI
-        const bulkDisplayUI = this._getBulkPricingDisplay(variant);
-        
-        let decision;
-        try {
-            decision = await this.adapter?.resolvePricing({
-                sellable: product,
-                variant: variant,
-                quantity: 1,
-                customer: this.customer,
-                place: this.place
-            });
-        } catch (e) {
-            console.warn('Pricing resolution failed:', e.message);
-            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
-        }
+        const bulkDisplayUI = this._getBulkPricingDisplay(selectedVariant);
 
         // Check if theme has custom ProductCard component
         const theme = this.themeManager?.currentName || 'default';
@@ -771,7 +679,7 @@ export default class ProductRenderer {
         if (override) {
             try {
                 const card = new override(this);
-                const result = card.render(product, decision);
+                const result = card.render(product);
 
                 // Handle string result (HTML)
                 if (typeof result === 'string') {
@@ -799,18 +707,17 @@ export default class ProductRenderer {
         }
 
         // Fallback to default rendering
-        return this._createDefaultProductCard(product, variant, decision, bulkDisplayUI);
+        return this._createDefaultProductCard(product, selectedVariant, bulkDisplayUI);
     }
 
     /**
      * Create default product card (fallback)
      * @param {Object} product - Product data
-     * @param {Object} variant - Product variant
-     * @param {Object} decision - CommercialDecision
+     * @param {Object} selectedVariant - Product variant
      * @param {Object} bulkDisplayUI - Bulk pricing display data
      * @returns {HTMLElement}
      */
-    _createDefaultProductCard(product, variant, decision, bulkDisplayUI) {
+    _createDefaultProductCard(product, selectedVariant, bulkDisplayUI) {
         const wrapper = this.templateHolder?.content?.getElementById('cartique-product-grid-component');
         if (!wrapper) {
             console.warn('Grid component template not found');
@@ -842,56 +749,6 @@ export default class ProductRenderer {
             }
         }
         // --- END BULK PRICING DISPLAY ---
-
-        // Extract data from CommercialDecision directly (cart bulk logic)
-        const item = decision?.items?.[0] || {};
-        const adjustments = decision?.adjustments || [];
-        
-        const hasBulk = adjustments.some(a => 
-            a.type === 'bulk_discount' || 
-            a.label?.toLowerCase().includes('bulk')
-        );
-        const unitPrice = item.unitPrice?.amount || 0;
-        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
-        
-        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
-        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
-        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
-
-        const bulkDisplay = {
-            hasBulk: hasBulk,
-            isBulk: hasBulk,
-            retailPrice: retailPrice,
-            bulkPrice: bulkPrice,
-            unitPrice: unitPrice,
-            minimumQty: bulkMinQty,
-            heading: hasBulk ? 'Bulk Price Applied' : 'BULK PRICE',
-            message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
-            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
-            bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-            staticDisplay: {
-                label: 'BULK PRICE',
-                price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-                minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
-            }
-        };
-
-        if (bulkDisplay.hasBulk) {
-            const priceContainer = productCardTemplate.querySelector('.currency-price-display');
-            if (priceContainer) {
-                const existing = priceContainer.querySelector('.cartique-bulk-pricing');
-                if (existing) existing.remove();
-
-                const bulkEl = document.createElement('div');
-                bulkEl.className = 'cartique-bulk-pricing';
-                bulkEl.innerHTML = `
-                    <div class="bulk-label">${bulkDisplay.staticDisplay.label}</div>
-                    <div class="bulk-price">${bulkDisplay.staticDisplay.price}</div>
-                    <div class="bulk-min-qty">${bulkDisplay.staticDisplay.minQty}</div>
-                `;
-                priceContainer.appendChild(bulkEl);
-            }
-        }
 
         // Image click handler
         const imgContainer = productCardTemplate.querySelector('.cartique_product_image_container');
@@ -1005,15 +862,11 @@ export default class ProductRenderer {
         await this.updateProductElement(productListingTemplate, product);
 
         // --- BULK PRICING DISPLAY: Product UI (shown before purchase) ---
-        let variant = null;
-        try {
-            variant = this.adapter?.getSelectedVariant(product);
-        } catch (e) {
-            console.warn('Failed to get variant:', e.message);
-            variant = product.variants?.[0] || { price: 0 };
-        }
+        const selectedVariant = this.adapter?.getSelectedVariant(product)
+            || product.variants?.[0]
+            || {};
         
-        const bulkDisplayUI = this._getBulkPricingDisplay(variant);
+        const bulkDisplayUI = this._getBulkPricingDisplay(selectedVariant);
         
         if (bulkDisplayUI && bulkDisplayUI.hasBulk) {
             const priceContainer = productListingTemplate.querySelector('.currency-price-display');
@@ -1034,72 +887,6 @@ export default class ProductRenderer {
             }
         }
         // --- END BULK PRICING DISPLAY ---
-
-        // --- BULK PRICING: List Card (cart bulk logic) ---
-        let decision;
-        try {
-            decision = await this.adapter?.resolvePricing({
-                sellable: product,
-                variant: variant,
-                quantity: 1,
-                customer: this.customer,
-                place: this.place
-            });
-        } catch (e) {
-            console.warn('Pricing resolution failed:', e.message);
-            decision = { items: [{ unitPrice: { amount: 0 } }], adjustments: [], totals: { subtotal: { amount: 0 } } };
-        }
-
-        // Extract data from CommercialDecision directly
-        const item = decision?.items?.[0] || {};
-        const adjustments = decision?.adjustments || [];
-        
-        const hasBulk = adjustments.some(a => 
-            a.type === 'bulk_discount' || 
-            a.label?.toLowerCase().includes('bulk')
-        );
-        const unitPrice = item.unitPrice?.amount || 0;
-        const retailPrice = item.comparePrice?.amount || variant?.price || 0;
-        
-        const bulkAdjustment = adjustments.find(a => a.type === 'bulk_discount');
-        const bulkPrice = bulkAdjustment?.metadata?.bulkPrice || null;
-        const bulkMinQty = bulkAdjustment?.metadata?.minimumQty || null;
-
-        const bulkDisplay = {
-            hasBulk: hasBulk,
-            isBulk: hasBulk,
-            retailPrice: retailPrice,
-            bulkPrice: bulkPrice,
-            unitPrice: unitPrice,
-            minimumQty: bulkMinQty,
-            heading: hasBulk ? 'Bulk Price Applied' : 'BULK PRICE',
-            message: bulkMinQty ? `Minimum ${bulkMinQty} items` : null,
-            displayPrice: `${this.currencySymbol}${this.formatPrice(unitPrice)} each`,
-            bulkDisplayPrice: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-            staticDisplay: {
-                label: 'BULK PRICE',
-                price: bulkPrice ? `${this.currencySymbol}${this.formatPrice(bulkPrice)} each` : null,
-                minQty: bulkMinQty ? `Minimum ${bulkMinQty} items` : null
-            }
-        };
-
-        if (bulkDisplay.hasBulk) {
-            const priceContainer = productListingTemplate.querySelector('.currency-price-display');
-            if (priceContainer) {
-                const existing = priceContainer.querySelector('.cartique-bulk-pricing');
-                if (existing) existing.remove();
-
-                const bulkEl = document.createElement('div');
-                bulkEl.className = 'cartique-bulk-pricing list-view';
-                bulkEl.innerHTML = `
-                    <span class="bulk-label">${bulkDisplay.staticDisplay.label}</span>
-                    <span class="bulk-price">${bulkDisplay.staticDisplay.price}</span>
-                    <span class="bulk-min-qty">${bulkDisplay.staticDisplay.minQty}</span>
-                `;
-                priceContainer.appendChild(bulkEl);
-            }
-        }
-        // --- END BULK PRICING ---
 
         // Image click handler
         const imgContainer = productListingTemplate.querySelector('.cartique_product_image_container');
@@ -1146,6 +933,12 @@ export default class ProductRenderer {
     }
 
     async updateProductElement(element, product) {
+        // Get canonical pricing from variant
+        const selectedVariant = product.variants?.[0] || {};
+        const displayPrice = selectedVariant.price || 0;
+        const bulkPrice = selectedVariant.bulkPrice || null;
+        const bulkMinimumQty = selectedVariant.bulkMinimumQty || null;
+
         // Update all product fields EXCEPT currency
         for (const [key, value] of Object.entries(product || {})) {
             if (key === 'currency') continue;
@@ -1174,75 +967,31 @@ export default class ProductRenderer {
             el.style.fontWeight = '';
         });
 
-        // Handle pricing
+        // Handle pricing - use canonical variant price
         const priceEl = element.querySelector('#price');
         const salePriceEl = element.querySelector('#sale_price');
         const salePriceCurrencyEl = element.querySelector('#sale_price_currency');
 
-        if (product?.sale_price && product?.original_price) {
-            if (priceEl) {
-                priceEl.textContent = this.formatPrice(product.variants?.[0]?.price || 0);
-                priceEl.style.textDecoration = 'line-through';
-                priceEl.style.color = '#666';
-                priceEl.style.opacity = '0.7';
-                priceEl.style.fontWeight = '';
-            }
-            if (salePriceEl) {
-                // sale price not in canonical data
-                salePriceEl.style.display = 'block';
-                salePriceEl.style.color = 'red';
-                salePriceEl.style.fontWeight = 'bold';
-                const saleContainer = salePriceEl.closest('span');
-                if (saleContainer) saleContainer.style.display = '';
-            }
-            if (salePriceCurrencyEl) {
-                salePriceCurrencyEl.textContent = this.currencySymbol || '$';
-                salePriceCurrencyEl.style.display = '';
-                salePriceCurrencyEl.style.color = 'red';
-                salePriceCurrencyEl.style.fontWeight = 'bold';
-            }
-        } else if (product?.sale_price) {
-            if (priceEl) {
-                priceEl.textContent = this.formatPrice(product.variants?.[0]?.price || 0);
-                priceEl.style.textDecoration = 'line-through';
-                priceEl.style.color = '#666';
-                priceEl.style.opacity = '0.7';
-                priceEl.style.fontWeight = '';
-            }
-            if (salePriceEl) {
-                // sale price not in canonical data
-                salePriceEl.style.display = 'block';
-                salePriceEl.style.color = 'red';
-                salePriceEl.style.fontWeight = 'bold';
-                const saleContainer = salePriceEl.closest('span');
-                if (saleContainer) saleContainer.style.display = '';
-            }
-            if (salePriceCurrencyEl) {
-                salePriceCurrencyEl.textContent = this.currencySymbol || '$';
-                salePriceCurrencyEl.style.display = '';
-                salePriceCurrencyEl.style.color = 'red';
-                salePriceCurrencyEl.style.fontWeight = 'bold';
-            }
-        } else {
-            if (priceEl) {
-                priceEl.textContent = this.formatPrice(product?.price || 0);
-                priceEl.style.textDecoration = '';
-                priceEl.style.color = '';
-                priceEl.style.opacity = '';
-                priceEl.style.fontWeight = '';
-            }
-            if (salePriceEl) {
-                salePriceEl.textContent = '';
-                salePriceEl.style.display = 'none';
-                const saleContainer = salePriceEl.closest('span');
-                if (saleContainer) saleContainer.style.display = 'none';
-            }
-            if (salePriceCurrencyEl) {
-                salePriceCurrencyEl.textContent = '';
-                salePriceCurrencyEl.style.display = 'none';
-                salePriceCurrencyEl.style.color = '';
-                salePriceCurrencyEl.style.fontWeight = '';
-            }
+        if (priceEl) {
+            priceEl.textContent = this.formatPrice(displayPrice);
+            priceEl.style.textDecoration = '';
+            priceEl.style.color = '';
+            priceEl.style.opacity = '';
+            priceEl.style.fontWeight = '';
+        }
+
+        // Remove sale price elements (not in canonical data)
+        if (salePriceEl) {
+            salePriceEl.textContent = '';
+            salePriceEl.style.display = 'none';
+            const saleContainer = salePriceEl.closest('span');
+            if (saleContainer) saleContainer.style.display = 'none';
+        }
+        if (salePriceCurrencyEl) {
+            salePriceCurrencyEl.textContent = '';
+            salePriceCurrencyEl.style.display = 'none';
+            salePriceCurrencyEl.style.color = '';
+            salePriceCurrencyEl.style.fontWeight = '';
         }
 
         // STOCK MANAGEMENT
