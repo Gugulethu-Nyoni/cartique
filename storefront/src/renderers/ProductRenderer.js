@@ -709,6 +709,7 @@ export default class ProductRenderer {
         `;
     }
 
+    
     renderStars(rating) {
         const numRating = parseFloat(rating) || 0;
         const fullStars = Math.floor(numRating);
