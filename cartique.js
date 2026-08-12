@@ -10,6 +10,13 @@
 
 import StorefrontCore from './storefront/src/StorefrontCore.js';
 import { ResolutionEngine } from './src/engine/ResolutionEngine.js';
+import {
+    VariantResolver,
+    PricingResolver,
+    PromotionResolver,
+    TaxResolver,
+    ShippingResolver
+} from './src/engine/resolvers/index.js';
 import { Customer, Place } from './src/commerce/index.js';
 
 export default class Cartique {
@@ -33,7 +40,15 @@ export default class Cartique {
         this.place = options.place || Place.southAfrica();
 
         // 3. Create kernel (with default resolvers)
-        this.kernel = new ResolutionEngine();
+        this.kernel = new ResolutionEngine({
+        resolvers: [
+            new VariantResolver(),
+            new PricingResolver(),
+            new PromotionResolver(),
+            new TaxResolver(),
+            new ShippingResolver()
+        ]
+    });
 
         // 4. Create storefront
         this.storefront = new StorefrontCore(
