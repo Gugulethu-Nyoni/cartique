@@ -39,71 +39,91 @@ export class PricingResolver {
   /**
    * Resolve pricing from a selected variant
    */
-  _resolveFromVariant(state, variant, quantity, customer) {
-    let unitPrice = variant.price || 0;
+  _resolveFromVariant(state, variant, quantity, customer = null) {
+    let unitPrice = variant.basePrice || 0;
     const appliedRules = [];
 
-    // Check customer group pricing
-    const customerGroup = customer.group;
-    if (customerGroup === 'wholesale' && variant.wholesalePrice) {
-      unitPrice = variant.wholesalePrice;
-      appliedRules.push({ type: 'customer_group', group: 'wholesale' });
+    // Customer-group pricing
+    const customerGroup = customer?.group || 'retail';
+
+    if (customerGroup === 'wholesale' && variant.wholesalePrice !== null) {
+        unitPrice = variant.wholesalePrice;
+
+        appliedRules.push({
+            type: 'customer_group',
+            group: 'wholesale'
+        });
     }
 
-    // Check bulk pricing
-    const bulkPrice = variant.bulkPrice || null;
-    const bulkMinQty = variant.bulkMinimumQty || null;
-    if (bulkPrice !== null && bulkMinQty !== null && quantity >= bulkMinQty) {
-      unitPrice = bulkPrice;
-      appliedRules.push({ type: 'bulk', minQuantity: bulkMinQty });
+    // Bulk pricing — highest applicable tier wins
+    const bulkPricing = variant.bulkPricing || [];
+
+    const matchingTier = [...bulkPricing]
+        .sort((a, b) => b.minQuantity - a.minQuantity)
+        .find(tier => quantity >= tier.minQuantity);
+
+    if (matchingTier) {
+        unitPrice = matchingTier.price;
+
+        appliedRules.push({
+            type: 'bulk',
+            minQuantity: matchingTier.minQuantity
+        });
     }
 
-    // Create money objects
-    const unitPriceMoney = new Money(unitPrice, 'ZAR', 2);
-    const subtotal = new Money(unitPrice * quantity, 'ZAR', 2);
+    // Money uses decimal currency values
+    const unitPriceMoney = Money.fromDecimal(unitPrice, 'ZAR', 2);
+    const subtotal = Money.fromDecimal(
+        unitPrice * quantity,
+        'ZAR',
+        2
+    );
 
-    // Create resolution item
+    const isBulk = Boolean(matchingTier);
+    const bulkPrice = matchingTier?.price ?? null;
+    const bulkMinQty = matchingTier?.minQuantity ?? null;
+
     const item = new ResolutionItem({
-      sellable: state.sellable,
-      variant: variant,
-      quantity: quantity,
-      unitPrice: unitPriceMoney,
-      origin: { type: 'direct' },
-      metadata: {
-        appliedRules: appliedRules,
-        bulkPrice: bulkPrice,
-        bulkMinimumQty: bulkMinQty,
-        isBulk: appliedRules.some(r => r.type === 'bulk')
-      }
+        sellable: state.sellable,
+        variant: variant,
+        quantity: quantity,
+        unitPrice: unitPriceMoney,
+        origin: { type: 'direct' },
+        metadata: {
+            appliedRules,
+            bulkPrice,
+            bulkMinimumQty: bulkMinQty,
+            isBulk,
+            basePrice: variant.basePrice,
+            wholesalePrice: variant.wholesalePrice,
+            selectedPrice: unitPrice
+        }
     });
 
-    // Build resolved data
     const resolvedData = {
-      pricing: {
-        unitPrice: unitPrice,
-        quantity: quantity,
-        subtotal: subtotal,
-        appliedRules: appliedRules,
-        bulkPrice: bulkPrice,
-        bulkMinimumQty: bulkMinQty,
-        isBulk: appliedRules.some(r => r.type === 'bulk')
-      }
+        pricing: {
+            unitPrice,
+            quantity,
+            subtotal,
+            appliedRules,
+            bulkPrice,
+            bulkMinimumQty: bulkMinQty,
+            isBulk
+        }
     };
 
-    const isBulk = appliedRules.some(r => r.type === 'bulk');
-
     return ResolutionPatch.success({
-      items: [item],
-      resolved: resolvedData,
-      journalEntries: [{
-        resolver: 'PricingResolver',
-        capability: 'pricing',
-        decision: isBulk ? 'bulk-applied' : 'retail-applied',
-        reason: isBulk 
-          ? `Bulk pricing applied: ${unitPrice} each (min: ${bulkMinQty})`
-          : `Retail pricing applied: ${unitPrice} each`,
-        confidence: 100
-      }]
+        items: [item],
+        resolved: resolvedData,
+        journalEntries: [{
+            resolver: 'PricingResolver',
+            capability: 'pricing',
+            decision: isBulk ? 'bulk-applied' : 'retail-applied',
+            reason: isBulk
+                ? `Bulk pricing applied: ${unitPrice} each (min: ${bulkMinQty})`
+                : `Retail pricing applied: ${unitPrice} each`,
+            confidence: 100
+        }]
     });
   }
 
