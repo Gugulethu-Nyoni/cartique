@@ -33,7 +33,12 @@ export const products = [
 
         title: 'Chia Seeds',
 
-        product_images: [],
+        product_images: [
+    'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=500', // dried herbs
+    'https://images.pexels.com/photos/4198021/pexels-photo-4198021.jpeg?w=500', // essential oils
+    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=500', // herbal tea
+    'https://images.pexels.com/photos/4041392/pexels-photo-4041392.jpeg?w=500' // natural supplements
+    ],
 
         variants: [
             {
@@ -221,8 +226,14 @@ export const products = [
 
         title: 'Soursop Leaves',
 
-        product_images: [],
-
+        product_images: [
+            'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=600&h=600&fit=crop',  // dried herbs in bowl
+            'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&h=600&fit=crop',  // herbal tea cup
+            'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&h=600&fit=crop',  // essential oils
+            'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=600&h=600&fit=crop',  // natural supplements
+            'https://images.pexels.com/photos/4198021/pexels-photo-4198021.jpeg?w=600&h=600&fit=crop',  // herbal extracts
+            'https://images.pexels.com/photos/4041392/pexels-photo-4041392.jpeg?w=600&h=600&fit=crop'  // dried flowers/plants
+        ],
         variants: [
             {
                 id: 14,
