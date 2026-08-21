@@ -1,3 +1,4 @@
+import { GalleryFactory } from './gallery/index.js';
 /**
  * @semantq/storefront
  *
@@ -23,6 +24,44 @@ export default class ProductRenderer {
         if (!this.state) {
             throw new Error('ProductRenderer requires shared state object');
         }
+
+
+    /**
+     * Get raw product images (primary + additional)
+     * Raw only — normalization happens in GalleryEngine
+     * @param {Object} product - Product data
+     * @returns {Array} Raw image URLs
+     */
+    _getProductImages(product) {
+        return [
+            product.image,
+            ...(product.product_images || [])
+        ].filter(Boolean);
+    }
+
+
+    /**
+     * Get configured gallery mode
+     * @returns {string} Resolved gallery mode
+     */
+    _getGalleryMode() {
+        const themeConfig = this.themeManager?.currentTheme?.config;
+        const configured = themeConfig?.components?.productGallery;
+        return GalleryFactory.resolveMode(configured);
+    }
+
+
+    /**
+     * Clean up gallery on navigation
+     */
+    _destroyGallery() {
+        if (this._galleryEngine) {
+            this._galleryEngine.mode?.destroy?.();
+            this._galleryEngine.destroy();
+            this._galleryEngine = null;
+        }
+    }
+
         
         // Ensure eventListeners exists
         if (!this.eventListeners) {
@@ -396,13 +435,34 @@ export default class ProductRenderer {
         }
         // --- END PRICING ---
         
+        // Determine gallery vs single image
+        const images = this._getProductImages(product);
+        const galleryMode = this._getGalleryMode();
+
+        let imageHTML;
+        if (images.length <= 1) {
+            // Existing single image behaviour
+            imageHTML = `
+                <div class="product-image-container">
+                    <img src="${images[0] || ''}" alt="${product.title || ''}" loading="lazy">
+                </div>
+            `;
+            this._galleryEngine = null;
+        } else {
+            // Gallery mode
+            this._galleryEngine = GalleryFactory.create(
+                images,
+                galleryMode,
+                { product, features: this.features }
+            );
+            imageHTML = this._galleryEngine.mode.render();
+        }
+
         productView.innerHTML = `
             <button class="back-to-products">← Back to Products</button>
             <div class="product-content-wrapper">
                 <div class="product-image-column">
-                    <div class="product-image-container">
-                        <img src="${product.image || ''}" alt="${product.title || ''}" loading="lazy">
-                    </div>
+                    ${imageHTML}
                 </div>
                 <div class="product-info-column">
                     <div class="product-meta">
@@ -499,6 +559,16 @@ export default class ProductRenderer {
 
         container.appendChild(productView);
         container.style.display = 'block';
+
+        // Attach gallery events if gallery is active
+        if (this._galleryEngine?.mode?.attachEvents) {
+            this._galleryEngine.mode.attachEvents(productView);
+        }
+
+        // Attach gallery events if gallery is active
+        if (this._galleryEngine?.mode?.attachEvents) {
+            this._galleryEngine.mode.attachEvents(productView);
+        }
         
         // Attach review form submit listener
         const submitBtn = container.querySelector('#review-submit-btn');
