@@ -1,4 +1,3 @@
-import { GalleryFactory } from './gallery/index.js';
 /**
  * @semantq/storefront
  *
@@ -16,6 +15,8 @@ import { GalleryFactory } from './gallery/index.js';
  * Single ownership: Layout + Product Display
  */
 
+import { GalleryFactory } from './gallery/index.js';
+
 export default class ProductRenderer {
     constructor(context = {}) {
         Object.assign(this, context);
@@ -24,44 +25,6 @@ export default class ProductRenderer {
         if (!this.state) {
             throw new Error('ProductRenderer requires shared state object');
         }
-
-
-    /**
-     * Get raw product images (primary + additional)
-     * Raw only — normalization happens in GalleryEngine
-     * @param {Object} product - Product data
-     * @returns {Array} Raw image URLs
-     */
-    _getProductImages(product) {
-        return [
-            product.image,
-            ...(product.product_images || [])
-        ].filter(Boolean);
-    }
-
-
-    /**
-     * Get configured gallery mode
-     * @returns {string} Resolved gallery mode
-     */
-    _getGalleryMode() {
-        const themeConfig = this.themeManager?.currentTheme?.config;
-        const configured = themeConfig?.components?.productGallery;
-        return GalleryFactory.resolveMode(configured);
-    }
-
-
-    /**
-     * Clean up gallery on navigation
-     */
-    _destroyGallery() {
-        if (this._galleryEngine) {
-            this._galleryEngine.mode?.destroy?.();
-            this._galleryEngine.destroy();
-            this._galleryEngine = null;
-        }
-    }
-
         
         // Ensure eventListeners exists
         if (!this.eventListeners) {
@@ -109,6 +72,47 @@ export default class ProductRenderer {
         // THEME COMPONENTS
         this.themeManager = context.themeManager || null;
         this.componentRegistry = context.componentRegistry || null;
+        
+        // GALLERY STATE
+        this._galleryEngine = null;
+    }
+
+    // ==========================================================
+    // GALLERY HELPER METHODS
+    // ==========================================================
+
+    /**
+     * Get raw product images (primary + additional)
+     * Raw only — normalization happens in GalleryEngine
+     * @param {Object} product - Product data
+     * @returns {Array} Raw image URLs
+     */
+    _getProductImages(product) {
+        return [
+            product.image,
+            ...(product.product_images || [])
+        ].filter(Boolean);
+    }
+
+    /**
+     * Get configured gallery mode
+     * @returns {string} Resolved gallery mode
+     */
+    _getGalleryMode() {
+        const themeConfig = this.themeManager?.currentTheme?.config;
+        const configured = themeConfig?.components?.productGallery;
+        return GalleryFactory.resolveMode(configured);
+    }
+
+    /**
+     * Clean up gallery on navigation
+     */
+    _destroyGallery() {
+        if (this._galleryEngine) {
+            this._galleryEngine.mode?.destroy?.();
+            this._galleryEngine.destroy();
+            this._galleryEngine = null;
+        }
     }
 
     // ==========================================================
@@ -338,6 +342,9 @@ export default class ProductRenderer {
     }
 
     async renderSingleProduct(product) {
+        // Clean up any existing gallery before rendering new product
+        this._destroyGallery();
+
         if (!product) {
             console.error('Product not found');
             return this.renderEmptyState({
@@ -435,13 +442,13 @@ export default class ProductRenderer {
         }
         // --- END PRICING ---
         
-        // Determine gallery vs single image
+        // --- GALLERY INTEGRATION ---
         const images = this._getProductImages(product);
         const galleryMode = this._getGalleryMode();
 
         let imageHTML;
         if (images.length <= 1) {
-            // Existing single image behaviour
+            // Single image — existing behaviour
             imageHTML = `
                 <div class="product-image-container">
                     <img src="${images[0] || ''}" alt="${product.title || ''}" loading="lazy">
@@ -449,7 +456,7 @@ export default class ProductRenderer {
             `;
             this._galleryEngine = null;
         } else {
-            // Gallery mode
+            // Multiple images — activate gallery
             this._galleryEngine = GalleryFactory.create(
                 images,
                 galleryMode,
@@ -457,6 +464,7 @@ export default class ProductRenderer {
             );
             imageHTML = this._galleryEngine.mode.render();
         }
+        // --- END GALLERY INTEGRATION ---
 
         productView.innerHTML = `
             <button class="back-to-products">← Back to Products</button>
@@ -498,6 +506,8 @@ export default class ProductRenderer {
                     console.trace();
                 }
                 
+                this._destroyGallery();
+
                 if (typeof this.onBackToList === 'function') {
                     await this.onBackToList();
                 } else {
@@ -559,11 +569,6 @@ export default class ProductRenderer {
 
         container.appendChild(productView);
         container.style.display = 'block';
-
-        // Attach gallery events if gallery is active
-        if (this._galleryEngine?.mode?.attachEvents) {
-            this._galleryEngine.mode.attachEvents(productView);
-        }
 
         // Attach gallery events if gallery is active
         if (this._galleryEngine?.mode?.attachEvents) {
