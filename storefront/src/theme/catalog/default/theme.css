@@ -2910,14 +2910,12 @@
 .cartique-gallery {
     width: 100%;
     position: relative;
+}
 
-    overflow: hidden;
-\}
-
-.gallery-horizontal .gallery-hero-image {
+.gallery-hero-image {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     border-radius: 8px;
 }
 
@@ -2979,9 +2977,8 @@
     height: 100%;
     object-fit: cover;
     display: block;
-
     position: static;
-\}
+}
 
 .gallery-classic .gallery-hero-container,
 .gallery-horizontal .gallery-hero-container {
@@ -3027,6 +3024,7 @@
 
 .gallery-horizontal .gallery-hero-container {
     aspect-ratio: 4/3;
+    overflow: hidden;
 }
 
 .gallery-horizontal .gallery-thumbnails-horizontal {
