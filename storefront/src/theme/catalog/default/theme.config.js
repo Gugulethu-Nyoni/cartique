@@ -16,6 +16,6 @@ export default {
         productGrid: 'default',
         cartDrawer: 'default'
     ,
-        productGallery: \'horizontal\'
+        productGallery: 'horizontal'
     }
 };
