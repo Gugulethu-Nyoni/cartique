@@ -4,7 +4,7 @@
  */
 
 import Cartique from '../../../cartique.js';
-import products from './products.js';
+import products from './products_clothing.js';
 
 // ==========================================================
 // 1. CURRENCY & HELPERS
@@ -86,8 +86,8 @@ const features = {
     sale: true,
     search: true,
     sorting: true,
-    sidebar: false,
-    footer: false,
+    sidebar: true,
+    footer: true,
     
     // ----- Checkout & Navigation -----
     checkoutUrl: '/auth/dashboard',

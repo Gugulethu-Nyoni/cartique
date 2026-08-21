@@ -34,11 +34,11 @@ export const products = [
         title: 'Chia Seeds',
 
         product_images: [
-    'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=500', // dried herbs
-    'https://images.pexels.com/photos/4198021/pexels-photo-4198021.jpeg?w=500', // essential oils
-    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=500', // herbal tea
-    'https://images.pexels.com/photos/4041392/pexels-photo-4041392.jpeg?w=500' // natural supplements
-    ],
+            'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=500',
+            'https://images.pexels.com/photos/4198021/pexels-photo-4198021.jpeg?w=500',
+            'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=500',
+            'https://images.pexels.com/photos/4041392/pexels-photo-4041392.jpeg?w=500'
+        ],
 
         variants: [
             {
@@ -227,12 +227,12 @@ export const products = [
         title: 'Soursop Leaves',
 
         product_images: [
-            'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=600&h=600&fit=crop',  // dried herbs in bowl
-            'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&h=600&fit=crop',  // herbal tea cup
-            'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&h=600&fit=crop',  // essential oils
-            'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=600&h=600&fit=crop',  // natural supplements
-            'https://images.pexels.com/photos/4198021/pexels-photo-4198021.jpeg?w=600&h=600&fit=crop',  // herbal extracts
-            'https://images.pexels.com/photos/4041392/pexels-photo-4041392.jpeg?w=600&h=600&fit=crop'  // dried flowers/plants
+            'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=600&h=600&fit=crop',
+            'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&h=600&fit=crop',
+            'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&h=600&fit=crop',
+            'https://images.unsplash.com/photo-1596178060671-7a80dc8059ea?w=600&h=600&fit=crop',
+            'https://images.pexels.com/photos/4198021/pexels-photo-4198021.jpeg?w=600&h=600&fit=crop',
+            'https://images.pexels.com/photos/4041392/pexels-photo-4041392.jpeg?w=600&h=600&fit=crop'
         ],
         variants: [
             {
@@ -309,7 +309,233 @@ export const products = [
         media: [],
 
         reviews: [
-            // Same ProductReview + Customer shape here.
+            {
+                id: 3,
+                productId: 14,
+                customerId: 1,
+                rating: 5,
+                comment:
+                    'This soursop tea is amazing! It has a very soothing effect and helps me sleep better at night.',
+                status: 'approved',
+                createdAt: '2026-06-10T09:15:00.000Z',
+                updatedAt: '2026-06-10T09:15:00.000Z',
+
+                customer: {
+                    id: 1,
+                    phone: null,
+                    metadata: null,
+                    createdAt: '2026-01-01T10:00:00.000Z',
+                    loyaltyPoints: 0,
+                    updatedAt: '2026-01-01T10:00:00.000Z',
+                    userId: 1,
+
+                    users: {
+                        id: 1,
+                        name: 'Sarah',
+                        surname: 'M.',
+                        email: 'sarah@example.com'
+                    }
+                }
+            }
+        ]
+    },
+
+    {
+        id: 25,
+        sku: 'MORINGA-001',
+        slug: 'moringa-powder',
+        short_description: 'Organic moringa leaf powder - nature\'s multivitamin.',
+        description:
+            'Premium organic moringa leaf powder, sustainably sourced and hand-harvested. Packed with vitamins A, C, and E, calcium, potassium, and protein. A powerful superfood for daily wellness.',
+        status: 'active',
+
+        attributes: {
+            origin: 'South Africa',
+            organic: true,
+            glutenFree: true,
+            vegan: true
+        },
+
+        metadata: {
+            brand: 'Botaniq',
+            unit: 'g',
+            precision: 2
+        },
+
+        createdAt: '2026-02-01T10:00:00.000Z',
+        updatedAt: '2026-02-01T10:00:00.000Z',
+
+        currency: 'ZAR',
+
+        image:
+            'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=600&h=600&fit=crop&crop=center',
+
+        title: 'Moringa Powder',
+
+        product_images: [],
+
+        variants: [
+            {
+                id: 25,
+                productId: 25,
+                sku: 'MOR001',
+                barcode: null,
+
+                attributes: [
+                    { key: 'form', value: 'Powder', dataType: 'string' },
+                    { key: 'weight', value: '100g', dataType: 'string' },
+                    {
+                        key: 'pouch_size',
+                        value: '160x240mm + 80mm gusset',
+                        dataType: 'string'
+                    }
+                ],
+
+                variant_image: null,
+
+                price: 180,
+                compareAtPrice: null,
+                costPrice: 90,
+
+                bulkPrice: 150,
+                bulkMinimumQty: 10,
+
+                inventory: 45,
+                inventoryPolicy: 'deny',
+                low_stock_threshold: 5,
+
+                length_cm: 16,
+                width_cm: 8,
+                height_cm: 24,
+                weight_kg: 0.12,
+
+                isDefault: true,
+
+                createdAt: '2026-02-01T10:00:00.000Z',
+                updatedAt: '2026-02-01T10:00:00.000Z'
+            },
+
+            {
+                id: 26,
+                productId: 25,
+                sku: 'MOR002',
+                barcode: null,
+
+                attributes: [
+                    { key: 'form', value: 'Powder', dataType: 'string' },
+                    { key: 'weight', value: '250g', dataType: 'string' }
+                ],
+
+                variant_image: null,
+
+                price: 350,
+                compareAtPrice: null,
+                costPrice: 175,
+
+                bulkPrice: 300,
+                bulkMinimumQty: 5,
+
+                inventory: 20,
+                inventoryPolicy: 'deny',
+                low_stock_threshold: 5,
+
+                length_cm: 20,
+                width_cm: 12,
+                height_cm: 28,
+                weight_kg: 0.30,
+
+                isDefault: false,
+
+                createdAt: '2026-02-01T10:00:00.000Z',
+                updatedAt: '2026-02-01T10:00:00.000Z'
+            }
+        ],
+
+        categories: [
+            {
+                id: 3,
+                name: 'Superfoods',
+                slug: 'superfoods',
+                description: null,
+                parent_id: null,
+                metadata: null,
+                sortOrder: 0,
+                createdAt: '2026-01-01T10:00:00.000Z',
+                updatedAt: '2026-01-01T10:00:00.000Z'
+            },
+            {
+                id: 1,
+                name: 'Immune Boosters',
+                slug: 'immune-boosters',
+                description: null,
+                parent_id: null,
+                metadata: null,
+                sortOrder: 0,
+                createdAt: '2026-01-01T10:00:00.000Z',
+                updatedAt: '2026-01-01T10:00:00.000Z'
+            }
+        ],
+
+        media: [],
+
+        reviews: [
+            {
+                id: 4,
+                productId: 25,
+                customerId: 2,
+                rating: 5,
+                comment:
+                    'I\'ve been adding this moringa powder to my smoothies for a month now. I feel more energetic and my skin looks clearer!',
+                status: 'approved',
+                createdAt: '2026-06-20T11:30:00.000Z',
+                updatedAt: '2026-06-20T11:30:00.000Z',
+
+                customer: {
+                    id: 2,
+                    phone: null,
+                    metadata: null,
+                    createdAt: '2026-01-01T10:00:00.000Z',
+                    loyaltyPoints: 0,
+                    updatedAt: '2026-01-01T10:00:00.000Z',
+                    userId: 2,
+
+                    users: {
+                        id: 2,
+                        name: 'John',
+                        surname: 'D.',
+                        email: 'john@example.com'
+                    }
+                }
+            },
+
+            {
+                id: 5,
+                productId: 25,
+                customerId: 3,
+                rating: 4,
+                comment:
+                    'Good quality moringa. I use it in my morning tea. The 100g pack lasts me about 3 weeks.',
+                status: 'approved',
+                createdAt: '2026-07-01T08:45:00.000Z',
+                updatedAt: '2026-07-01T08:45:00.000Z',
+
+                customer: {
+                    id: 3,
+                    phone: null,
+                    metadata: null,
+                    createdAt: '2026-01-01T10:00:00.000Z',
+                    loyaltyPoints: 0,
+                    updatedAt: '2026-01-01T10:00:00.000Z',
+                    userId: 3,
+
+                    users: {
+                        id: 3,
+                        name: 'Lisa',
+                        surname: 'R.',
+                        email: 'lisa@example.com'
+                    }
+                }
+            }
         ]
     }
 ];
