@@ -15,6 +15,8 @@
  * Single ownership: Layout + Product Display
  */
 
+import { GalleryFactory } from './gallery/index.js';
+
 export default class ProductRenderer {
     constructor(context = {}) {
         Object.assign(this, context);
@@ -70,6 +72,47 @@ export default class ProductRenderer {
         // THEME COMPONENTS
         this.themeManager = context.themeManager || null;
         this.componentRegistry = context.componentRegistry || null;
+        
+        // GALLERY STATE
+        this._galleryEngine = null;
+    }
+
+    // ==========================================================
+    // GALLERY HELPER METHODS
+    // ==========================================================
+
+    /**
+     * Get raw product images (primary + additional)
+     * Raw only — normalization happens in GalleryEngine
+     * @param {Object} product - Product data
+     * @returns {Array} Raw image URLs
+     */
+    _getProductImages(product) {
+        return [
+            product.image,
+            ...(product.product_images || [])
+        ].filter(Boolean);
+    }
+
+    /**
+     * Get configured gallery mode
+     * @returns {string} Resolved gallery mode
+     */
+    _getGalleryMode() {
+        const themeConfig = this.themeManager?.currentTheme?.config;
+        const configured = themeConfig?.components?.productGallery;
+        return GalleryFactory.resolveMode(configured);
+    }
+
+    /**
+     * Clean up gallery on navigation
+     */
+    _destroyGallery() {
+        if (this._galleryEngine) {
+            this._galleryEngine.mode?.destroy?.();
+            this._galleryEngine.destroy();
+            this._galleryEngine = null;
+        }
     }
 
     // ==========================================================
@@ -299,6 +342,9 @@ export default class ProductRenderer {
     }
 
     async renderSingleProduct(product) {
+        // Clean up any existing gallery before rendering new product
+        this._destroyGallery();
+
         if (!product) {
             console.error('Product not found');
             return this.renderEmptyState({
@@ -396,13 +442,35 @@ export default class ProductRenderer {
         }
         // --- END PRICING ---
         
+        // --- GALLERY INTEGRATION ---
+        const images = this._getProductImages(product);
+        const galleryMode = this._getGalleryMode();
+
+        let imageHTML;
+        if (images.length <= 1) {
+            // Single image — existing behaviour
+            imageHTML = `
+                <div class="product-image-container">
+                    <img src="${images[0] || ''}" alt="${product.title || ''}" loading="lazy">
+                </div>
+            `;
+            this._galleryEngine = null;
+        } else {
+            // Multiple images — activate gallery
+            this._galleryEngine = GalleryFactory.create(
+                images,
+                galleryMode,
+                { product, features: this.features }
+            );
+            imageHTML = this._galleryEngine.mode.render();
+        }
+        // --- END GALLERY INTEGRATION ---
+
         productView.innerHTML = `
             <button class="back-to-products">← Back to Products</button>
             <div class="product-content-wrapper">
                 <div class="product-image-column">
-                    <div class="product-image-container">
-                        <img src="${product.image || ''}" alt="${product.title || ''}" loading="lazy">
-                    </div>
+                    ${imageHTML}
                 </div>
                 <div class="product-info-column">
                     <div class="product-meta">
@@ -438,6 +506,8 @@ export default class ProductRenderer {
                     console.trace();
                 }
                 
+                this._destroyGallery();
+
                 if (typeof this.onBackToList === 'function') {
                     await this.onBackToList();
                 } else {
@@ -499,6 +569,11 @@ export default class ProductRenderer {
 
         container.appendChild(productView);
         container.style.display = 'block';
+
+        // Attach gallery events if gallery is active
+        if (this._galleryEngine?.mode?.attachEvents) {
+            this._galleryEngine.mode.attachEvents(productView);
+        }
         
         // Attach review form submit listener
         const submitBtn = container.querySelector('#review-submit-btn');

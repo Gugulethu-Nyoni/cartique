@@ -15,5 +15,7 @@ export default {
         productCard: 'default',
         productGrid: 'default',
         cartDrawer: 'default'
+    ,
+        productGallery: 'editorial'
     }
 };

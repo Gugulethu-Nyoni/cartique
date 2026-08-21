@@ -458,7 +458,7 @@
     background: #f5f5f5;
 }
 
-.product-image-column img {
+.product-image-column > .product-image-container > img {
     position: absolute;
     top: 0;
     left: 0;
@@ -2901,4 +2901,281 @@
     align-items: center;
     gap: 0.75rem;
   }
+}
+
+/* ==========================================
+   PRODUCT GALLERY — SHARED STYLES
+   ========================================== */
+
+.cartique-gallery {
+    width: 100%;
+    position: relative;
+}
+
+.gallery-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.gallery-counter {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 2;
+}
+
+/* ==========================================
+   MODE 1 — CLASSIC
+   Vertical thumbnails + large hero
+   ========================================== */
+
+.gallery-classic .gallery-classic-layout {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 16px;
+}
+
+.gallery-classic .gallery-thumbnails-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gallery-classic .gallery-thumbnail,
+.gallery-horizontal .gallery-thumbnail {
+    border: 2px solid transparent;
+    border-radius: 6px;
+    overflow: hidden;
+    padding: 0;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    background: none;
+}
+
+.gallery-classic .gallery-thumbnail {
+    width: 80px;
+    height: 80px;
+    flex: 0 0 80px;
+}
+
+.gallery-classic .gallery-thumbnail.active,
+.gallery-horizontal .gallery-thumbnail.active {
+    border-color: var(--cartique-accent, #655793);
+}
+
+.gallery-classic .gallery-thumbnail img,
+.gallery-horizontal .gallery-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: static;
+}
+
+.gallery-classic .gallery-hero-container,
+.gallery-horizontal .gallery-hero-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #f5f5f5;
+}
+
+.gallery-classic .gallery-hero-container {
+    aspect-ratio: 1;
+}
+
+.gallery-classic .gallery-arrow,
+.gallery-horizontal .gallery-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: background 0.2s;
+}
+
+.gallery-classic .gallery-arrow:hover,
+.gallery-horizontal .gallery-arrow:hover {
+    background: white;
+}
+
+.gallery-prev { left: 12px; }
+.gallery-next { right: 12px; }
+
+/* ==========================================
+   MODE 2 — HORIZONTAL
+   Large hero + horizontal thumbnail strip
+   ========================================== */
+
+.gallery-horizontal .gallery-hero-container {
+    aspect-ratio: 4/3;
+    overflow: hidden;
+}
+
+.gallery-horizontal .gallery-thumbnails-horizontal {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    overflow-x: auto;
+    padding: 4px 0;
+}
+
+.gallery-horizontal .gallery-thumbnail {
+    flex: 0 0 60px;
+    width: 60px;
+    height: 60px;
+}
+
+/* ==========================================
+   MODE 3 — EDITORIAL
+   Asymmetric grid + lightbox
+   ========================================== */
+
+.gallery-editorial .gallery-editorial-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    aspect-ratio: 4/3;
+}
+
+.gallery-editorial .gallery-grid-item {
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 6px;
+    background: none;
+}
+
+.gallery-editorial .gallery-grid-item.featured {
+    grid-row: span 2;
+}
+
+.gallery-editorial .gallery-grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Editorial Lightbox */
+.gallery-lightbox {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+}
+
+.lightbox-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    cursor: pointer;
+}
+
+.lightbox-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lightbox-image {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    z-index: 1;
+}
+
+.lightbox-close,
+.lightbox-prev,
+.lightbox-next {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 24px;
+    z-index: 2;
+    transition: background 0.2s;
+}
+
+.lightbox-close:hover,
+.lightbox-prev:hover,
+.lightbox-next:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.lightbox-close {
+    top: 20px;
+    right: 20px;
+}
+
+.lightbox-prev {
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.lightbox-next {
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* ==========================================
+   RESPONSIVE — LOCKED COMPOSITIONS
+   ========================================== */
+
+/* Classic -> mobile: hero on top, horizontal thumbs below */
+@media (max-width: 768px) {
+    .gallery-classic .gallery-classic-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+    }
+    
+    .gallery-classic .gallery-thumbnails-vertical {
+        flex-direction: row;
+        order: 2;
+        overflow-x: auto;
+        padding: 4px 0;
+    }
+    
+    .gallery-classic .gallery-hero-container {
+        order: 1;
+    }
+}
+
+/* Editorial -> mobile: 2-column grid */
+@media (max-width: 768px) {
+    .gallery-editorial .gallery-editorial-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
 }

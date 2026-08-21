@@ -1,0 +1,219 @@
+Absolutely. We’ll park the project at the completed pricing milestone, with the next task clearly defined as **Image Galleries**.
+
+## Cartique — Project Status / Parking Point
+
+**Date:** 12 August 2026
+**Branch:** `v2-development`
+**Current milestone:** Product Pricing Display Fix — **COMPLETED**
+
+### 1. Completed in this session
+
+The pricing display issue has been resolved end-to-end.
+
+#### Kernel / Commerce Decision Layer
+
+The pricing kernel was verified as correct:
+
+* Variant `104`
+* Base retail price: **R140**
+* Bulk price: **R110**
+* Bulk threshold: **5 units**
+* Quantity 2 → **R140.00**
+* Quantity 5 → **R110.00**
+* Quantity 5 subtotal → **R550.00**
+* Bulk rule correctly identified and applied.
+
+Regression test:
+
+```bash
+node tests/kernel/pricing-resolution.test.mjs
+```
+
+Result:
+
+```text
+Retail (qty 2): R140.00
+Bulk (qty 5): R110.00
+✅ PASS - Both tests passed
+```
+
+### 2. ProductRenderer pricing contract
+
+`ProductRenderer.js` was migrated away from the legacy pricing fields:
+
+* `product.price`
+* `product.sale_price`
+* `product.original_price`
+
+The renderer now uses the canonical variant pricing contract:
+
+```text
+variant.price
+variant.bulkPrice
+variant.bulkMinimumQty
+```
+
+Variant selection uses:
+
+```text
+adapter.getSelectedVariant(product)
+        ↓
+product.variants[0]
+        ↓
+{}
+```
+
+This means the storefront renderer no longer guesses at legacy product-level pricing fields.
+
+Verification:
+
+```bash
+grep -n "product\.price\|product\.sale_price\|product\.original_price" storefront/src/renderers/ProductRenderer.js || echo "No legacy fields found"
+```
+
+Result:
+
+```text
+No legacy fields found
+```
+
+Syntax check also passed:
+
+```bash
+node --check storefront/src/renderers/ProductRenderer.js
+```
+
+### 3. Permanent regression test
+
+The investigation script:
+
+```text
+tests/kernel/quick-test.mjs
+```
+
+was promoted to:
+
+```text
+tests/kernel/pricing-resolution.test.mjs
+```
+
+This is now treated as a permanent regression test for the pricing-resolution pipeline.
+
+### 4. Storefront result
+
+Pricing is now visibly rendering correctly in the storefront.
+
+The major issue that previously produced **R0.00** has been resolved.
+
+The pricing flow is now conceptually:
+
+```text
+Product
+   ↓
+Variant Selection
+   ↓
+Variant.price
+   ↓
+PricingResolver
+   ↓
+Commercial Decision
+   ↓
+Storefront ProductRenderer
+   ↓
+Correct displayed price
+```
+
+Bulk pricing is also exposed when the selected variant provides:
+
+```text
+bulkPrice
+bulkMinimumQty
+```
+
+---
+
+# Current Parking Point
+
+The pricing milestone is **complete**.
+
+Do not reopen or refactor the pricing work unless a new regression is discovered.
+
+The next development task is:
+
+## Next Task — Enable Product Image Galleries
+
+### Objective
+
+Introduce configurable product image galleries in the storefront.
+
+### Gallery configuration
+
+There will be **three gallery styles** available:
+
+**1. Default gallery — mandatory**
+
+The default gallery style will always be available.
+
+**2. Optional Gallery Style #1**
+
+Additional gallery presentation style.
+
+**3. Optional Gallery Style #2**
+
+Additional gallery presentation style.
+
+The two additional styles should be **feature-configurable**, rather than hard-coded as universally enabled functionality.
+
+Conceptually:
+
+```text
+Product Image Gallery
+        │
+        ├── Default Style
+        │     └── Always available
+        │
+        ├── Optional Style 1
+        │     └── Feature configurable
+        │
+        └── Optional Style 2
+              └── Feature configurable
+```
+
+### Important architectural principle
+
+Gallery **presentation** should remain separate from the underlying product image data.
+
+In other words:
+
+```text
+Product Images
+      ↓
+Gallery Configuration
+      ↓
+Selected Gallery Style
+      ↓
+Gallery Renderer
+```
+
+The feature configuration should determine which gallery capabilities are available, while the renderer determines how the images are presented.
+
+---
+
+## Resume Point Tomorrow
+
+Start with:
+
+> **Enable product image galleries — default style + two optional configurable styles.**
+
+Before implementing, inspect the existing:
+
+* product image data structure
+* `ProductRenderer`
+* storefront product page
+* existing feature configuration system
+* existing image/media handling
+* any existing gallery-related CSS/JS
+
+Then design the gallery implementation around the existing architecture rather than introducing a parallel image system.
+
+**Parking status: PRICING DISPLAY FIX COMPLETE → IMAGE GALLERIES NEXT.**
