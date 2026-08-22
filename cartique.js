@@ -20,7 +20,7 @@ import {
 import { Customer, Place } from './src/commerce/index.js';
 
 export default class Cartique {
-    constructor(products = [], options = {}) {
+    constructor(products = [], options = {}, storefrontData = {}) {
         // 1. Default options
         this.options = {
             kernelMode: true,
@@ -34,6 +34,7 @@ export default class Cartique {
             itemsPerPage: 12,
             ...options
         };
+        this.storefrontData = storefrontData;
 
         // 2. Create customer and place
         this.customer = options.customer || Customer.retail({ id: 'demo-user' });
@@ -61,7 +62,7 @@ export default class Cartique {
             },
             options.callbacks || {},
             this.kernel
-        );
+        , this.storefrontData);
 
         // 5. Expose for debugging
         if (this.options.debug) {
