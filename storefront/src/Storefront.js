@@ -5,7 +5,7 @@ const CARTIQUE_CSS = `
 
 
 export default class Cartique {
- constructor(products, features = {}, callbacks = {}) {
+ constructor(products, features = {}, callbacks = {}, storefrontData = {}) {
     // 1. Validation
     if (!products || !Array.isArray(products)) {
         throw new Error('Cartique requires an array of products');
@@ -87,6 +87,7 @@ export default class Cartique {
     this.loadedCount = this.itemsPerBatch;
 
     this.callbacks = callbacks || {};
+        this.storefrontData = storefrontData;
 
     // 5. Fire off the Engine
     this.init();
@@ -1476,7 +1477,63 @@ initializeContainers() {
     }
   }
 
+
+    async renderShellTop() {
+        const registry = this.themeManager?.componentRegistry;
+        if (!registry) return;
+
+        const shellContainer = document.createElement('div');
+        shellContainer.className = 'cq-theme-shell-top';
+        shellContainer.id = 'cartique-shell-top';
+        
+        const order = ['AnnouncementBar', 'Header', 'Hero', 'TrustStrip', 'FeaturedCategories'];
+
+        order.forEach(componentName => {
+            const Component = registry.get(this.themeManager.currentName, componentName);
+            if (Component) {
+                const instance = new Component({
+                    storefrontData: this.storefrontData,
+                    features: this.features,
+                    categories: this.categories,
+                    themeManager: this.themeManager
+                });
+                shellContainer.innerHTML += instance.render();
+            }
+        });
+
+        this.container.prepend(shellContainer);
+    }
+
+    async renderShellBottom() {
+        const registry = this.themeManager?.componentRegistry;
+        if (!registry) return;
+
+        const shellContainer = document.createElement('div');
+        shellContainer.className = 'cq-theme-shell-bottom';
+        shellContainer.id = 'cartique-shell-bottom';
+        
+        const order = ['PromotionalBlock', 'SocialProof', 'Newsletter', 'PageFooter', 'CustomContentBlock'];
+
+        order.forEach(componentName => {
+            const Component = registry.get(this.themeManager.currentName, componentName);
+            if (Component) {
+                const instance = new Component({
+                    storefrontData: this.storefrontData,
+                    features: this.features,
+                    categories: this.categories,
+                    themeManager: this.themeManager
+                });
+                shellContainer.innerHTML += instance.render();
+            }
+        });
+
+        this.container.after(shellContainer);
+    }
+
   async renderAllComponents() {
+
+        // Render shell top blocks
+        await this.renderShellTop();
     const renderMethods = [
         this.renderMainFrame.bind(this),          
         this.renderSidebar.bind(this),
@@ -1494,6 +1551,7 @@ initializeContainers() {
         } catch (error) {
             console.error(`Render failed for method: ${method.name}`, error);
         }
+        await this.renderShellBottom();
     }
 
     // FIX: Apply sidebar visibility
@@ -1517,6 +1575,7 @@ initializeContainers() {
     if (sidebarEnabled && this.features.sidebarFeatures?.filters) {
         this.renderSidebarFilters(); 
     }
+        await this.renderShellBottom();
 }
 
 
