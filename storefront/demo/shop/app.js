@@ -70,6 +70,7 @@ const features = {
     
     // ----- Theme -----
     theme: 'light',
+    themeName: 'default',
     themeColor: '#655793',
     catalogPath: '/storefront/src/theme/catalog/',
     
