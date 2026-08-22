@@ -951,7 +951,7 @@ if (this.services?.cart?.syncWithKernel) {
     this._initialized = true;
 
     try {
-      const initialTheme = this.features.theme || 'default';
+      const initialTheme = this.features.themeName || 'default';
       await this.themeManager.initialize(initialTheme);
       
       const sidebarEnabled = this.features.sidebar &&
@@ -1013,7 +1013,86 @@ if (this.services?.cart?.syncWithKernel) {
     this.cartRenderer.templateHolder = this.templateHolder;
   }
 
+  async renderShellTop() {
+    const registry = this.themeManager?.componentRegistry;
+    if (!registry) return;
+
+    document.getElementById('cartique-shell-top')?.remove();
+
+    const shellContainer = document.createElement('div');
+    shellContainer.className = 'cq-theme-shell-top';
+    shellContainer.id = 'cartique-shell-top';
+
+    const order = [
+      'AnnouncementBar',
+      'Header',
+      'Hero',
+      'TrustStrip',
+      'FeaturedCategories'
+    ];
+
+    order.forEach(componentName => {
+      const Component = registry.get(
+        this.themeManager.currentName,
+        componentName
+      );
+
+      if (Component) {
+        const instance = new Component({
+          storefrontData: this.storefrontData,
+          features: this.features,
+          categories: this.categories,
+          themeManager: this.themeManager
+        });
+
+        shellContainer.innerHTML += instance.render();
+      }
+    });
+
+    this.container.prepend(shellContainer);
+  }
+
+  async renderShellBottom() {
+    const registry = this.themeManager?.componentRegistry;
+    if (!registry) return;
+
+    document.getElementById('cartique-shell-bottom')?.remove();
+
+    const shellContainer = document.createElement('div');
+    shellContainer.className = 'cq-theme-shell-bottom';
+    shellContainer.id = 'cartique-shell-bottom';
+
+    const order = [
+      'PromotionalBlock',
+      'SocialProof',
+      'Newsletter',
+      'PageFooter',
+      'CustomContentBlock'
+    ];
+
+    order.forEach(componentName => {
+      const Component = registry.get(
+        this.themeManager.currentName,
+        componentName
+      );
+
+      if (Component) {
+        const instance = new Component({
+          storefrontData: this.storefrontData,
+          features: this.features,
+          categories: this.categories,
+          themeManager: this.themeManager
+        });
+
+        shellContainer.innerHTML += instance.render();
+      }
+    });
+
+    this.container.appendChild(shellContainer);
+  }
+
   async renderAllComponents() {
+    try { await this.renderShellTop(); } catch (e) { console.warn('renderShellTop failed:', e.message); }
     try { await this.productRenderer.renderMainFrame(); } catch (e) { console.warn('renderMainFrame failed:', e.message); }
     try { await this.productRenderer.renderSidebar(); } catch (e) { console.warn('renderSidebar failed:', e.message); }
     try { await this.collectionRenderer.renderCatalogueMenu(); } catch (e) { console.warn('renderCatalogueMenu failed:', e.message); }
@@ -1021,6 +1100,7 @@ if (this.services?.cart?.syncWithKernel) {
     try { await this.productRenderer.renderFooter(); } catch (e) { console.warn('renderFooter failed:', e.message); }
     try { await this.cartRenderer.renderCartSlider(); } catch (e) { console.warn('renderCartSlider failed:', e.message); }
     try { await this.cartRenderer.renderCartItemTemplate(); } catch (e) { console.warn('renderCartItemTemplate failed:', e.message); }
+    try { await this.renderShellBottom(); } catch (e) { console.warn('renderShellBottom failed:', e.message); }
 
     if (this.isBrowser()) {
       const sidebar = document.getElementById('cartique-sidebar');
