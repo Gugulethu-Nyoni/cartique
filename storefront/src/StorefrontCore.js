@@ -44,7 +44,7 @@ import Logger from './debug/Logger.js';
 
 
 export default class StorefrontCore {
-  constructor(products, features = {}, callbacks = {}, kernel = null) {
+  constructor(products, features = {}, callbacks = {}, kernel = null, storefrontData = {}) {
     // ==========================================================
     // 1. VALIDATION
     // ==========================================================
@@ -181,6 +181,7 @@ export default class StorefrontCore {
     this.itemsPerBatch = this.features.itemsPerPage || 12;
     this.loadedCount = this.itemsPerBatch;
     this.callbacks = callbacks || {};
+        this.storefrontData = storefrontData;
     this.kernel = kernel;
 
     // Initialize guard to prevent double initialization
