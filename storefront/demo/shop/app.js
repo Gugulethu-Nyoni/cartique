@@ -130,7 +130,82 @@ const features = {
 // 3. INITIALIZE STOREFRONT
 // ==========================================================
 
-const storefront = new Cartique(products, features);
+
+const storefrontData = {
+    brand: { name: 'Botaniq', tagline: 'Natural wellness, thoughtfully sourced.' },
+    announcement: { enabled: true, text: 'Free delivery on orders over R1,000', href: null },
+    navigation: {
+        menu: [
+            { label: 'Shop', href: '#shop' },
+            { label: 'Categories', href: '#categories' },
+            { label: 'About', href: '#about' },
+            { label: 'Contact', href: '#contact' }
+        ]
+    },
+    hero: {
+        enabled: true,
+        image: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1600&h=600&fit=crop',
+        eyebrow: 'New Season',
+        heading: 'Designed for everyday living.',
+        description: 'Discover our latest collection.',
+        ctaText: 'Shop Now',
+        ctaLink: '#shop'
+    },
+    usps: [
+        { icon: '🚚', title: 'Free Delivery', description: 'On orders over R1,000' },
+        { icon: '🔒', title: 'Secure Payments', description: 'SSL encrypted' },
+        { icon: '🔄', title: 'Easy Returns', description: '30-day policy' },
+        { icon: '💬', title: 'Support', description: 'Mon-Fri 9am-5pm' }
+    ],
+    promotionalBlock: {
+        enabled: true,
+        image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=600&fit=crop',
+        eyebrow: 'Sustainable by design',
+        heading: 'Discover the collection',
+        description: 'Ethically sourced materials.',
+        ctaLabel: 'Explore',
+        ctaHref: '#shop'
+    },
+    testimonials: [
+        { quote: 'Excellent quality and fast delivery.', customer: 'Jane D.' },
+        { quote: 'My go-to store for wellness products.', customer: 'Mark S.' }
+    ],
+    newsletter: {
+        enabled: true,
+        heading: 'Stay in the loop',
+        description: 'Get new products, offers and announcements.',
+        placeholder: 'Enter your email',
+        buttonText: 'Subscribe'
+    },
+    footer: {
+        columns: [
+            {
+                heading: 'Shop',
+                links: [
+                    { label: 'All Products', href: '#shop' },
+                    { label: 'Categories', href: '#categories' },
+                    { label: 'New Arrivals', href: '#new' }
+                ]
+            },
+            {
+                heading: 'Customer Care',
+                links: [
+                    { label: 'Contact', href: '#contact' },
+                    { label: 'Shipping', href: '#shipping' },
+                    { label: 'Returns', href: '#returns' },
+                    { label: 'FAQs', href: '#faqs' }
+                ]
+            }
+        ]
+    },
+    customContent: {
+        enabled: true,
+        html: ''
+    }
+};
+
+
+const storefront = new Cartique(products, features, storefrontData);
 
 // Initialize
 await storefront.init();
